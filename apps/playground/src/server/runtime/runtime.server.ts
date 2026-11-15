@@ -1,13 +1,5 @@
-import "@tanstack/react-start/server-only";
-
 import {
-	makeWorkersTelemetryLayer,
-	SpanContent,
-	toJsonValue,
-	withTelemetryCorrelation,
-	withTelemetryExport,
-} from "@sketchi/observability";
-import {
+	String as Str,
 	Context,
 	Deferred,
 	Effect,
@@ -17,16 +9,26 @@ import {
 	pipe,
 	Predicate,
 } from "effect";
-
-import type { CodeModeHttpRequestError } from "../codemode/api.server";
-import type { McpTransportError } from "../codemode/mcp.server";
+import "@tanstack/react-start/server-only";
+import { type CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
+import {
+	makeWorkersTelemetryLayer,
+	SpanContent,
+	toJsonValue,
+	withTelemetryCorrelation,
+	withTelemetryExport,
+} from "@sketchi/observability";
+import type { CodeModeHttpRequestError } from "../../features/build/api.server";
 import { correlationIdHeader } from "./correlation.server";
 import { RequestBodyReadError } from "./request-body.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
 import { PlaygroundAiModelLive } from "../ai/model.server";
-import { PlaygroundCodeModeLive } from "../codemode/service.server";
+import {
+	StudioBuildHostLive,
+	StudioBuildRequestLive,
+} from "../../features/build/capabilities.server";
 import { PlaygroundGenerationLive } from "../generation/service.server";
-import { PlaygroundCodeModeUsageLive } from "../codemode/usage-events.server";
+import { PlaygroundCodeModeUsageLive } from "../../features/build/usage-events.server";
 import {
 	handleCreateStudioProjectFromArtifactRequest,
 	handleGetStudioDiagramRequest,
@@ -47,72 +49,61 @@ import {
 	type PlaygroundPlatformBoundaryShape,
 	type PlaygroundRequestServices,
 } from "./context.server";
-
 export interface PlaygroundRequestBoundary {
 	readonly env: StudioEnv;
 	readonly platform: PlaygroundPlatformBoundaryShape;
 	readonly request: Request;
 }
-
 class PlaygroundCallbackFibers extends Context.Service<
 	PlaygroundCallbackFibers,
 	FiberSet.FiberSet<unknown, unknown>
 >()("@sketchi/playground/PlaygroundCallbackFibers") {}
-
 const PlaygroundCallbackFibersLive = Layer.effect(
 	PlaygroundCallbackFibers,
 	FiberSet.make<unknown, unknown>(),
 );
-
 const PlaygroundTelemetryLive = makeWorkersTelemetryLayer({
 	resource: { serviceName: "sketchi-studio" },
 });
-
 const PlaygroundCoreLive = Layer.mergeAll(
 	PlaygroundClockLive,
 	PlaygroundIdsLive,
 	PlaygroundAiModelLive,
 	PlaygroundCallbackFibersLive,
-	PlaygroundCodeModeLive,
+	StudioBuildHostLive,
 	PlaygroundCodeModeUsageLive,
 	PlaygroundGenerationLive,
 	PlaygroundTelemetryLive,
 );
-
 export const PlaygroundHostLive = PlaygroundStudioLayer.pipe(
 	Layer.provideMerge(Layer.merge(PlaygroundCoreLive, PlaygroundStudioLocalBucketLive)),
 );
-
 export type PlaygroundHostServices = Layer.Success<typeof PlaygroundHostLive>;
-
 export type PlaygroundRequestEffect<A, E = never> = Effect.Effect<
 	A,
 	E,
-	PlaygroundHostServices | PlaygroundRequestServices | PlaygroundRequestCallbacks
+	| PlaygroundHostServices
+	| CodeModeRuntimeEnvironment
+	| PlaygroundRequestServices
+	| PlaygroundRequestCallbacks
 >;
-
 export type PlaygroundCallbackEffect<A, E = never> = Effect.Effect<
 	A,
 	E,
-	PlaygroundHostServices | PlaygroundRequestServices
+	PlaygroundHostServices | CodeModeRuntimeEnvironment | PlaygroundRequestServices
 >;
-
 export type PlaygroundRequestRunner = <A, E>(effect: PlaygroundCallbackEffect<A, E>) => Promise<A>;
-
 export interface PlaygroundRequestCallbacksShape {
 	readonly runPromise: PlaygroundRequestRunner;
 }
-
 export class PlaygroundRequestCallbacks extends Context.Service<
 	PlaygroundRequestCallbacks,
 	PlaygroundRequestCallbacksShape
 >()("@sketchi/playground/PlaygroundRequestCallbacks") {}
-
-type PlaygroundHttpError = CodeModeHttpRequestError | McpTransportError | RequestBodyReadError;
+type PlaygroundHttpError = CodeModeHttpRequestError | RequestBodyReadError;
 type PlaygroundRequestResult<A, E> =
 	| A
 	| (unknown extends E ? Response : E extends PlaygroundHttpError ? Response : never);
-
 export interface PlaygroundRuntime {
 	readonly dispose: () => Promise<void>;
 	readonly run: <A, E>(
@@ -120,7 +111,6 @@ export interface PlaygroundRuntime {
 		boundary: PlaygroundRequestBoundary,
 	) => Promise<PlaygroundRequestResult<A, E>>;
 }
-
 export {
 	handleCreateStudioProjectFromArtifactRequest,
 	handleGetStudioDiagramRequest,
@@ -129,7 +119,6 @@ export {
 	handleListStudioProjectsRequest,
 	handleSaveStudioDrawingRequest,
 };
-
 function runWithPlaygroundRuntime<A, E>(
 	runtime: ManagedRuntime.ManagedRuntime<PlaygroundHostServices, never>,
 	effect: PlaygroundRequestEffect<A, E>,
@@ -157,7 +146,6 @@ function runWithPlaygroundRuntime<A, E>(
 			"request.route": requestRoute,
 		};
 		const correlation = { attemptId, ...(rayId ? { rayId } : {}), runId, traceId };
-
 		yield* Effect.annotateCurrentSpan({
 			...requestAnnotations,
 			...(rayId ? { "cf.ray_id": rayId } : {}),
@@ -167,7 +155,6 @@ function runWithPlaygroundRuntime<A, E>(
 			"sketchi.trace_id": traceId,
 			"url.full": boundary.request.url,
 		});
-
 		const requestSpan = yield* Effect.currentSpan;
 		const runTrackedEffect =
 			yield* FiberSet.runtimePromise(callbackFibers)<PlaygroundHostServices>();
@@ -186,16 +173,15 @@ function runWithPlaygroundRuntime<A, E>(
 			runTrackedEffect(withRequestContext(callbackEffect, "playground.request.deferred"));
 		const recordStreamEnd = (recorded: Effect.Effect<void>) =>
 			boundary.platform.waitUntilPromise(
-				runTrackedEffect(
-					withRequestContext(recorded, "playground.response.stream"),
-					// Only disposing the runtime interrupts a stream still being read; that is not a failure.
-				).catch(() => undefined),
+				runTrackedEffect(withRequestContext(recorded, "playground.response.stream")).catch(
+					() => undefined,
+				),
 			);
 		const runRequestEffect: PlaygroundRequestRunner = (callbackEffect) =>
 			runTrackedEffect(withRequestContext(callbackEffect, "playground.request.callback"), {
 				signal: boundary.request.signal,
 			});
-		const requestContext = pipe(
+		const baseRequestContext = pipe(
 			Context.empty(),
 			Context.add(PlaygroundBindings, boundary.env),
 			Context.add(PlaygroundPlatformCallbacks, {
@@ -213,7 +199,10 @@ function runWithPlaygroundRuntime<A, E>(
 				traceId,
 			}),
 		);
-
+		const buildContext = yield* Effect.scoped(
+			Layer.build(StudioBuildRequestLive).pipe(Effect.provide(baseRequestContext)),
+		);
+		const requestContext = Context.merge(baseRequestContext, buildContext);
 		const errorResponse = (tag: PlaygroundHttpError["_tag"], status: number, message: string) =>
 			Effect.logError("Playground HTTP request failed", {
 				error_tag: tag,
@@ -228,9 +217,6 @@ function runWithPlaygroundRuntime<A, E>(
 		const result = yield* effect.pipe(
 			Effect.catchIf(Predicate.isTagged("CodeModeHttpRequestError"), () =>
 				errorResponse("CodeModeHttpRequestError", 400, "The request could not be decoded."),
-			),
-			Effect.catchIf(Predicate.isTagged("McpTransportError"), () =>
-				errorResponse("McpTransportError", 500, "The MCP transport failed."),
 			),
 			Effect.catchIf(Predicate.isTagged("RequestBodyReadError"), () =>
 				errorResponse("RequestBodyReadError", 400, "The request body could not be read."),
@@ -267,16 +253,13 @@ function runWithPlaygroundRuntime<A, E>(
 		}),
 		Effect.withSpan("playground.request"),
 	);
-
 	return runtime.runPromise(program, {
 		signal: boundary.request.signal,
 	});
 }
-
 // Credentials, not content: a session cookie or bearer token in a shared table would let
 // anyone who reads it act as that user.
 const credentialHeaders = new Set(["authorization", "cookie", "proxy-authorization", "set-cookie"]);
-
 function recordedHeaders(headers: Headers): Record<string, string> {
 	const recorded: Record<string, string> = {};
 	for (const [name, value] of headers) {
@@ -284,11 +267,9 @@ function recordedHeaders(headers: Headers): Record<string, string> {
 	}
 	return recorded;
 }
-
 function isEventStream(response: Response): boolean {
-	return (response.headers.get("content-type") ?? "").startsWith("text/event-stream");
+	return Str.startsWith("text/event-stream")(response.headers.get("content-type") ?? "");
 }
-
 /** Passes a streamed body through unchanged and records the text that passed once it ends. */
 function recordStreamedBody(
 	response: Response,
@@ -297,7 +278,10 @@ function recordStreamedBody(
 	readonly recorded: Effect.Effect<void>;
 	readonly response: Response;
 } {
-	const ended = Deferred.makeUnsafe<{ readonly complete: boolean; readonly text: string }>();
+	const ended = Deferred.makeUnsafe<{
+		readonly complete: boolean;
+		readonly text: string;
+	}>();
 	const decoder = new TextDecoder();
 	let text = "";
 	const end = (complete: boolean) => {
@@ -308,6 +292,7 @@ function recordStreamedBody(
 	// Pulls one chunk per read, so the client's pace and its cancellation reach the source.
 	const body = new ReadableStream<Uint8Array>(
 		{
+			// @effect-diagnostics-next-line asyncFunction:off -- Web ReadableStream pull consumes exactly one native reader chunk and preserves backpressure.
 			async pull(controller) {
 				try {
 					const chunk = await reader.read();
@@ -341,15 +326,13 @@ function recordStreamedBody(
 		response: new Response(body, response),
 	};
 }
-
 function isTextBody(contentType: string): boolean {
 	return (
 		contentType === "" ||
-		contentType.startsWith("text/") ||
+		Str.startsWith("text/")(contentType) ||
 		/\bjson\b|\bxml\b|x-www-form-urlencoded|javascript/.test(contentType)
 	);
 }
-
 /** Records a copy of a complete response body on the current span; the original stays unread. */
 function recordBody(message: Response, attribute: string): Effect.Effect<void> {
 	if (!message.body) return Effect.void;
@@ -357,6 +340,7 @@ function recordBody(message: Response, attribute: string): Effect.Effect<void> {
 	const copy = message.clone();
 	const text = isTextBody(message.headers.get("content-type") ?? "");
 	return Effect.tryPromise({
+		// @effect-diagnostics-next-line asyncFunction:off -- Adapt the cloned native Response body promise into this Effect boundary.
 		try: async (): Promise<string | Uint8Array> =>
 			text ? copy.text() : new Uint8Array(await copy.arrayBuffer()),
 		catch: (cause) =>
@@ -369,7 +353,6 @@ function recordBody(message: Response, attribute: string): Effect.Effect<void> {
 		}),
 	);
 }
-
 function normalizedRequestRoute(pathname: string): string {
 	const routePatterns: ReadonlyArray<readonly [RegExp, string]> = [
 		[/^\/api\/v1\/artifacts\/[^/]+\/patch$/, "/api/v1/artifacts/:artifactId/patch"],
@@ -402,7 +385,6 @@ function normalizedRequestRoute(pathname: string): string {
 	]);
 	return staticRoutes.has(pathname) ? pathname : "/unmatched";
 }
-
 export function makePlaygroundRuntime(): PlaygroundRuntime {
 	const runtime = ManagedRuntime.make(PlaygroundHostLive);
 	return {
@@ -410,7 +392,5 @@ export function makePlaygroundRuntime(): PlaygroundRuntime {
 		run: (effect, boundary) => runWithPlaygroundRuntime(runtime, effect, boundary),
 	};
 }
-
 const playgroundRuntime = makePlaygroundRuntime();
-
 export const runPlaygroundEffect = playgroundRuntime.run;

@@ -56,7 +56,6 @@ export interface CodeModePngRendererNamespace {
 		renderPng(request: PngRenderRequest, caller?: PngRenderCaller): Promise<PngRenderResult>;
 		/** The icon draw service's raster work; a stub in tests that do not draw icons may omit it. */
 		runIconJob?(request: IconJobRequest, caller?: PngRenderCaller): Promise<IconJobResult>;
-		prewarm(harnessUrl: string, caller?: PngRenderCaller): Promise<void> | void;
 	};
 }
 
@@ -68,8 +67,6 @@ export interface CloudflareBrowserRunArtifactRenderer extends CodeModeArtifactRe
 	readonly renderPng: (
 		input: Parameters<CodeModeArtifactRenderer["renderPng"]>[0],
 	) => Effect.Effect<ArrayBuffer | Uint8Array, BrowserRenderingFailure | BrowserRenderingTimeout>;
-	/** Asks the renderer to open a harness page if it has none. Failures only reach telemetry. */
-	readonly prewarm: Effect.Effect<void>;
 }
 
 export interface PlaygroundBrowserRenderingShape {
@@ -119,16 +116,6 @@ export function createCloudflareBrowserRunArtifactRenderer(
 	const caller = browserRunCaller;
 
 	return {
-		prewarm: Effect.flatMap(caller, (parent) =>
-			Effect.tryPromise({
-				try: async () => renderers.getByName(harnessUrl).prewarm(harnessUrl, parent),
-				catch: browserFailure("durableObject"),
-			}),
-		).pipe(
-			Effect.withSpan("playground.browserRendering.prewarm"),
-			Effect.annotateSpans({ operation: "prewarm" }),
-			Effect.ignore,
-		),
 		renderPng: Effect.fn("playground.browserRendering.renderPng")((input) => {
 			const render = Effect.flatMap(caller, (parent) =>
 				Effect.tryPromise({

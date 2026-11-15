@@ -5,7 +5,7 @@ import type { IconImagingJob } from "@sketchi/icon-draw";
 import { describe, expect, it } from "vitest";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
-import type { CodeModePngRendererNamespace } from "../codemode/browser-renderer.server";
+import type { CodeModePngRendererNamespace } from "../../features/render/browser-renderer.server";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
 import { drawIconForAgent, handleDrawIconRequest, secondsUntilUtcMidnight } from "./draw.server";
 
@@ -54,7 +54,6 @@ function fakeEnv(calls: Calls, authorReplies: unknown[]): StudioEnv {
 	const renderer: CodeModePngRendererNamespace = {
 		getByName: () => ({
 			renderPng: () => Promise.reject(new Error("not used")),
-			prewarm: () => undefined,
 			runIconJob: ({ job }) => {
 				calls.jobs.push(job);
 				return Promise.resolve({

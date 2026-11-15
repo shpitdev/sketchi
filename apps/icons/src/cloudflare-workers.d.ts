@@ -1,10 +1,12 @@
 declare module "cloudflare:workers" {
+  import type { McpSessionNamespace } from "@sketchi/cloudflare/mcp-session";
   import type { IconAssetsBinding } from "./lib/catalog.server";
   import type { CommunityEnv } from "@sketchi/community-icons";
   import type { TelemetryPipeline } from "@sketchi/observability";
 
   export const env: CommunityEnv & {
     ASSETS: IconAssetsBinding;
+    ICONS_MCP_SESSION: McpSessionNamespace;
     TELEMETRY_SPANS?: TelemetryPipeline;
     SKETCHI_APP_SURFACE?: string;
     EXCALIDRAW_LIBRARY_SUBMIT?: string;
@@ -24,7 +26,7 @@ declare module "cloudflare:workers" {
   }
 
   export abstract class DurableObject<Env = unknown> {
-    protected readonly ctx: { readonly storage: DurableObjectStorage };
+    protected readonly ctx: { waitUntil(promise: Promise<unknown>): void; readonly storage: DurableObjectStorage };
     protected readonly env: Env;
     constructor(ctx: unknown, env: Env);
   }

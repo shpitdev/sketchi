@@ -1,10 +1,13 @@
 // @vitest-environment node
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Effect, Layer } from "effect";
+import { McpClient, McpProtocol } from "effect/ai";
+import { FetchHttpClient } from "effect/http";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createServer } from "node:net";
-import { resolve } from "node:path";
+import { request as httpRequest } from "node:http";
+import { dirname, resolve } from "node:path";
+import { mkdir, mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const workerConfig = resolve(process.cwd(), "dist/apps/icons/server/wrangler.json");
@@ -12,6 +15,7 @@ const workerConfig = resolve(process.cwd(), "dist/apps/icons/server/wrangler.jso
 let origin = "";
 let worker: ChildProcessWithoutNullStreams | undefined;
 let workerOutput = "";
+let localDirectory = "";
 
 async function availablePort(): Promise<number> {
 	const server = createServer();
@@ -48,6 +52,18 @@ async function waitForWorker(url: string): Promise<void> {
 
 describe("built icons Worker", () => {
 	beforeAll(async () => {
+		// Exercise the built product with local bindings; never connect its configured
+		// production AI or telemetry from a runtime test.
+		await mkdir(resolve(process.cwd(), ".memory/worker-tests"), { recursive: true });
+		localDirectory = await mkdtemp(resolve(process.cwd(), ".memory/worker-tests/icons-"));
+		const config = JSON.parse(await readFile(workerConfig, "utf8"));
+		delete config.ai;
+		delete config.previews;
+		delete config.pipelines;
+		config.main = resolve(dirname(workerConfig), config.main);
+		config.assets.directory = resolve(dirname(workerConfig), config.assets.directory);
+		const localConfig = resolve(localDirectory, "wrangler.json");
+		await writeFile(localConfig, JSON.stringify(config));
 		const port = await availablePort();
 		origin = `http://127.0.0.1:${port}`;
 		worker = spawn(
@@ -57,13 +73,16 @@ describe("built icons Worker", () => {
 				"wrangler",
 				"dev",
 				"--config",
-				workerConfig,
+				localConfig,
+				"--local",
+				"--persist-to",
+				localDirectory,
 				"--ip",
 				"127.0.0.1",
 				"--port",
 				String(port),
 			],
-			{ cwd: process.cwd(), env: process.env },
+			{ cwd: process.cwd(), env: process.env, detached: true },
 		);
 		worker.stdout.on("data", (chunk: Buffer) => {
 			workerOutput += chunk.toString();
@@ -75,13 +94,15 @@ describe("built icons Worker", () => {
 	}, 35_000);
 
 	afterAll(async () => {
-		if (!worker || worker.exitCode !== null) return;
-		worker.kill("SIGTERM");
-		await Promise.race([
-			new Promise<void>((resolveExit) => worker?.once("exit", () => resolveExit())),
-			new Promise<void>((resolveWait) => setTimeout(resolveWait, 5_000)),
-		]);
-		if (worker.exitCode === null) worker.kill("SIGKILL");
+		if (worker && worker.exitCode === null) {
+			process.kill(-worker.pid!, "SIGTERM");
+			await Promise.race([
+				new Promise<void>((resolveExit) => worker?.once("exit", () => resolveExit())),
+				new Promise<void>((resolveWait) => setTimeout(resolveWait, 5_000)),
+			]);
+			if (worker.exitCode === null) process.kill(-worker.pid!, "SIGKILL");
+		}
+		if (localDirectory) await rm(localDirectory, { recursive: true, force: true });
 	});
 
 	it("serves detail, raw SVG, HEAD, and CORS through the assets binding", async () => {
@@ -115,23 +136,63 @@ describe("built icons Worker", () => {
 		expect(options.headers.get("Access-Control-Allow-Methods")).toContain("HEAD");
 	});
 
-	it("loads raw SVG through MCP get_icon in the built Worker", async () => {
-		const client = new Client({ name: "worker-smoke", version: "0.0.0" });
-		const transport = new StreamableHTTPClientTransport(new URL(`${origin}/mcp`));
-		try {
-			await client.connect(transport);
-			const result = await client.callTool({
-				arguments: { slug: "kubernetes" },
-				name: "get_icon",
-			});
-			const content = Array.isArray(result.content) ? result.content : [];
-			expect(content[0]).toMatchObject({
-				text: expect.stringContaining("<svg"),
-				type: "text",
-			});
-			expect(result.structuredContent).toMatchObject({ slug: "kubernetes" });
-		} finally {
-			await client.close();
-		}
+	it("rejects oversized MCP bodies and loads raw SVG in the built Worker", async () => {
+		// Observe the early HTTP rejection while upload is in flight. Node Fetch
+		// can replace this response with a socket error when workerd closes it.
+		const oversized = await new Promise<{ status: number | undefined; body: string }>(
+			(resolveResponse, reject) => {
+				const body = JSON.stringify({
+					jsonrpc: "2.0",
+					id: 1,
+					method: "tools/call",
+					params: { name: "get_icon", arguments: { slug: "x".repeat(1024 * 1024) } },
+				});
+				const outgoing = httpRequest(
+					`${origin}/mcp`,
+					{
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Accept: "application/json, text/event-stream",
+							"Content-Length": Buffer.byteLength(body),
+						},
+					},
+					(incoming) => {
+						let text = "";
+						incoming.setEncoding("utf8");
+						incoming.on("data", (chunk: string) => {
+							text += chunk;
+						});
+						incoming.on("error", reject);
+						incoming.on("end", () => resolveResponse({ status: incoming.statusCode, body: text }));
+					},
+				);
+				outgoing.on("error", reject);
+				outgoing.end(body);
+			},
+		);
+		expect(oversized).toEqual({ status: 413, body: "" });
+		await Effect.runPromise(
+			Effect.gen(function* () {
+				const client = yield* McpClient.McpClient;
+				const tool = (yield* client.listTools()).find((tool) => tool.name === "get_icon");
+				if (!tool) throw new Error("get_icon missing from built Worker");
+				const result = yield* client.callTool({ tool, arguments: { slug: "kubernetes" } });
+				expect(result.content[0]).toMatchObject({
+					type: "text",
+					text: expect.stringContaining("<svg"),
+				});
+				expect(result.structuredContent).toMatchObject({ slug: "kubernetes" });
+			}).pipe(
+				Effect.provide(
+					McpClient.layerHttp({
+						name: "worker-smoke",
+						version: "0.0.0",
+						protocol: McpProtocol.v2025_11_25,
+						url: `${origin}/mcp`,
+					}).pipe(Layer.provide(FetchHttpClient.layer)),
+				),
+			),
+		);
 	});
 });

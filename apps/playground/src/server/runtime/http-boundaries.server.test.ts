@@ -7,10 +7,9 @@ import {
 	handleCreateCanvasRequest,
 	handleFamilyBuildRequest,
 	handlePatchArtifactRequest,
-} from "../codemode/api.server";
+} from "../../features/build/api.server";
 
-import { McpTransportError } from "../codemode/mcp.server";
-import { PlaygroundCodeModeUsage } from "../codemode/usage-events.server";
+import { PlaygroundCodeModeUsage } from "../../features/build/usage-events.server";
 import { handleGenerateDiagramRequest } from "../generation/api.server";
 import { PlaygroundPlatformCallbacks, PlaygroundRequestMetadata } from "./context.server";
 import { readBoundedJson, RequestBodyReadError } from "./request-body.server";
@@ -28,13 +27,6 @@ describe("HTTP runtime boundaries", () => {
 				message: "private error",
 			}),
 			status: 400,
-		},
-		{
-			error: McpTransportError.make({
-				cause: "private cause",
-				message: "private error",
-			}),
-			status: 500,
 		},
 		{
 			error: RequestBodyReadError.make({

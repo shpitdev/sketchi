@@ -1,15 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 async function handle(request: Request): Promise<Response> {
-	const [{ getPlaygroundRequestBoundary }, { handleSketchiMcpRequest }, { runPlaygroundEffect }] =
-		await Promise.all([
-			import("@/server/bindings/cloudflare-bindings.server"),
-			import("@/server/codemode/mcp.server"),
-			import("@/server/runtime/runtime.server"),
-		]);
-
-	const boundary = getPlaygroundRequestBoundary(request);
-	return runPlaygroundEffect(handleSketchiMcpRequest(request), boundary);
+	const [{ handleSketchiMcpRequest }, { env }] = await Promise.all([
+		import("@/features/mcp/mcp.server"),
+		import("cloudflare:workers"),
+	]);
+	return handleSketchiMcpRequest(request, env);
 }
 
 export const Route = createFileRoute("/mcp")({

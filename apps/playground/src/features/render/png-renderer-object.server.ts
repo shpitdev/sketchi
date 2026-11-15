@@ -129,19 +129,6 @@ export class CodeModePngRenderer extends DurableObject<CodeModePngRendererEnv> {
 	}
 
 	/**
-	 * Starts opening a harness page and returns at once. A failure is recorded
-	 * on the prewarm span; the next export opens its own page.
-	 */
-	prewarm(harnessUrl: string, caller?: PngRenderCaller): void {
-		this.#rendererRuntime()?.runFork(
-			Effect.gen(function* () {
-				const pool = yield* BrowserRenderPool;
-				yield* pool.prewarm(harnessUrl);
-			}).pipe(Effect.ignore, this.#exportSpans("playground.pngRenderer.prewarm", caller)),
-		);
-	}
-
-	/**
 	 * Roots one call's spans under the caller's span, with the caller's ray, run and
 	 * attempt IDs, and sends them when the call ends.
 	 */

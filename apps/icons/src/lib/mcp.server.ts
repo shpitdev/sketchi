@@ -1,133 +1,102 @@
-import { IconSource } from "./api.server.js";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { mcpToolContent } from "@sketchi/cloudflare/mcp-content";
+import { type McpSessionNamespace, routeMcpSession } from "@sketchi/cloudflare/mcp-session";
 import {
-	CallToolRequestSchema,
-	ListToolsRequestSchema,
-	type CallToolResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import { Array, Context, Effect, Option, Schema, Stream } from "effect";
-import { Tool } from "effect/ai";
-import { withCors } from "./cors-policy.js";
-import type { IconSourceLoader } from "./catalog.server.js";
-import { IconToolkit, IconToolHandlers, normalizeIconToolArguments } from "./toolkit.server.js";
+	makeWorkersTelemetryLayer,
+	withTelemetryCorrelation,
+	withTelemetryExport,
+	type TelemetryExportTarget,
+} from "@sketchi/observability";
+import { Context, Effect, Layer, Predicate, Scheduler } from "effect";
+import { SecureRandom } from "effect/crypto";
+import { McpProtocol, McpSchema, McpServer } from "effect/ai";
+import { HttpMiddleware, HttpRouter, HttpServer, HttpServerRequest } from "effect/http";
+import { IconSource } from "./api.server.js";
+import { createIconSourceLoader } from "./catalog.server.js";
+import { corsPreflight, withCors } from "./cors-policy.js";
+import type { IconsHttpEnv } from "./http.server.js";
+import { IconToolkit, IconToolHandlers } from "./toolkit.server.js";
 
-const definitions = Array.map(
-	[IconToolkit.tools.search_icons, IconToolkit.tools.get_icon],
-	(tool) => ({
-		name: tool.name,
-		title: Option.getOrElse(Context.getOption(tool.annotations, Tool.Title), () => tool.name),
-		description: tool.description,
-		// Preserve the advertised closed shape; ingress still accepts/ignores extra keys.
-		inputSchema: { ...Tool.getJsonSchema(tool), additionalProperties: false },
-		annotations: {
-			readOnlyHint: Context.get(tool.annotations, Tool.Readonly),
-			idempotentHint: Context.get(tool.annotations, Tool.Idempotent),
-			openWorldHint: Context.get(tool.annotations, Tool.OpenWorld),
-		},
-	}),
+/** Request-owned export target, never captured in registrations or session state. */
+class IconMcpExport extends Context.Service<IconMcpExport, TelemetryExportTarget>()(
+	"icons/McpExport",
+) {}
+
+const content = mcpToolContent((name, result) => {
+	const value = result.structuredContent;
+	if (
+		name !== "get_icon" ||
+		!Predicate.isObject(value) ||
+		typeof value.svg !== "string" ||
+		typeof value.svgUrl !== "string"
+	)
+		return result;
+	return new McpSchema.CallToolResult({
+		...result,
+		content: [
+			{ type: "text", text: value.svg },
+			{ type: "text", text: `Permanent SVG URL: ${value.svgUrl}` },
+		],
+	});
+});
+
+export const IconMcpRegistrations = McpServer.toolkit(IconToolkit).pipe(
+	Layer.provide(IconToolHandlers),
+	Layer.provide(content),
 );
 
-function invalidArguments(message: string): CallToolResult {
-	return { content: [{ text: message, type: "text" }], isError: true };
-}
-
-export interface IconMcpServerOptions {
-	readonly origin?: string;
-	readonly sourceLoader: IconSourceLoader;
-}
-
-export function createIconMcpServer(options: IconMcpServerOptions): Server {
-	const source = {
-		origin: options.origin ?? "https://icons.sketchi.app",
-		sourceLoader: options.sourceLoader,
-	};
-	const server = new Server(
-		{ name: "sketchi-icons", version: "1.0.0" },
-		{ capabilities: { tools: { listChanged: false } } },
+/** A Durable Object owns this server's scope. Construction performs no binding I/O. */
+export function makeIconMcpHandler(origin: string | null) {
+	const app = McpServer.layerHttp({
+		name: "sketchi-icons",
+		version: "1.0.0",
+		path: "/mcp",
+		protocols: [McpProtocol.v2025_11_25, McpProtocol.v2025_06_18, McpProtocol.v2025_03_26],
+		allowedOrigins: origin === null ? [] : [origin],
+		allowSessionTermination: true,
+		registrations: IconMcpRegistrations,
+	}).pipe(
+		Layer.provide(HttpServer.layerServices),
+		Layer.provideMerge(makeWorkersTelemetryLayer({ resource: { serviceName: "sketchi-icons" } })),
+		Layer.provideMerge(Layer.succeed(HttpMiddleware.TracerDisabledWhen, () => true)),
+		Layer.provideMerge(Layer.succeed(Scheduler.Scheduler, new Scheduler.MixedScheduler("sync"))),
 	);
-	server.setRequestHandler(ListToolsRequestSchema, () => ({ tools: definitions }));
-	server.setRequestHandler(CallToolRequestSchema, (request, extra) => {
-		const name = request.params.name;
-		if (name !== "search_icons" && name !== "get_icon")
-			return invalidArguments(`Tool ${name} was not found.`);
-		const call = Effect.gen(function* () {
-			const input = yield* Schema.decodeUnknownEffect(Schema.Json)(request.params.arguments ?? {});
-			const toolkit = yield* IconToolkit;
-			const stream = yield* toolkit.handle(
-				name,
-				normalizeIconToolArguments(name, input),
-				request.params._meta?.progressToken?.toString(),
-			);
-			const output = yield* stream.pipe(
-				Stream.filter((result) => !result.preliminary),
-				Stream.runLast,
-			);
-			if (Option.isNone(output)) return invalidArguments(`Tool ${name} returned no result.`);
-			// HandlerResult includes failure values even in error mode; use the tool
-			// success schema to narrow the transport projection without a type assertion.
-			if (name === "get_icon") {
-				const detail = yield* Schema.decodeUnknownEffect(IconToolkit.tools.get_icon.successSchema)(
-					output.value.result,
+	const runtime = HttpRouter.toWebHandler(app, {
+		disableLogger: true,
+		middleware: (effect) =>
+			Effect.gen(function* () {
+				const target = yield* IconMcpExport;
+				const request = yield* HttpServerRequest.HttpServerRequest;
+				return yield* effect.pipe(
+					withTelemetryExport(target),
+					Effect.withSpan("icons.mcp", { attributes: { "http.request.method": request.method } }),
+					(program) =>
+						withTelemetryCorrelation(program, { requestId: SecureRandom.uuidV4Unsafe() }),
 				);
-				return {
-					content: [
-						{ text: detail.svg, type: "text" as const },
-						{ text: `Permanent SVG URL: ${detail.svgUrl}`, type: "text" as const },
-					],
-					structuredContent: detail,
-				};
-			}
-			const value = yield* Schema.decodeUnknownEffect(IconToolkit.tools.search_icons.successSchema)(
-				output.value.result,
-			);
-			const json = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown, { space: 2 }))(
-				value,
-			);
-			return { content: [{ text: json, type: "text" as const }], structuredContent: value };
-		}).pipe(
-			Effect.catchTags({
-				IconNotFound: (error) => Effect.succeed(invalidArguments(error.message)),
-				AiError: (error) =>
-					error.reason._tag === "ToolParameterValidationError"
-						? Effect.succeed(
-								invalidArguments(
-									name === "search_icons"
-										? "limit must be an integer from 1 to 100."
-										: "slug is required.",
-								),
-							)
-						: Effect.fail(error),
 			}),
-			// @effect-diagnostics-next-line strictEffectProvide:off -- SDK callback owns this Toolkit layer and its request source.
-			Effect.provide(IconToolHandlers),
-			Effect.provideService(IconSource, source),
-		);
-		return Effect.runPromise(call, { signal: extra.signal });
 	});
-	return server;
+	return {
+		dispose: runtime.dispose,
+		fetch(request: Request, env: IconsHttpEnv, waitUntil: (promise: Promise<unknown>) => void) {
+			return runtime.handler(
+				request,
+				Context.make(IconSource, {
+					origin: new URL(request.url).origin,
+					sourceLoader: createIconSourceLoader(env.ASSETS),
+				}).pipe(Context.add(IconMcpExport, { pipeline: env.TELEMETRY_SPANS, waitUntil })),
+			);
+		},
+	};
 }
 
-// @effect-diagnostics-next-line asyncFunction:off -- Existing agents HTTP transport is a Promise host boundary until slice 5b.
-export async function handleIconMcpRequest(
-	request: Request,
-	sourceLoader: IconSourceLoader,
-): Promise<Response> {
-	const { createLegacyMcpHandler } = await import("agents/mcp");
-	const handler = createLegacyMcpHandler(
-		createIconMcpServer({
-			origin: new URL(request.url).origin,
-			sourceLoader,
-		}),
-		{ route: "/mcp" },
-	);
-	const response = await handler(
-		request,
-		{},
-		{
-			passThroughOnException() {},
-			props: {},
-			waitUntil() {},
-		},
-	);
-	return withCors(response);
+export interface IconsMcpEnv extends IconsHttpEnv {
+	readonly ICONS_MCP_SESSION: McpSessionNamespace;
 }
+
+/** Cloudflare fetch callback; native McpServer owns the HTTP protocol inside the session. */
+export const handleIconMcpRequest = (request: Request, env: IconsMcpEnv) =>
+	request.method === "OPTIONS"
+		? Promise.resolve(corsPreflight())
+		: Effect.runPromise(
+				routeMcpSession(request, env.ICONS_MCP_SESSION).pipe(Effect.map(withCors)),
+				{ signal: request.signal },
+			);

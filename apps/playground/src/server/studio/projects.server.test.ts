@@ -6,7 +6,8 @@ import { describe, expect, it } from "vitest";
 import { MemoryStudioObjectBucket } from "@sketchi/studio-projects/server";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
-import { PlaygroundCodeMode } from "../codemode/service.server";
+import * as Build from "@sketchi/diagrams/build/code-mode/runtime";
+import { buildResponse } from "@sketchi/diagrams/build/operation";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
 import {
 	handleCreateStudioProjectFromArtifactRequest as handleCreateStudioProjectFromArtifactRequestEffect,
@@ -70,14 +71,15 @@ async function createArtifact(bucket: MemoryStudioObjectBucket, title: string): 
 	const env = { SKETCHI_ARTIFACTS: bucket };
 	const result = await runPlaygroundEffect(
 		Effect.gen(function* () {
-			const codeMode = yield* PlaygroundCodeMode;
-			return yield* codeMode.buildFamily(familyForType("flowchart"), {
-				spec: flowchartSpec(title),
-				options: {
-					artifactFormats: ["scene", "excalidraw"],
-					inlineArtifacts: ["scene"],
-				},
-			});
+			return yield* buildResponse(
+				familyForType("flowchart").build(Build)({
+					spec: flowchartSpec(title),
+					options: {
+						artifactFormats: ["scene", "excalidraw"],
+						inlineArtifacts: ["scene"],
+					},
+				}),
+			);
 		}),
 		testBoundary(env, request),
 	);

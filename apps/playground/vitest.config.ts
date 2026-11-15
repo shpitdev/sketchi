@@ -4,12 +4,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
 	plugins: [react()],
 	test: {
+		server: { deps: { inline: ["@cloudflare/codemode"] } },
 		environment: "jsdom",
-		server: {
-			deps: {
-				inline: [/agents/, /partyserver/],
-			},
-		},
 		globals: true,
 		coverage: {
 			reportsDirectory: "../../coverage/apps/playground",

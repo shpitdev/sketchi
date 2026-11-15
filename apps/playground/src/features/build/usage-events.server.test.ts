@@ -6,7 +6,7 @@ import {
 } from "@sketchi/observability";
 import { Effect, Layer } from "effect";
 
-import { PlaygroundIds, PlaygroundRequestMetadata } from "../runtime/context.server";
+import { PlaygroundIds, PlaygroundRequestMetadata } from "../../server/runtime/context.server";
 import {
 	type CodeModeUsageCaptureInput,
 	PlaygroundCodeModeUsage,
@@ -189,5 +189,45 @@ describe("Code Mode usage on spans", () => {
 				],
 			);
 		}).pipe(requestMetadata(), Effect.provide(usageLayer())),
+	);
+	it.effect(
+		"counts distinct attempts once, preserves external issues, and captures the whole response",
+		() =>
+			Effect.gen(function* () {
+				for (const withId of [false, true]) {
+					const first = {
+						ok: false,
+						status: "invalid_input",
+						...(withId ? { buildId: "build-first" } : {}),
+						issues: [{ code: "missing_field", severity: "error", message: "Missing label" }],
+					};
+					const second = { ...first, ...(withId ? { buildId: "build-second" } : {}) };
+					const responseBody = {
+						ok: true,
+						builds: [first, second],
+						result: {
+							built: structuredClone(first),
+							other: structuredClone(second),
+							custom: { issues: [{ code: "script_issue", message: "Preserve this" }] },
+							data: "x".repeat(120_000),
+						},
+					};
+					const span = yield* captured({
+						durationMs: 1,
+						operation: "execute",
+						surface: "mcp",
+						requestBody: { code: "async () => {}" },
+						responseBody,
+					});
+					assert.deepInclude(span.attributes[USAGE_EVENT_ATTRIBUTE] as object, { issue_count: 3 });
+					assert.deepStrictEqual(
+						(span.attributes[USAGE_ISSUES_ATTRIBUTE] as { code: string }[]).map(
+							(issue) => issue.code,
+						),
+						["missing_field", "missing_field", "script_issue"],
+					);
+					assert.deepStrictEqual(span.attributes[SpanContent.output], responseBody);
+				}
+			}),
 	);
 });

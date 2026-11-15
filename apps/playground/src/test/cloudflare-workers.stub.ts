@@ -9,6 +9,7 @@ export class DurableObject {
 }
 
 export class RpcTarget {}
+export class WorkerEntrypoint {}
 export class WorkflowEntrypoint {}
 
 export const env = {};

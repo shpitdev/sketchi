@@ -398,7 +398,6 @@ export interface BrowserRenderPoolShape {
 	 * Opens one harness page when none is open or opening, so the first export
 	 * of a session finds it ready. It never adds a page to a pool in use.
 	 */
-	readonly prewarm: (harnessUrl: string) => Effect.Effect<void, BrowserRenderingFailure>;
 }
 
 /**
@@ -417,13 +416,6 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 			Effect.gen(function* () {
 				// Orders page openings against render requests to tell warm from cold.
 				let sequence = 0;
-				// Pages open or opening per harness URL, and prewarms in flight.
-				const pageCounts = new Map<string, number>();
-				const prewarming = new Set<string>();
-				const countPages = (harnessUrl: string, delta: number) =>
-					Effect.sync(() => {
-						pageCounts.set(harnessUrl, (pageCounts.get(harnessUrl) ?? 0) + delta);
-					});
 				// Start times of the latest launches, oldest first.
 				const launchStarts: number[] = [];
 				const launchGate = yield* Semaphore.make(1);
@@ -445,10 +437,7 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 				const pagesByHarness = yield* RcMap.make({
 					lookup: (harnessUrl: string) =>
 						Pool.makeWithTTL({
-							acquire: Effect.acquireRelease(countPages(harnessUrl, 1), () =>
-								countPages(harnessUrl, -1),
-							).pipe(
-								Effect.andThen(Effect.timed(openHarnessPage(binding, harnessUrl, paceLaunch))),
+							acquire: Effect.timed(openHarnessPage(binding, harnessUrl, paceLaunch)).pipe(
 								Effect.map(([openDuration, harness]) => {
 									harness.openedAt = ++sequence;
 									harness.openMs = Duration.toMillis(openDuration);
@@ -547,15 +536,6 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 							export_ms: exportMs,
 						});
 						return value;
-					}),
-					prewarm: Effect.fn("playground.browserRendering.prewarm")(function* (harnessUrl) {
-						if (prewarming.has(harnessUrl) || (pageCounts.get(harnessUrl) ?? 0) > 0) {
-							return;
-						}
-						prewarming.add(harnessUrl);
-						yield* Effect.scoped(
-							RcMap.get(pagesByHarness, harnessUrl).pipe(Effect.flatMap(Pool.get)),
-						).pipe(Effect.ensuring(Effect.sync(() => prewarming.delete(harnessUrl))));
 					}),
 				});
 			}),

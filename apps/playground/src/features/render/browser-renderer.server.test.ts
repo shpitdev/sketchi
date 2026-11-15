@@ -54,10 +54,9 @@ function rendered(coldStart = false): PngRenderResult {
 
 function fakeRenderers(renderPng: (request: PngRenderRequest) => Promise<PngRenderResult>) {
 	const renderPngMock = vi.fn(renderPng);
-	const prewarm = vi.fn((_harnessUrl: string) => {});
-	const getByName = vi.fn((_name: string) => ({ renderPng: renderPngMock, prewarm }));
+	const getByName = vi.fn((_name: string) => ({ renderPng: renderPngMock }));
 	const renderers: CodeModePngRendererNamespace = { getByName };
-	return { getByName, prewarm, renderPng: renderPngMock, renderers };
+	return { getByName, renderPng: renderPngMock, renderers };
 }
 
 function restartedObjectError(): Error {
@@ -183,33 +182,6 @@ describe("Cloudflare Browser Run Code Mode renderer", () => {
 				expect.any(Object),
 				expect.objectContaining({ attemptId: "attempt_1", rayId: "ray_1", runId: "run_1" }),
 			);
-		}),
-	);
-
-	it.effect("prewarms the Durable Object for the harness URL", () =>
-		Effect.gen(function* () {
-			const { getByName, prewarm, renderers } = fakeRenderers(async () => rendered());
-			yield* createCloudflareBrowserRunArtifactRenderer(renderers, {
-				assetOrigin: "https://studio.test",
-			}).prewarm;
-			expect(getByName).toHaveBeenCalledWith("https://studio.test/codemode-export-harness");
-			expect(prewarm).toHaveBeenCalledWith("https://studio.test/codemode-export-harness", {
-				spanId: expect.any(String),
-				traceId: expect.any(String),
-			});
-		}),
-	);
-
-	it.effect("keeps a failed prewarm out of the caller's error channel", () =>
-		Effect.gen(function* () {
-			const { prewarm, renderers } = fakeRenderers(async () => rendered());
-			prewarm.mockImplementation(() => {
-				throw new Error("Durable Object overloaded");
-			});
-			const exit = yield* Effect.exit(
-				createCloudflareBrowserRunArtifactRenderer(renderers).prewarm,
-			);
-			assert.isTrue(Exit.isSuccess(exit));
 		}),
 	);
 

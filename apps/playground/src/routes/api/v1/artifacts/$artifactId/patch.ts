@@ -10,7 +10,7 @@ export const Route = createFileRoute("/api/v1/artifacts/$artifactId/patch")({
 					{ runPlaygroundEffect },
 				] = await Promise.all([
 					import("@/server/bindings/cloudflare-bindings.server"),
-					import("@/server/codemode/api.server"),
+					import("@/features/build/api.server"),
 					import("@/server/runtime/runtime.server"),
 				]);
 

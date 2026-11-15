@@ -19,9 +19,8 @@ import {
 import { type BuildFlowchartResult } from "@sketchi/diagrams/build/code-mode/contract";
 import { CANVAS_LIMITS } from "@sketchi/drawing";
 
-import { type StudioEnv } from "../bindings/studio-env.server";
-import { runPlaygroundEffect } from "../runtime/runtime.server";
-import { PlaygroundCodeMode } from "./service.server";
+import { type StudioEnv } from "../../server/bindings/studio-env.server";
+import { runPlaygroundEffect } from "../../server/runtime/runtime.server";
 import { USAGE_EVENT_ATTRIBUTE, USAGE_ISSUES_ATTRIBUTE } from "./usage-events.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
@@ -1115,22 +1114,13 @@ describe("HTTP package validation authority", () => {
 			return Effect.succeed(result);
 		});
 		const response = await runPlaygroundEffect(
-			Effect.gen(function* () {
-				const codeMode = yield* PlaygroundCodeMode;
-				return yield* handleFamilyBuildRequest(familyForType("flowchart"), request).pipe(
-					Effect.provideService(PlaygroundCodeMode, {
-						...codeMode,
-						buildFamily: (family, input) =>
-							codeMode.buildFamily(
-								{
-									...family,
-									build: (runtime) => family.build({ ...runtime, buildFlowchart: operation }),
-								},
-								input,
-							),
-					}),
-				);
-			}),
+			handleFamilyBuildRequest(
+				{
+					...familyForType("flowchart"),
+					build: () => operation,
+				},
+				request,
+			),
 			testBoundary({}, request),
 		);
 		expect(response.status).toBe(400);

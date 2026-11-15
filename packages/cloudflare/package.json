@@ -6,6 +6,14 @@
 		"./ai-gateway": {
 			"types": "./dist/ai-gateway.d.ts",
 			"default": "./dist/ai-gateway.js"
+		},
+		"./mcp-content": {
+			"types": "./dist/mcp-content.d.ts",
+			"default": "./dist/mcp-content.js"
+		},
+		"./mcp-session": {
+			"types": "./dist/mcp-session.d.ts",
+			"default": "./dist/mcp-session.js"
 		}
 	},
 	"dependencies": {

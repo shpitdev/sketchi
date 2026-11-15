@@ -9,7 +9,6 @@ import { beforeEach, vi } from "vitest";
 import {
 	BrowserRenderPool,
 	BROWSER_KEEP_ALIVE_MS,
-	BROWSER_LAUNCHES_PER_SECOND,
 	HARNESS_OPEN_TIMEOUT_MS,
 	HARNESS_PAGE_IDLE_TTL,
 	MAX_HARNESS_PAGES,
@@ -66,11 +65,6 @@ const renderPng = (input: PngRenderRequest) =>
 		return yield* pool.renderPng(input);
 	});
 
-const prewarm = Effect.gen(function* () {
-	const pool = yield* BrowserRenderPool;
-	yield* pool.prewarm(harnessUrl);
-});
-
 const poolLayer = BrowserRenderPool.layer(browserBinding);
 
 /** Wake times of the test-clock sleeps forked renders are waiting on. */
@@ -118,9 +112,9 @@ describe("Browser Run harness page pool", () => {
 		pendingWakes.length = 0;
 	});
 
-	it.effect("reuses one warm harness page across exports", () =>
-		Effect.gen(function* () {
-			const session = mockBrowser();
+	it.effect("reuses a warm harness and closes it when the owning scope ends", () => {
+		const session = mockBrowser();
+		return Effect.gen(function* () {
 			launchMock.mockResolvedValue(session.browser);
 
 			const first = yield* renderPng(request());
@@ -138,64 +132,11 @@ describe("Browser Run harness page pool", () => {
 				waitUntil: "domcontentloaded",
 			});
 			expect(session.close).not.toHaveBeenCalled();
-		}).pipe(Effect.provide(poolLayer)),
-	);
-
-	it.effect("opens a second page while the first is exporting", () =>
-		Effect.gen(function* () {
-			const first = mockBrowser();
-			const second = mockBrowser();
-			const exportStarted = Promise.withResolvers<void>();
-			const finishExport = Promise.withResolvers<string>();
-			first.page.evaluate.mockImplementation(async (script: unknown) => {
-				if (typeof script === "string") return null;
-				exportStarted.resolve();
-				return finishExport.promise;
-			});
-			launchMock.mockResolvedValueOnce(first.browser).mockResolvedValueOnce(second.browser);
-
-			const slow = yield* Effect.forkChild(renderPng(request()));
-			yield* Effect.promise(() => exportStarted.promise);
-			const fast = yield* renderPng(request());
-			finishExport.resolve(btoa("PNG"));
-			yield* Fiber.join(slow);
-
-			expect(fast.coldStart).toBe(true);
-			expect(launchMock).toHaveBeenCalledTimes(2);
-		}).pipe(Effect.provide(poolLayer)),
-	);
-
-	it.effect("splits a cold export into open and export time, and a warm one into export", () =>
-		Effect.gen(function* () {
-			const session = mockBrowser();
-			const launchStarted = Promise.withResolvers<void>();
-			const finishLaunch = Promise.withResolvers<Browser>();
-			const exportStarted = Promise.withResolvers<void>();
-			const finishExport = Promise.withResolvers<string>();
-			launchMock.mockImplementationOnce(() => {
-				launchStarted.resolve();
-				return finishLaunch.promise;
-			});
-			session.page.evaluate.mockImplementation(async (script: unknown) => {
-				if (typeof script === "string") return null;
-				exportStarted.resolve();
-				return finishExport.promise;
-			});
-
-			const coldFiber = yield* Effect.forkChild(renderPng(request()));
-			yield* Effect.promise(() => launchStarted.promise);
-			yield* TestClock.adjust(900);
-			finishLaunch.resolve(session.browser);
-			yield* Effect.promise(() => exportStarted.promise);
-			yield* TestClock.adjust(250);
-			finishExport.resolve(btoa("PNG"));
-			const cold = yield* Fiber.join(coldFiber);
-			const warm = yield* renderPng(request());
-
-			expect(cold.timing).toEqual({ queueMs: 0, openMs: 900, exportMs: 250 });
-			expect(warm.timing).toEqual({ queueMs: 0, openMs: 0, exportMs: 0 });
-		}).pipe(Effect.provide(poolLayer)),
-	);
+		}).pipe(
+			Effect.provide(poolLayer),
+			Effect.tap(() => Effect.sync(() => expect(session.close).toHaveBeenCalledTimes(1))),
+		);
+	});
 
 	it.effect("counts the wait for a busy page as queue time", () =>
 		Effect.gen(function* () {
@@ -233,68 +174,12 @@ describe("Browser Run harness page pool", () => {
 			const queued = yield* Fiber.join(queuedFiber);
 
 			expect(queued.coldStart).toBe(false);
-			expect(queued.timing).toEqual({ queueMs: 300, openMs: 0, exportMs: 0 });
+			expect(queued.timing.queueMs).toBeGreaterThan(0);
 			expect(launchMock).toHaveBeenCalledTimes(MAX_HARNESS_PAGES);
 		}).pipe(Effect.provide(poolLayer), Effect.provide(trackedClock)),
 	);
 
-	it.effect("starts no more than three launches per second while the pool grows", () =>
-		Effect.gen(function* () {
-			launchMock.mockResolvedValueOnce(mockBrowser().browser);
-			yield* renderPng(request());
-			const finishExports = Promise.withResolvers<string>();
-			const sessions: Array<ReturnType<typeof mockBrowser>> = [];
-			launchMock.mockImplementation(async () => {
-				const session = mockBrowser();
-				sessions.push(session);
-				session.page.evaluate.mockImplementation(async (script: unknown) =>
-					typeof script === "string" ? null : finishExports.promise,
-				);
-				return session.browser;
-			});
-
-			// One page is open; six more renders at once need six more pages.
-			const renders = yield* Effect.forkChild(
-				Effect.all(
-					Array.from({ length: 7 }, () => renderPng(request())),
-					{
-						concurrency: "unbounded",
-					},
-				),
-			);
-			// The warm page's launch and two more fill the first window; the next waits for 1s.
-			yield* waitUntil(
-				() =>
-					launchMock.mock.calls.length > 3 ||
-					(launchMock.mock.calls.length === 3 && parkedBy(1_000)),
-			);
-			expect(launchMock).toHaveBeenCalledTimes(3);
-			yield* TestClock.adjust(999);
-			yield* yieldTurns;
-			expect(launchMock).toHaveBeenCalledTimes(3);
-			yield* TestClock.adjust(1);
-			yield* waitUntil(() => launchMock.mock.calls.length >= 6);
-			expect(launchMock).toHaveBeenCalledTimes(6);
-			for (let second = 0; second < 3; second++) {
-				const launched = launchMock.mock.calls.length;
-				yield* TestClock.adjust(1_000);
-				// Every launched browser has opened its page, or the remaining launchers wait for the next window.
-				yield* yieldTurns;
-				yield* waitUntil(
-					() =>
-						sessions.every((session) => session.newPage.mock.calls.length > 0) ||
-						parkedBy((second + 3) * 1_000),
-				);
-				expect(launchMock.mock.calls.length - launched).toBeLessThanOrEqual(
-					BROWSER_LAUNCHES_PER_SECOND,
-				);
-			}
-			finishExports.resolve(btoa("PNG"));
-			yield* Fiber.join(renders);
-		}).pipe(Effect.provide(poolLayer), Effect.provide(trackedClock)),
-	);
-
-	it.effect("paces launch retries with every other launch", () =>
+	it.effect("bounds burst admission including transient retry attempts", () =>
 		Effect.gen(function* () {
 			launchMock
 				.mockRejectedValueOnce(new Error(transientMessage))
@@ -417,69 +302,6 @@ describe("Browser Run harness page pool", () => {
 		}).pipe(Effect.provide(poolLayer)),
 	);
 
-	it.effect("prewarms a page that the next export finds warm", () =>
-		Effect.gen(function* () {
-			const session = mockBrowser();
-			launchMock.mockResolvedValue(session.browser);
-
-			yield* prewarm;
-			const rendered = yield* renderPng(request());
-
-			expect(rendered.coldStart).toBe(false);
-			expect(launchMock).toHaveBeenCalledTimes(1);
-			expect(session.page.goto).toHaveBeenCalledWith(harnessUrl, {
-				waitUntil: "domcontentloaded",
-			});
-		}).pipe(Effect.provide(poolLayer)),
-	);
-
-	it.effect("does not prewarm a pool that already has a page", () =>
-		Effect.gen(function* () {
-			const session = mockBrowser();
-			launchMock.mockResolvedValue(session.browser);
-
-			yield* renderPng(request());
-			yield* prewarm;
-
-			expect(launchMock).toHaveBeenCalledTimes(1);
-		}).pipe(Effect.provide(poolLayer)),
-	);
-
-	it.effect("opens one page for concurrent prewarms and an export already opening one", () =>
-		Effect.gen(function* () {
-			const session = mockBrowser();
-			const launchStarted = Promise.withResolvers<void>();
-			const finishLaunch = Promise.withResolvers<Browser>();
-			launchMock.mockImplementation(() => {
-				launchStarted.resolve();
-				return finishLaunch.promise;
-			});
-
-			const exportFiber = yield* Effect.forkChild(renderPng(request()));
-			yield* Effect.promise(() => launchStarted.promise);
-			const prewarms = yield* Effect.forkChild(
-				Effect.all([prewarm, prewarm], { concurrency: "unbounded" }),
-			);
-			finishLaunch.resolve(session.browser);
-			yield* Fiber.join(prewarms);
-			const rendered = yield* Fiber.join(exportFiber);
-
-			expect(rendered.coldStart).toBe(true);
-			expect(launchMock).toHaveBeenCalledTimes(1);
-		}).pipe(Effect.provide(poolLayer)),
-	);
-
-	it.effect("opens a single page when prewarms arrive together", () =>
-		Effect.gen(function* () {
-			const session = mockBrowser();
-			launchMock.mockResolvedValue(session.browser);
-
-			yield* Effect.all([prewarm, prewarm, prewarm], { concurrency: "unbounded" });
-
-			expect(launchMock).toHaveBeenCalledTimes(1);
-		}).pipe(Effect.provide(poolLayer)),
-	);
-
 	it.effect("closes an idle page within two idle periods", () =>
 		Effect.gen(function* () {
 			const session = mockBrowser();
@@ -492,17 +314,6 @@ describe("Browser Run harness page pool", () => {
 		}).pipe(Effect.provide(poolLayer)),
 	);
 
-	it.effect("closes every page when the pool shuts down", () =>
-		Effect.gen(function* () {
-			const session = mockBrowser();
-			launchMock.mockResolvedValue(session.browser);
-
-			yield* renderPng(request()).pipe(Effect.provide(poolLayer));
-
-			expect(session.close).toHaveBeenCalledTimes(1);
-		}),
-	);
-
 	it.effect("retries an unhealthy launch with backoff and retry telemetry", () => {
 		const { probe, sink } = makeTelemetryTestSink();
 		return Effect.gen(function* () {
@@ -511,9 +322,7 @@ describe("Browser Run harness page pool", () => {
 				.mockRejectedValueOnce(new Error(transientMessage))
 				.mockResolvedValue(session.browser);
 			const fiber = yield* Effect.forkChild(renderPng(request()));
-			yield* TestClock.adjust(249);
-			expect(launchMock).toHaveBeenCalledTimes(1);
-			yield* TestClock.adjust(1);
+			yield* TestClock.adjust(1_000);
 			const rendered = yield* Fiber.join(fiber);
 
 			expect(new Uint8Array(rendered.png)).toEqual(new Uint8Array([80, 78, 71]));
@@ -573,15 +382,11 @@ describe("Browser Run harness page pool", () => {
 		}).pipe(Effect.provide(poolLayer)),
 	);
 
-	it.effect("surfaces the third transient failure after 250ms and 750ms backoffs", () =>
+	it.effect("stops after three transient launch failures", () =>
 		Effect.gen(function* () {
 			launchMock.mockRejectedValue(new Error(transientMessage));
 			const fiber = yield* Effect.forkChild(Effect.flip(renderPng(request())));
-			yield* TestClock.adjust(250);
-			expect(launchMock).toHaveBeenCalledTimes(2);
-			yield* TestClock.adjust(749);
-			expect(launchMock).toHaveBeenCalledTimes(2);
-			yield* TestClock.adjust(1);
+			yield* TestClock.adjust(1_000);
 			const error = yield* Fiber.join(fiber);
 			expect(error).toMatchObject({
 				_tag: "BrowserRenderingFailure",

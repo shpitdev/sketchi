@@ -6,18 +6,19 @@ import type { CloudflareAiGatewayProvider } from "@sketchi/cloudflare/ai-gateway
 import type { WorkersAiRunner } from "@sketchi/diagrams/generate/jev-workers-ai";
 import type { TelemetryPipeline } from "@sketchi/observability";
 
-import type { CodeModePngRendererNamespace } from "../codemode/browser-renderer.server";
+import type { CodeModePngRendererNamespace } from "../../features/render/browser-renderer.server";
 import type { IconDrawBudgetNamespace } from "../icons/budget-object.server";
-import type { PlaygroundAssetsBinding } from "../codemode/icon-catalog.server";
+import type { PlaygroundAssetsBinding } from "../../features/build/icon-catalog.server";
 
 export interface StudioEnv {
 	/** Workers AI: the AI Gateway for generation, and `run` for Jev's family narrowing. */
 	AI?: CloudflareAiGatewayProvider & Partial<WorkersAiRunner>;
 	ASSETS?: PlaygroundAssetsBinding;
 	CODEMODE_PNG_RENDERER?: CodeModePngRendererNamespace;
+	STUDIO_MCP_SESSION?: import("@sketchi/cloudflare/mcp-session").McpSessionNamespace;
 	/** D1: the community icons the icons app publishes, which diagrams draw by slug. */
 	COMMUNITY_ICONS?: CommunityIconDatabase;
-	LOADER?: unknown;
+	LOADER?: import("../../features/mcp/sandbox.server").SketchiWorkerLoader;
 	SKETCHI_ARTIFACTS?: CodeModeObjectBucket;
 	SKETCHI_AI_GATEWAY_ID?: string;
 	SKETCHI_AI_GENERATE_MODEL?: string;

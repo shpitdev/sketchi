@@ -1,9 +1,7 @@
-import codemode from "@cloudflare/codemode/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import react from "@vitejs/plugin-react";
-import agents from "agents/vite";
 import { defineConfig, type Plugin } from "vite";
 
 import { localInspectorPort, localViteCacheDir } from "../../tools/local-dev-ports";
@@ -23,7 +21,11 @@ function enforceClientServerBoundary(): Plugin {
 			const serverModuleIds = Object.values(bundle)
 				.flatMap((output) => (output.type === "chunk" ? Object.keys(output.modules) : []))
 				.map((moduleId) => moduleId.replaceAll("\\", "/"))
-				.filter((moduleId) => moduleId.includes(playgroundServerSourceSegment));
+				.filter(
+					(moduleId) =>
+						moduleId.includes(playgroundServerSourceSegment) ||
+						/\/apps\/playground\/src\/features\/.*\.server\./.test(moduleId),
+				);
 
 			if (serverModuleIds.length > 0) {
 				this.error(
@@ -54,8 +56,6 @@ export default defineConfig({
 	plugins: [
 		excalidrawFonts(),
 		enforceClientServerBoundary(),
-		agents(),
-		codemode(),
 		cloudflare({
 			configPath: new URL("./wrangler.jsonc", import.meta.url).pathname,
 			inspectorPort: localInspectorPort(6210),

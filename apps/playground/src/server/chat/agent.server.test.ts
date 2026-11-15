@@ -15,7 +15,6 @@ import {
 } from "@sketchi/diagrams/build/code-mode/runtime";
 
 import { PlaygroundAiModel } from "../ai/model.server";
-import { PlaygroundCodeMode, type PlaygroundCodeModeShape } from "../codemode/service.server";
 
 import {
 	MAX_CHAT_TOTAL_CHARACTERS,
@@ -232,9 +231,6 @@ describe("Studio build results the model reads", () => {
 				]),
 			],
 		});
-		const codeMode = {
-			buildFamily: (_family: unknown, input: unknown) => build(input),
-		} as unknown as PlaygroundCodeModeShape;
 		const request = new Request("https://studio.test/api/chat", {
 			method: "POST",
 			body: JSON.stringify({
@@ -261,7 +257,6 @@ describe("Studio build results the model reads", () => {
 		const response = await runPlaygroundEffect(
 			handleStudioAgentRequest(request).pipe(
 				Effect.provideService(PlaygroundAiModel, { model: Effect.succeed(model) }),
-				Effect.provideService(PlaygroundCodeMode, codeMode),
 			),
 			{ env: {}, platform: { waitUntilPromise: () => undefined }, request },
 		);
@@ -330,9 +325,6 @@ describe("Studio build results the model reads", () => {
 		const response = await runPlaygroundEffect(
 			handleStudioAgentRequest(request).pipe(
 				Effect.provideService(PlaygroundAiModel, { model: Effect.succeed(model) }),
-				Effect.provideService(PlaygroundCodeMode, {
-					buildFamily: (_family: unknown, input: unknown) => build(input),
-				} as unknown as PlaygroundCodeModeShape),
 			),
 			{ env: {}, platform: { waitUntilPromise: () => undefined }, request },
 		);
@@ -407,9 +399,6 @@ describe("Studio build results the model reads", () => {
 		const response = await runPlaygroundEffect(
 			handleStudioAgentRequest(request).pipe(
 				Effect.provideService(PlaygroundAiModel, { model: Effect.succeed(model) }),
-				Effect.provideService(PlaygroundCodeMode, {
-					buildFamily: (_family: unknown, input: unknown) => build(input),
-				} as unknown as PlaygroundCodeModeShape),
 			),
 			{ env: {}, platform: { waitUntilPromise: () => undefined }, request },
 		);

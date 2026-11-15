@@ -6,7 +6,8 @@ import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
-import { PlaygroundCodeMode } from "../codemode/service.server";
+import * as Build from "@sketchi/diagrams/build/code-mode/runtime";
+import { buildResponse } from "@sketchi/diagrams/build/operation";
 import { PlaygroundGeneration } from "../generation/service.server";
 import {
 	handleCreateStudioProjectFromArtifactRequest,
@@ -189,22 +190,23 @@ describe("binding-dependent host lifecycles", () => {
 		try {
 			const built = await runtime.run(
 				Effect.gen(function* () {
-					const codeMode = yield* PlaygroundCodeMode;
-					return yield* codeMode.buildFamily(familyForType("flowchart"), {
-						spec: {
-							title: "Lifecycle source",
-							nodes: {
-								start: "Change proposed",
-								review: "Review evidence",
-								end: "Change recorded",
+					return yield* buildResponse(
+						familyForType("flowchart").build(Build)({
+							spec: {
+								title: "Lifecycle source",
+								nodes: {
+									start: "Change proposed",
+									review: "Review evidence",
+									end: "Change recorded",
+								},
+								edges: [
+									["start", "review"],
+									["review", "end"],
+								],
 							},
-							edges: [
-								["start", "review"],
-								["review", "end"],
-							],
-						},
-						options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
-					});
+							options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+						}),
+					);
 				}),
 				boundary(env),
 			);

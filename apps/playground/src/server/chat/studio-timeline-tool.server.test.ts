@@ -6,6 +6,7 @@ import {
 	buildTimeline,
 	CodeModeRuntimeEnvironment,
 } from "@sketchi/diagrams/build/code-mode/runtime";
+import { buildResponse } from "@sketchi/diagrams/build/operation";
 import { familyForType } from "@sketchi/diagrams/family";
 import type { UIMessage } from "ai";
 import { Effect } from "effect";
@@ -17,7 +18,7 @@ it("repairs a timeline through the Studio host and displays its real accepted sc
 	const storage = makeMemoryArtifactStorage();
 	const executor = await Effect.runPromise(
 		makeStudioFamilyExecutor(familyForType("timeline"), (input) =>
-			buildTimeline(input).pipe(
+			buildResponse(buildTimeline(input)).pipe(
 				Effect.provideService(CodeModeArtifactStorage, storage),
 				Effect.provideService(CodeModeRuntimeEnvironment, {
 					createId: (prefix) => `${prefix}_studio_timeline`,

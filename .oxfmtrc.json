@@ -24,7 +24,7 @@
 		"packages/icons/catalog/src/generated/**",
 		// Byte-exact fixtures and frozen compatibility corpora
 		"apps/cli/src/__fixtures__/**",
-		"apps/playground/src/server/codemode/fixtures/**",
+		"apps/playground/src/features/build/fixtures/**",
 		// Vendored shadcn and AI Elements registry components
 		"apps/playground/src/components/ai-elements/**",
 		"packages/ui/src/components/**",

@@ -6,6 +6,7 @@
   },
   "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.tsx"],
   "references": [
+    { "path": "../../packages/cloudflare/tsconfig.lib.json" },
     {
       "path": "../../packages/observability/tsconfig.lib.json"
     },

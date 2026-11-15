@@ -22,8 +22,7 @@ import {
 	savedLogoSlugs,
 } from "../../features/playground/studio-chat-request";
 import { PlaygroundAiModel } from "../ai/model.server";
-import { logosNamedIn, logosWithSlugs } from "../codemode/icon-catalog.server";
-import { PlaygroundCodeMode } from "../codemode/service.server";
+import { logosNamedIn, logosWithSlugs } from "../../features/build/icon-catalog.server";
 import { readBoundedJson } from "../runtime/request-body.server";
 import { PlaygroundRequestCallbacks } from "../runtime/runtime.server";
 import { makeStudioBuildTurn, studioTurnOutcome } from "./studio-build-tool.server";
@@ -119,7 +118,6 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 
 	const ai = yield* PlaygroundAiModel;
 	const callbacks = yield* PlaygroundRequestCallbacks;
-	const codeMode = yield* PlaygroundCodeMode;
 	const model = yield* ai.model;
 	// Logos come only from what the user wrote across the conversation, and the logos its saved
 	// diagrams drew, which were grounded in what the user wrote then.
@@ -133,7 +131,6 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 	// One budget for the turn: both tools share attempts and the accepted artifact.
 	const turn = yield* makeStudioBuildTurn();
 	const tools = yield* makeStudioFamilyTools(
-		codeMode,
 		{ turn, logos, request: latestUserText(messages) },
 		callbacks.runPromise,
 	);

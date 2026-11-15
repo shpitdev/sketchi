@@ -1,13 +1,5 @@
-import {
-	CodeModeArtifactStorage,
-	makeMemoryArtifactStorage,
-} from "@sketchi/diagrams/build/code-mode/artifacts";
-import {
-	type ApplyDiagramPatchResult,
-	type GetArtifactResult,
-} from "@sketchi/diagrams/build/code-mode/contract";
-import { familyForType, type FamilyOperation } from "@sketchi/diagrams/family";
-import { Effect, Layer } from "effect";
+import { familyForType } from "@sketchi/diagrams/family";
+import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import {
 	handleFamilyBuildRequest,
@@ -42,36 +34,19 @@ const runtimeResults = vi.hoisted(() => {
 	};
 });
 
-vi.mock("./service.server", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("./service.server")>();
+vi.mock("@sketchi/diagrams/build/code-mode/runtime", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@sketchi/diagrams/build/code-mode/runtime")>();
 	return {
 		...actual,
-		PlaygroundCodeModeLive: Layer.succeed(actual.PlaygroundCodeMode, {
-			buildDocument: () => Effect.die("Internal document builds are outside the HTTP corpus."),
-			applyDiagramPatch: () =>
-				Effect.succeed(runtimeResults.getApplyDiagramPatch() as ApplyDiagramPatchResult),
-			// These deliberately partial fixtures isolate HTTP envelope/status projection from
-			// document validation, which is exercised by the real family build tests.
-			buildFamily: <A>(family: FamilyOperation<A>) =>
-				Effect.succeed(
-					(family.operation === "buildMindmap"
-						? runtimeResults.getBuildMindmap()
-						: runtimeResults.getBuildFlowchart()) as A,
-				),
-			editFlowchart: () => Effect.die("Flowchart edits are outside the frozen v1 corpus."),
-			createCanvas: () => Effect.die("Canvas creation is outside the frozen v1 corpus."),
-			prewarmPngRenderer: Effect.void,
-			getArtifact: () => Effect.succeed(runtimeResults.getGetArtifact() as GetArtifactResult),
-			readStoredArtifact: () => Effect.succeed(null),
-			searchIcons: () => Effect.die("Icon search is outside the frozen v1 corpus."),
-		}).pipe(
-			Layer.provideMerge(Layer.succeed(CodeModeArtifactStorage, makeMemoryArtifactStorage())),
-		),
+		buildFlowchart: () => Effect.succeed(runtimeResults.getBuildFlowchart()),
+		buildMindmap: () => Effect.succeed(runtimeResults.getBuildMindmap()),
+		getArtifact: () => Effect.succeed(runtimeResults.getGetArtifact()),
+		applyDiagramPatch: () => Effect.succeed(runtimeResults.getApplyDiagramPatch()),
 	};
 });
 
-import { type StudioEnv } from "../bindings/studio-env.server";
-import { runPlaygroundEffect } from "../runtime/runtime.server";
+import { type StudioEnv } from "../../server/bindings/studio-env.server";
+import { runPlaygroundEffect } from "../../server/runtime/runtime.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
 	return {
@@ -87,14 +62,31 @@ function testBoundary(env: StudioEnv, request: Request) {
 
 function handleBuildFlowchartRequest(env: StudioEnv, request: Request) {
 	return runPlaygroundEffect(
-		handleFamilyBuildRequest(familyForType("flowchart"), request),
+		handleFamilyBuildRequest(
+			{
+				...familyForType("flowchart"),
+				build: () => () =>
+					Effect.succeed(
+						runtimeResults.getBuildFlowchart() as import("@sketchi/diagrams/build/code-mode/contract").BuildFlowchartResult,
+					),
+			},
+			request,
+		),
 		testBoundary(env, request),
 	);
 }
 
 function handleBuildMindmapRequest(env: StudioEnv, request: Request) {
+	const family = familyForType("mindmap");
 	return runPlaygroundEffect(
-		handleFamilyBuildRequest(familyForType("mindmap"), request),
+		handleFamilyBuildRequest(
+			{
+				...familyForType("mindmap"),
+				build: () => () =>
+					Effect.succeed(runtimeResults.getBuildMindmap() as typeof family.contracts.output.Type),
+			},
+			request,
+		),
 		testBoundary(env, request),
 	);
 }
@@ -361,7 +353,7 @@ describe("exact-base Code Mode HTTP status compatibility corpus", () => {
 			applyDiagramPatch,
 			requestTooLarge,
 		};
-		const fixturePath = `${process.cwd()}/apps/playground/src/server/codemode/fixtures/http-status-compatibility-v1.json`;
+		const fixturePath = `${process.cwd()}/apps/playground/src/features/build/fixtures/http-status-compatibility-v1.json`;
 		await expect(`${JSON.stringify(corpus, null, 2)}\n`).toMatchFileSnapshot(fixturePath);
 	});
 });

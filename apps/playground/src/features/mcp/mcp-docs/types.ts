@@ -133,7 +133,12 @@ function propertyName(name: string): string {
 	return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) ? name : JSON.stringify(name);
 }
 
-/** JSON constraints remain enforced by the host; declarations describe their structural types. */
+/**
+ * JSON constraints remain enforced by the host; declarations describe sandbox JS values.
+ * Effect 4.1.4 toCodeDocument cannot emit the owning custom literal declarations without
+ * toCode callbacks. Its JSON bridge loses array mutability and spells nonfinite numbers
+ * as strings. Replace this formatter after those family-owned declarations are retired.
+ */
 export function jsonSchemaType(
 	value: unknown,
 	prefix: string,

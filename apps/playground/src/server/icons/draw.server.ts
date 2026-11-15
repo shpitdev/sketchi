@@ -27,22 +27,22 @@ import {
 	browserRenderingRetrySchedule,
 	BrowserRenderingFailure,
 	browserFailure,
-} from "../codemode/browser-render-pool.server";
+} from "../../features/render/browser-render-pool.server";
 import {
 	browserRunCaller,
 	browserRunHarnessUrl,
 	type CodeModePngRendererNamespace,
-} from "../codemode/browser-renderer.server";
+} from "../../features/render/browser-renderer.server";
 import {
 	NODE_LOGO_ASSET_PATH,
 	type PlaygroundAssetsBinding,
-} from "../codemode/icon-catalog.server";
-import { rendererOptions } from "../codemode/service.server";
+} from "../../features/build/icon-catalog.server";
+import { rendererOptions } from "../../features/build/capabilities.server";
 import {
 	codeModeUsageResponseHeaders,
 	type CodeModeUsageContext,
 	PlaygroundCodeModeUsage,
-} from "../codemode/usage-events.server";
+} from "../../features/build/usage-events.server";
 import {
 	PlaygroundBindings,
 	PlaygroundClock,

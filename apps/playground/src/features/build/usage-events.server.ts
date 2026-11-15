@@ -5,7 +5,7 @@ import { type ArtifactFormat, type ArtifactFormatRef } from "@sketchi/drawing/ar
 import { SpanContent } from "@sketchi/observability";
 import { Context, Effect, Layer } from "effect";
 
-import { PlaygroundIds, PlaygroundRequestMetadata } from "../runtime/context.server";
+import { PlaygroundIds, PlaygroundRequestMetadata } from "../../server/runtime/context.server";
 
 const MAX_ISSUE_DEPTH = 8;
 

@@ -113,15 +113,12 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(canvasDocs.examples[0]?.code).toContain("sketchi.createCanvas");
 	});
 
-	it("pins every generated field, optionality, literal and recursive reference to the package schemas", async () => {
+	it("keeps the consumed declarations fresh and compiles their structural contracts", () => {
 		const generated = generateCodeModeTypes();
 		expect(SKETCHI_CODE_MODE_TYPES).toBe(generated);
-		await expect(generated).toMatchFileSnapshot(
-			`${process.cwd()}/apps/playground/src/server/codemode/mcp-docs/code-mode-types.generated.txt`,
-		);
 		const source = ts.createSourceFile(
 			"code-mode-types.ts",
-			`${generated}
+			`${SKETCHI_CODE_MODE_TYPES}
         type Assert<T extends true> = T;
         type Same<A, B> = [A] extends [B] ? [B] extends [A] ? true : false : false;
         type OptionalKeys<T> = {

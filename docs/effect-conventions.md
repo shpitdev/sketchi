@@ -76,21 +76,23 @@ construction remain visible; no dummy key or global logger workaround is used.
 
 ## Shared tools
 
-Studio's `codemode/toolkit.server.ts` owns the public `docs`, `search` and `execute`
-Tool definitions and handler layer. `execute.server.ts` contains the existing
-sandbox/receipt workflow independently of MCP construction. Icons' `lib/toolkit.server.ts`
-owns `search_icons` and `get_icon`; its source loader and origin come from `IconToolSource`.
-Consumers can provide these handlers and consume `Toolkit.handle` streams without
-starting an MCP server. Definitions do not capture request bindings.
+Studio's `features/mcp/toolkit.server.ts` owns the public `docs`, `search` and
+`execute` definitions and handlers. `execute.server.ts` owns sandbox settlement,
+receipts and model delivery. Icons' `lib/toolkit.server.ts` owns `search_icons` and
+`get_icon`, with the request origin and source loader supplied through `IconSource`.
+Each host registers its Toolkit once with native `McpServer.toolkit`.
 
-The current SDK/agents transport consumes those streams in its request-owned runtime.
-Its adapter preserves MCP text/structured output and the established validation issue
-format. Effect 4.1.4 exposes validation failures as AiError descriptions, so the Studio
-adapter uses the same tool schema and upstream Standard Schema issue formatter on
-failure. It defines no separate validation contract. `HandlerResult` also includes
-failure values without a discriminated success type; transport projections narrow
-through the tool's own success schema. The SDK host remains until the transport slice;
-chat migration is separate.
+A Durable Object owns each native `McpServer.layerHttp` session. The opaque session
+header includes the object locator; an evicted object asks the client to initialize
+again. HTTP middleware supplies request bindings and telemetry. Studio's
+`features/build/capabilities.server.ts` supplies concrete artifact, icon and render
+capabilities to the public diagram operations; it defines no operation facade.
+
+Effect 4.1.4's Toolkit registration emits JSON text and structured content; its
+`MiddlewareSuccess` is opaque. The shared registration-time content decorator maps
+only the already-encoded native result to readable docs, artifact delivery and raw
+SVG. Native registration retains input decoding, typed errors, interruption and
+request context. It performs no schema redecoding or redispatch.
 
 ## Diagnostic ratchet
 

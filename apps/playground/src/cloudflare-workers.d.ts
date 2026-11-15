@@ -2,14 +2,15 @@ declare module "cloudflare:workers" {
   import type { CodeModeObjectBucket } from "@sketchi/diagrams/build/code-mode/artifacts";
   import type { CloudflareAiGatewayProvider } from "@sketchi/cloudflare/ai-gateway";
   import type { TelemetryPipeline } from "@sketchi/observability";
-  import type { CodeModePngRendererNamespace } from "./server/codemode/browser-renderer.server";
-  import type { PlaygroundAssetsBinding } from "./server/codemode/icon-catalog.server";
+  import type { CodeModePngRendererNamespace } from "./features/render/browser-renderer.server";
+  import type { PlaygroundAssetsBinding } from "./features/build/icon-catalog.server";
 
   export const env: {
     AI?: CloudflareAiGatewayProvider;
     ASSETS?: PlaygroundAssetsBinding;
     CODEMODE_PNG_RENDERER?: CodeModePngRendererNamespace;
-    LOADER?: unknown;
+    STUDIO_MCP_SESSION?: import("@sketchi/cloudflare/mcp-session").McpSessionNamespace;
+    LOADER?: import("./features/mcp/sandbox.server").SketchiWorkerLoader;
     SKETCHI_ARTIFACTS?: CodeModeObjectBucket;
     SKETCHI_AI_GATEWAY_ID?: string;
     SKETCHI_AI_GENERATE_MODEL?: string;
@@ -29,6 +30,8 @@ declare module "cloudflare:workers" {
     setAlarm(scheduledTime: number): Promise<void>;
     deleteAll(): Promise<void>;
   }
+
+  export abstract class RpcTarget {}
 
   export abstract class DurableObject<Env = unknown> {
     protected readonly ctx: {

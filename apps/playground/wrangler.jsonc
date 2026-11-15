@@ -2,7 +2,11 @@
 	"$schema": "../../node_modules/wrangler/config-schema.json",
 	"name": "sketchi-studio",
 	"compatibility_date": "2026-06-06",
-	"compatibility_flags": ["nodejs_compat"],
+	"compatibility_flags": [
+		"nodejs_compat",
+		"enable_request_signal",
+		"durable_object_io_tasks_prevent_eviction"
+	],
 	"main": "./src/worker-entry.ts",
 	"assets": {
 		"binding": "ASSETS"
@@ -23,6 +27,7 @@
 	// Holds warm Browser Run pages for Code Mode PNG export between requests.
 	"durable_objects": {
 		"bindings": [
+			{ "name": "STUDIO_MCP_SESSION", "class_name": "StudioMcpSession" },
 			{
 				"name": "CODEMODE_PNG_RENDERER",
 				"class_name": "CodeModePngRenderer"
@@ -51,7 +56,8 @@
 		{
 			"tag": "v3",
 			"new_sqlite_classes": ["ClientRateLimit"]
-		}
+		},
+		{ "tag": "mcp-v1", "new_sqlite_classes": ["StudioMcpSession"] }
 	],
 	"observability": {
 		"enabled": true,
@@ -115,6 +121,7 @@
 		],
 		"durable_objects": {
 			"bindings": [
+				{ "name": "STUDIO_MCP_SESSION", "class_name": "StudioMcpSession" },
 				{
 					"name": "CODEMODE_PNG_RENDERER",
 					"class_name": "CodeModePngRenderer"

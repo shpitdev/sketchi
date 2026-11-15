@@ -12,6 +12,7 @@
 		"lucide-react": "1.65.0",
 		"roughjs": "4.6.6",
 		"@sketchi/observability": "workspace:*",
+		"@sketchi/cloudflare": "workspace:*",
 		"@effect/atom-react": "catalog:",
 		"effect": "catalog:",
 		"scheduler": "catalog:",

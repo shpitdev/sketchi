@@ -27,7 +27,7 @@ import {
 } from "@sketchi/studio-projects/server";
 import { Context, Effect, Layer, Schema, Result } from "effect";
 
-import { artifactStoreForBindings } from "../codemode/service.server";
+import { artifactStoreForBindings } from "../../features/build/capabilities.server";
 import { PlaygroundBindings, PlaygroundClock, PlaygroundIds } from "../runtime/context.server";
 
 export class PlaygroundStudioLocalBucket extends Context.Service<

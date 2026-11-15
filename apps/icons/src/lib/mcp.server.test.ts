@@ -1,186 +1,112 @@
 // @vitest-environment node
+import { describe, expect, it } from "@effect/vitest";
+import { Deferred, Effect, Fiber, Layer } from "effect";
+import { McpProtocol, McpServer, McpTest } from "effect/ai";
+import { IconSource } from "./api.server.js";
+import type { IconSourceLoader } from "./catalog.server.js";
+import { IconMcpRegistrations } from "./mcp.server.js";
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { describe, expect, it } from "vitest";
+const clientFor = (origin: string, sourceLoader: IconSourceLoader) =>
+	McpTest.makeClient(
+		IconMcpRegistrations.pipe(
+			Layer.provide(
+				McpServer.middleware<{ provides: IconSource }>()((effect) =>
+					Effect.provideService(effect, IconSource, { origin, sourceLoader }),
+				).layer,
+			),
+		),
+		{ name: "icons-policy", version: "1", protocols: [McpProtocol.v2025_11_25] },
+	);
 
-import { createIconMcpServer } from "./mcp.server";
-
-describe("Sketchi Icons MCP", () => {
-	it("exposes ranked search_icons and raw-first get_icon contracts", async () => {
-		const server = createIconMcpServer({
-			origin: "https://icons.sketchi.app",
-			sourceLoader: async () => '<svg id="kubernetes" />',
-		});
-		const client = new Client({ name: "icons-test", version: "0.0.0" });
-		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-
-		try {
-			await server.connect(serverTransport);
-			await client.connect(clientTransport);
-			const tools = await client.listTools();
-			expect(tools.tools.map((tool) => tool.name).sort()).toEqual(["get_icon", "search_icons"]);
-			expect(tools.tools.every((tool) => tool.annotations?.readOnlyHint)).toBe(true);
-			expect(tools.tools.every((tool) => tool.inputSchema.additionalProperties === false)).toBe(
-				true,
-			);
-
-			const search = await client.callTool({
-				arguments: { limit: 5, q: "k8s" },
+describe("Icons MCP delivery policy (in-memory; Worker HTTP is separate)", () => {
+	it.effect("ranks aliases, trims real inputs and delivers raw SVG with isolated source URLs", () =>
+		Effect.gen(function* () {
+			const load: IconSourceLoader = async (request) =>
+				`<svg data-origin="${new URL(request.url).origin}" />`;
+			const one = yield* clientFor("https://one.test", load);
+			const two = yield* clientFor("https://two.test", load);
+			expect((yield* one.listTools()).tools.map((tool) => tool.name).sort()).toEqual([
+				"get_icon",
+				"search_icons",
+			]);
+			const search = yield* one.callTool({
 				name: "search_icons",
+				arguments: { q: " k8s ", limit: 1 },
 			});
 			expect(search.structuredContent).toMatchObject({
-				results: [{ slug: "kubernetes" }],
-			});
-
-			const get = await client.callTool({
-				arguments: { slug: "kubernetes" },
-				name: "get_icon",
-			});
-			const content = Array.isArray(get.content) ? get.content : [];
-			expect(content[0]).toEqual({
-				text: '<svg id="kubernetes" />',
-				type: "text",
-			});
-			expect(get.structuredContent).toMatchObject({
-				colorMode: "multicolor",
-				slug: "kubernetes",
-				svgUrl: "https://icons.sketchi.app/api/icons/kubernetes.svg",
-			});
-		} finally {
-			await client.close();
-			await server.close();
-		}
-	});
-
-	it("returns tool errors for invalid limits and missing icons", async () => {
-		const server = createIconMcpServer({ sourceLoader: async () => "<svg />" });
-		const client = new Client({ name: "icons-errors-test", version: "0.0.0" });
-		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-		try {
-			await server.connect(serverTransport);
-			await client.connect(clientTransport);
-			const invalid = await client.callTool({
-				arguments: { limit: 101 },
-				name: "search_icons",
-			});
-			expect(invalid.isError).toBe(true);
-			const missing = await client.callTool({
-				arguments: { slug: "missing" },
-				name: "get_icon",
-			});
-			expect(missing.isError).toBe(true);
-		} finally {
-			await client.close();
-			await server.close();
-		}
-	});
-	it("preserves permissive optional inputs, trimming, defaults and exact argument errors", async () => {
-		const server = createIconMcpServer({ sourceLoader: async () => "<svg />" });
-		const client = new Client({ name: "icons-inputs-test", version: "0.0.0" });
-		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-		try {
-			await server.connect(serverTransport);
-			await client.connect(clientTransport);
-			const defaults = await client.callTool({ name: "search_icons" });
-			expect(defaults.structuredContent).toMatchObject({ query: "", collection: null, count: 50 });
-			for (const input of [
-				{ q: 42, collection: false, extra: "ignored" },
-				{ q: "  ", collection: " " },
-			]) {
-				expect(await client.callTool({ name: "search_icons", arguments: input })).toEqual(defaults);
-			}
-			const trimmed = await client.callTool({
-				name: "search_icons",
-				arguments: { q: "  k8s  ", limit: 1, extra: true },
-			});
-			expect(trimmed.structuredContent).toMatchObject({
 				query: "k8s",
 				count: 1,
 				results: [{ slug: "kubernetes" }],
 			});
-			const icon = await client.callTool({
-				name: "get_icon",
-				arguments: { slug: " kubernetes ", extra: true },
-			});
-			expect(icon.structuredContent).toMatchObject({ slug: "kubernetes" });
-			for (const limit of [null, "5", 0, 1.5, 101]) {
-				expect(await client.callTool({ name: "search_icons", arguments: { limit } })).toEqual({
-					isError: true,
-					content: [{ type: "text", text: "limit must be an integer from 1 to 100." }],
-				});
-			}
-			for (const slug of [null, 1, "  "]) {
-				expect(await client.callTool({ name: "get_icon", arguments: { slug } })).toEqual({
-					isError: true,
-					content: [{ type: "text", text: "slug is required." }],
-				});
-			}
-			expect(await client.callTool({ name: "unknown", arguments: {} })).toEqual({
-				isError: true,
-				content: [{ type: "text", text: "Tool unknown was not found." }],
-			});
-		} finally {
-			await client.close();
-			await server.close();
-		}
-	});
-
-	it("retains source failure details as protocol errors", async () => {
-		const server = createIconMcpServer({
-			sourceLoader: async () => {
-				throw new Error("source unavailable");
-			},
-		});
-		const client = new Client({ name: "icons-source-failure-test", version: "0.0.0" });
-		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-		try {
-			await server.connect(serverTransport);
-			await client.connect(clientTransport);
-			await expect(
-				client.callTool({ name: "get_icon", arguments: { slug: "kubernetes" } }),
-			).rejects.toThrow("source unavailable");
-		} finally {
-			await client.close();
-			await server.close();
-		}
-	});
-
-	it("propagates SDK cancellation to the active source request", async () => {
-		const started = Promise.withResolvers<void>();
-		const aborted = Promise.withResolvers<void>();
-		const server = createIconMcpServer({
-			sourceLoader: (request) =>
-				new Promise<string>((_resolve, reject) => {
-					const abort = () => {
-						aborted.resolve();
-						reject(new Error("source cancelled"));
-					};
-					request.signal.addEventListener("abort", abort, { once: true });
-					if (request.signal.aborted) abort();
-					started.resolve();
-				}),
-		});
-		const client = new Client({ name: "icons-cancel-test", version: "0.0.0" });
-		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-		const controller = new AbortController();
-		try {
-			await server.connect(serverTransport);
-			await client.connect(clientTransport);
-			const call = client.callTool(
-				{ name: "get_icon", arguments: { slug: "kubernetes" } },
-				undefined,
-				{ signal: controller.signal },
+			const results = yield* Effect.all(
+				[one, two].map((client) =>
+					client.callTool({ name: "get_icon", arguments: { slug: " kubernetes " } }),
+				),
+				{ concurrency: 2 },
 			);
-			const rejected = call.catch((error: unknown) => error);
-			await started.promise;
-			controller.abort();
-			expect(await rejected).toBeInstanceOf(Error);
-			await aborted.promise;
-		} finally {
-			controller.abort();
-			await client.close();
-			await server.close();
-		}
-	});
+			for (const [index, result] of results.entries()) {
+				const origin = index === 0 ? "https://one.test" : "https://two.test";
+				expect(result.content[0]).toEqual({
+					type: "text",
+					text: `<svg data-origin="${origin}" />`,
+				});
+				expect(result.structuredContent).toMatchObject({
+					slug: "kubernetes",
+					svgUrl: `${origin}/api/icons/kubernetes.svg`,
+				});
+			}
+		}),
+	);
+
+	it.effect("keeps actionable input, missing-icon and source failure details", () =>
+		Effect.gen(function* () {
+			const client = yield* clientFor("https://icons.test", async () => {
+				throw new Error("Source returned HTTP 503.");
+			});
+			const invalid = yield* client.callTool({ name: "search_icons", arguments: { limit: 101 } });
+			expect(invalid).toMatchObject({
+				isError: true,
+				content: [{ text: expect.stringContaining("limit") }],
+			});
+			const missing = yield* client.callTool({ name: "get_icon", arguments: { slug: "missing" } });
+			expect(missing).toMatchObject({
+				isError: true,
+				content: [{ text: expect.stringContaining("missing") }],
+			});
+			const failed = yield* client.callTool({
+				name: "get_icon",
+				arguments: { slug: "kubernetes" },
+			});
+			expect(failed).toMatchObject({
+				isError: true,
+				content: [{ text: expect.stringContaining("503") }],
+			});
+		}),
+	);
+
+	it.effect("interrupts the active icon source through its request signal", () =>
+		Effect.gen(function* () {
+			const started = yield* Deferred.make<void>();
+			const stopped = yield* Deferred.make<boolean>();
+			const client = yield* clientFor("https://icons.test", (request) =>
+				Effect.runPromise(
+					Deferred.succeed(started, undefined).pipe(
+						Effect.andThen(Effect.never),
+						Effect.ensuring(
+							Effect.sync(() => request.signal.aborted).pipe(
+								Effect.flatMap((aborted) => Deferred.succeed(stopped, aborted)),
+							),
+						),
+					),
+					{ signal: request.signal },
+				),
+			);
+			const call = yield* client
+				.callTool({ name: "get_icon", arguments: { slug: "kubernetes" } })
+				.pipe(Effect.forkChild);
+			yield* Deferred.await(started);
+			yield* Fiber.interrupt(call);
+			expect(yield* Deferred.await(stopped)).toBe(true);
+		}),
+	);
 });
