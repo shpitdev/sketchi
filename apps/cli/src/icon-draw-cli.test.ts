@@ -1,3 +1,4 @@
+import type { CommunityPublished } from "@sketchi/community-icons/http-api";
 import { spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
@@ -22,7 +23,9 @@ function drawn(name: string) {
 		ok: true,
 		status: "drawn",
 		name,
-		recipe: { parts: [{ kind: "rect", x: 2, y: 2, width: 20, height: 20, fill: "#e01e5a" }] },
+		recipe: {
+			parts: [{ kind: "rect" as const, x: 2, y: 2, width: 20, height: 20, fill: "#e01e5a" }],
+		},
 		previews: { png28: PNG.toString("base64"), png112: PNG.toString("base64") },
 		excalidrawlib: {
 			type: "excalidrawlib",
@@ -191,10 +194,13 @@ describe("sketchi icon draw", () => {
 				JSON.stringify({
 					slug: "community/acme",
 					name: "acme",
+					recipe: drawn("acme").recipe,
+					colors: ["#e01e5a"],
+					createdAt: "2026-11-08T12:00:00.000Z",
 					url: "https://icons.example/community/acme",
-					api: "x",
+					api: "https://icons.example/api/community/acme",
 					created: true,
-				}),
+				} satisfies typeof CommunityPublished.Type),
 			);
 		});
 		const published = await runCli(
