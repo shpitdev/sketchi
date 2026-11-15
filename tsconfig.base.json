@@ -552,7 +552,9 @@
               "packages/diagrams/src/families/journey/document.ts",
               "packages/diagrams/src/families/journey/build.ts",
               "packages/diagrams/src/families/sankey/document.ts",
-              "packages/diagrams/src/families/sankey/build.ts"
+              "packages/diagrams/src/families/sankey/build.ts",
+              "packages/diagrams/src/families/gantt/document.ts",
+              "packages/diagrams/src/families/gantt/build.ts"
             ],
             "options": {
               "diagnosticSeverity": {
