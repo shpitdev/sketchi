@@ -7,6 +7,9 @@
   "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.tsx"],
   "references": [
     {
+      "path": "../../packages/observability/tsconfig.lib.json"
+    },
+    {
       "path": "../../packages/ui/tsconfig.lib.json"
     },
     {

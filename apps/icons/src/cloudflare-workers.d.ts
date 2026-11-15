@@ -1,9 +1,11 @@
 declare module "cloudflare:workers" {
   import type { IconAssetsBinding } from "./lib/catalog.server";
-  import type { CommunityEnv } from "./lib/community.server";
+  import type { CommunityEnv } from "@sketchi/community-icons";
+  import type { TelemetryPipeline } from "@sketchi/observability";
 
   export const env: CommunityEnv & {
     ASSETS: IconAssetsBinding;
+    TELEMETRY_SPANS?: TelemetryPipeline;
     SKETCHI_APP_SURFACE?: string;
     EXCALIDRAW_LIBRARY_SUBMIT?: string;
     EXCALIDRAW_LIBRARY_BACKEND?: string;

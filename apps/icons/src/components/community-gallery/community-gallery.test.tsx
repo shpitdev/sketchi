@@ -212,10 +212,16 @@ describe("linked community icons", () => {
 	});
 
 	it("reads a 404 as a missing icon instead of an undefined result", async () => {
-		const fetchMock = vi.fn(async () => new Response("{}", { status: 404 }));
+		const fetchMock = vi.fn<typeof globalThis.fetch>(
+			async () => new Response("{}", { status: 404 }),
+		);
 		vi.stubGlobal("fetch", fetchMock);
 		await expect(fetchCommunityIcon("community/gone")).resolves.toEqual({ status: "missing" });
-		expect(fetchMock).toHaveBeenCalledWith("/api/community/gone", {});
+		const target = fetchMock.mock.calls[0]?.[0];
+		expect(target && typeof target === "object" && "href" in target ? target.href : target).toBe(
+			new URL("/api/community/gone", window.location.origin).href,
+		);
+		expect(fetchMock.mock.calls[0]?.[1]?.method).toBe("GET");
 		vi.unstubAllGlobals();
 	});
 });

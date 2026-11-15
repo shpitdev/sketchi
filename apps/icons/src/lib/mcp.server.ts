@@ -1,3 +1,4 @@
+import { IconSource } from "./api.server.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
 	CallToolRequestSchema,
@@ -8,12 +9,7 @@ import { Array, Context, Effect, Option, Schema, Stream } from "effect";
 import { Tool } from "effect/ai";
 import { withCors } from "./cors-policy.js";
 import type { IconSourceLoader } from "./catalog.server.js";
-import {
-	IconToolkit,
-	IconToolHandlers,
-	IconToolSource,
-	normalizeIconToolArguments,
-} from "./toolkit.server.js";
+import { IconToolkit, IconToolHandlers, normalizeIconToolArguments } from "./toolkit.server.js";
 
 const definitions = Array.map(
 	[IconToolkit.tools.search_icons, IconToolkit.tools.get_icon],
@@ -104,7 +100,7 @@ export function createIconMcpServer(options: IconMcpServerOptions): Server {
 			}),
 			// @effect-diagnostics-next-line strictEffectProvide:off -- SDK callback owns this Toolkit layer and its request source.
 			Effect.provide(IconToolHandlers),
-			Effect.provideService(IconToolSource, source),
+			Effect.provideService(IconSource, source),
 		);
 		return Effect.runPromise(call, { signal: extra.signal });
 	});

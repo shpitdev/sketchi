@@ -8,6 +8,10 @@
 		".": {
 			"types": "./dist/index.d.ts",
 			"default": "./dist/index.js"
+		},
+		"./http-api": {
+			"types": "./dist/http-api.d.ts",
+			"default": "./dist/http-api.js"
 		}
 	},
 	"dependencies": {
