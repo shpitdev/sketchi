@@ -30,6 +30,14 @@ there is no special adapter directory for API maturity.
   services and upstream concurrency, cache and schedule primitives. Keep only the host
   integration upstream cannot provide; an Effect wrapper alone is not a conversion.
 
+Jev family decisions use `@effect/ai-typesafe` for question, answer and usage codecs.
+Its credential-free `TypeSafeClient` receives an Effect `HttpClient` that transports
+System One through Workers AI `AI.run`, prefixes the model with `typesafe/`, and
+unwraps the binding response. `AI.run` has no abort signal: interruption stops waiting
+but cannot establish that inference or billing stopped. This adapter is promoted to
+native diagnostic errors; family questions, thresholds and timeout policy stay in
+the narrowing service.
+
 ## Contracts, failures and tests
 
 - Model ordinary records with `Schema.Struct` and a same-name interface. Use current
