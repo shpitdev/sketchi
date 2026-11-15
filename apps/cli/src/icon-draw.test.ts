@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert";
 
 import { afterEach, describe, it } from "@effect/vitest";
 import { Effect, Fiber } from "effect";
+import { FetchHttpClient } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import { publishIcon, reserveStems } from "./icon-draw.js";
@@ -11,7 +12,7 @@ afterEach(() => {
 	globalThis.fetch = originalFetch;
 });
 
-const icon: Parameters<typeof publishIcon>[1] = {
+const icon = {
 	ok: true,
 	name: "acme",
 	recipe: { parts: [] },
@@ -29,7 +30,16 @@ const icon: Parameters<typeof publishIcon>[1] = {
 
 const published = () =>
 	new Response(
-		JSON.stringify({ slug: "community/acme", url: "https://icons.example/acme", created: true }),
+		JSON.stringify({
+			slug: "community/acme",
+			name: "Acme",
+			recipe: icon.recipe,
+			colors: [],
+			createdAt: "2026-11-14T00:00:00.000Z",
+			api: "https://icons.example/api/community/acme",
+			url: "https://icons.example/acme",
+			created: true,
+		}),
 		{ status: 201, headers: { "content-type": "application/json" } },
 	);
 
@@ -63,9 +73,9 @@ describe("publishIcon", () => {
 						: published(),
 				);
 			};
-			const fiber = yield* publishIcon("https://icons.example/api/community", icon).pipe(
-				Effect.forkChild,
-			);
+			const fiber = yield* publishIcon("https://icons.example/api/community", icon)
+				.pipe(Effect.provideService(FetchHttpClient.Fetch, globalThis.fetch))
+				.pipe(Effect.forkChild);
 			for (let second = 0; second < 90 && fiber.pollUnsafe() === undefined; second += 1) {
 				yield* settle;
 				yield* TestClock.adjust("1 second");
@@ -83,7 +93,9 @@ describe("publishIcon", () => {
 				return new Promise<Response>(() => undefined);
 			};
 			const fiber = yield* Effect.flip(
-				publishIcon("https://icons.example/api/community", icon),
+				publishIcon("https://icons.example/api/community", icon).pipe(
+					Effect.provideService(FetchHttpClient.Fetch, globalThis.fetch),
+				),
 			).pipe(Effect.forkChild);
 			yield* settle;
 			yield* TestClock.adjust("30 seconds");
@@ -100,7 +112,11 @@ describe("publishIcon", () => {
 				Promise.resolve(
 					new Response('{"error":{"code":"rejected","message":"Not allowed."}}', { status: 422 }),
 				);
-			const failure = yield* Effect.flip(publishIcon("https://icons.example/api/community", icon));
+			const failure = yield* Effect.flip(
+				publishIcon("https://icons.example/api/community", icon).pipe(
+					Effect.provideService(FetchHttpClient.Fetch, globalThis.fetch),
+				),
+			);
 			assert.equal(failure.message, "Not allowed.");
 			assert.deepEqual(failure.details, ["http_status:422", "rejected"]);
 		}),

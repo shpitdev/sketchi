@@ -38,6 +38,7 @@
 			"new_sqlite_classes": ["ClientRateLimit"]
 		}
 	],
+	"pipelines": [{ "binding": "TELEMETRY_SPANS", "stream": "e118fdd69a2548258389e82fb1ade1d6" }],
 	"workers_dev": true,
 	"vars": {
 		"SKETCHI_APP_SURFACE": "icons",
@@ -46,6 +47,7 @@
 		"EXCALIDRAW_LIBRARY_SUBMIT": "on"
 	},
 	"previews": {
+		"pipelines": [{ "binding": "TELEMETRY_SPANS", "stream": "d3066c58106b4facbc146e9188e383b1" }],
 		"vars": {
 			"SKETCHI_APP_SURFACE": "icons"
 		},

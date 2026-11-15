@@ -201,7 +201,11 @@
             }
           },
           {
-            "include": ["packages/icons/draw/src/lib/author-model.ts"],
+            "include": [
+              "packages/icons/draw/src/lib/author-model.ts",
+              "packages/icons/draw/src/lib/models.ts",
+              "packages/icons/draw/src/lib/google-judge.ts"
+            ],
             "options": {
               "diagnosticSeverity": {
                 "abortControllerInEffect": "error",
@@ -300,6 +304,80 @@
                 "instanceOfSchema": "error",
                 "schemaSync": "error",
                 "schemaSyncInEffect": "error"
+              }
+            }
+          },
+          {
+            "include": [
+              "packages/icons/community/src/http.ts",
+              "packages/icons/community/src/http-api.ts",
+              "apps/icons/src/lib/http.server.ts",
+              "apps/icons/src/lib/community-client.ts",
+              "apps/icons/src/worker-entry.ts",
+              "apps/cli/src/community-client.ts",
+              "packages/icons/catalog/src/http-api.ts",
+              "apps/icons/src/lib/api.server.ts",
+              "apps/icons/src/lib/catalog-http.server.ts",
+              "apps/icons/src/lib/catalog.server.ts"
+            ],
+            "options": {
+              "diagnosticSeverity": {
+                "abortControllerInEffect": "error",
+                "anyUnknownInErrorContext": "error",
+                "apiStabilityLeak": "off",
+                "asyncFunction": "error",
+                "classSelfMismatch": "error",
+                "cryptoRandomUUID": "error",
+                "cryptoRandomUUIDInEffect": "error",
+                "duplicatePackage": "error",
+                "effectFnImplicitAny": "error",
+                "errorPayloadShadowsName": "error",
+                "experimentalApiUsage": "off",
+                "extendsNativeError": "error",
+                "floatingEffect": "error",
+                "floatingEffectInVitest": "error",
+                "genericEffectServices": "error",
+                "globalConsole": "error",
+                "globalConsoleInEffect": "error",
+                "globalDate": "error",
+                "globalDateInEffect": "error",
+                "globalFetch": "error",
+                "globalFetchInEffect": "error",
+                "globalJson": "error",
+                "globalJsonInEffect": "error",
+                "globalRandom": "error",
+                "globalRandomInEffect": "error",
+                "globalTimers": "error",
+                "globalTimersInEffect": "error",
+                "instanceOfSchema": "error",
+                "missingEffectContext": "error",
+                "missingEffectError": "error",
+                "missingLayerContext": "error",
+                "missingReturnYieldStar": "error",
+                "missingStarInYieldEffectGen": "error",
+                "newPromise": "error",
+                "nodeBuiltinImport": "error",
+                "nonObjectEffectServiceType": "error",
+                "obsoleteMatchImport": "error",
+                "obsoleteSchemaImport": "error",
+                "outdatedApi": "error",
+                "overriddenSchemaConstructor": "error",
+                "preferEffectArray": "error",
+                "preferEffectRecord": "error",
+                "preferEffectString": "error",
+                "processEnv": "error",
+                "processEnvInEffect": "error",
+                "promiseInEffectSuccess": "error",
+                "runEffectInsideEffect": "error",
+                "schemaClassMissingBrand": "error",
+                "schemaClassObjectLiteral": "error",
+                "schemaLiteralNonFinite": "error",
+                "schemaOpaqueInstanceMember": "error",
+                "schemaSync": "error",
+                "schemaSyncInEffect": "error",
+                "strictEffectProvide": "error",
+                "unsafeEffectTypeAssertion": "error",
+                "unstableApiUsage": "off"
               }
             }
           }

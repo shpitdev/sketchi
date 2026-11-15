@@ -2,6 +2,10 @@ import { basename, extname, join, resolve } from "node:path";
 
 import { Clock, Duration, Effect, Schema } from "effect";
 
+import { publishIcon, type PublishedIcon } from "./community-client.js";
+export { publishIcon } from "./community-client.js";
+export type { PublishedIcon } from "./community-client.js";
+
 import { type CliFailure, type CliFilesystemError, CliIconError } from "./errors.js";
 import { LocalFileSystem } from "./filesystem.js";
 import { MAX_API_RESPONSE_BYTES, readBoundedText } from "./response-body.js";
@@ -13,8 +17,6 @@ export const SKETCHI_COMMUNITY_ENDPOINT_ENV = "SKETCHI_COMMUNITY_ENDPOINT";
 
 /** One draw attempt: the service answers within 85 s; this covers that and the upload. */
 const ICON_DRAW_ATTEMPT_TIMEOUT = "120 seconds";
-/** One publish attempt. Waits between attempts are outside it. */
-const PUBLISH_ATTEMPT_TIMEOUT = "30 seconds";
 /** A rate-limited request waits for Retry-After up to this long, at most this many times. */
 const MAX_RETRY_WAIT_SECONDS = 90;
 const MAX_RATE_LIMIT_RETRIES = 3;
@@ -101,15 +103,8 @@ const EndpointFailure = Schema.Struct({
 	),
 });
 
-const CommunityPublished = Schema.Struct({
-	slug: Schema.String,
-	url: Schema.String,
-	created: Schema.Boolean,
-});
-
 const decodeSuccess = Schema.decodeUnknownEffect(Schema.fromJsonString(IconDrawSuccess));
 const decodeFailure = Schema.decodeUnknownEffect(Schema.fromJsonString(EndpointFailure));
-const decodePublished = Schema.decodeUnknownEffect(Schema.fromJsonString(CommunityPublished));
 
 function base64(bytes: Uint8Array): string {
 	return Buffer.from(bytes).toString("base64");
@@ -306,69 +301,6 @@ export const requestIconDraw = Effect.fn("sketchi.cli.icon.draw")(function* (inp
 	}
 	if (response.status === 504) return yield* iconError("icon_timeout", message, hint, details);
 	return yield* iconError("endpoint_failure", message, hint, details);
-});
-
-export interface PublishedIcon {
-	readonly slug: string;
-	readonly url: string;
-	readonly created: boolean;
-}
-
-/** The community store's error envelope: `{ error: { code, message } }`. */
-const CommunityFailure = Schema.Struct({
-	error: Schema.optionalKey(
-		Schema.Struct({
-			code: Schema.optionalKey(Schema.String),
-			message: Schema.optionalKey(Schema.String),
-		}),
-	),
-});
-const decodeCommunityFailure = Schema.decodeUnknownEffect(Schema.fromJsonString(CommunityFailure));
-
-/** Publish a drawn icon to the community store, with the judge's verdict. */
-export const publishIcon = Effect.fn("sketchi.cli.icon.publish")(function* (
-	endpoint: string,
-	icon: IconDrawSuccess,
-) {
-	const failed = (message: string, details: readonly string[] = []) =>
-		iconError(
-			"publish_failed",
-			message,
-			"Publish it later with --publish, or share the .excalidrawlib.",
-			details,
-		);
-	const unreadable = () => failed("The community store returned an unreadable response.");
-	const response = yield* postWithRetry(
-		endpoint,
-		JSON.stringify({
-			name: icon.name,
-			recipe: icon.recipe,
-			verdict: {
-				recognizable: icon.judge.recognizable,
-				...(icon.judge.model ? { judge: icon.judge.model.slice(0, 64) } : {}),
-			},
-		}),
-		{
-			attemptTimeout: PUBLISH_ATTEMPT_TIMEOUT,
-			maxBytes: 64 * 1024,
-			failNetwork: () => failed("The community icon store could not be reached."),
-			failMalformed: unreadable,
-			failTimeout: () => failed("The community store did not answer in time."),
-		},
-	);
-	if (response.ok) {
-		return yield* decodePublished(response.text).pipe(Effect.mapError(unreadable));
-	}
-	const refusal = yield* decodeCommunityFailure(response.text).pipe(
-		Effect.orElseSucceed(() => ({ error: undefined })),
-	);
-	return yield* failed(
-		refusal.error?.message ?? `The community store answered HTTP ${String(response.status)}.`,
-		[
-			`http_status:${String(response.status)}`,
-			...(refusal.error?.code ? [refusal.error.code] : []),
-		],
-	);
 });
 
 export interface DrawnIcon {
