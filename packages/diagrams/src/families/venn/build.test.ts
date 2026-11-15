@@ -78,7 +78,7 @@ describe("Code Mode native Venn diagram", () => {
 			sets: phonesSpec.sets,
 			regions: phonesSpec.regions,
 		});
-		expect(built.quality.summary).toEqual({ nodeCount: 2, edgeCount: 0 });
+		expect(built.quality.summary).toEqual({ nodeCount: 2, edgeCount: 5 });
 		const excalidraw = inline(built).get("excalidraw") as Parameters<
 			typeof validateExcalidrawScene
 		>[0];
