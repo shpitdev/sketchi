@@ -2,7 +2,9 @@
 
 Replace the technical layers with product ownership, and remove the custom mechanisms Effect can own. This is the agreed execution plan following the complete mindmap example and the architecture review with the existing Fable collaborator. It supersedes the package-preservation assumption and slice order in [the original Effect plan](effect-everywhere.md); that plan remains evidence for runtime requirements and baselines.
 
-PR 810 remains staging. The user will review and merge it. A structural checkpoint is useful progress, but does not complete the Effect migration. The primary continues through the full plan, reporting actual gaps rather than promising a finishing date. Accepted integrated units are pushed at the next passing local gate, with a plain-language PR status update; documentation-only deltas reuse unchanged gate evidence. Author branches are backed up at natural stops. The PR stays draft until the full work and material gates are resolved.
+The user split this plan into a PR series on 2026-11-15. PR 810 contains the restructure, all 15 families including the shared graph unit, and app-side work integrated before the graph unit is accepted. It then becomes ready for the user to review and merge, with remaining mechanism rows stated plainly. Completing 810 does not complete Effect adoption. The seven final criteria below apply to the series. Accepted integrated units are pushed at the next passing local gate, with a plain-language PR status update; documentation-only deltas reuse unchanged gate evidence. Author branches are backed up at natural stops. No agent merges main or deploys production.
+
+After 810 merges, follow-up PRs start from main, one coherent area each: Studio chat; build/generate HTTP contracts and CLI clients; CLI internals; Icons server if it has not landed; the judge provider swap; and telemetry, operational scripts and the scenarios move with Frontierclimb. Preserve current author work and evidence for its proper PR. Do not start unrelated implementation merely to squeeze it into 810 before the graph cutoff.
 
 Units 0–3 are accepted and integrated. The shared family list and build operation are in place, with mindmap, Venn, sequence, timeline, chart, quadrant, journey, Sankey, Gantt, Org-chart and Wireframe converted. The four graph families, host state and resource ownership, app/tool moves and final preview proof remain open. This is the structural checkpoint, not final PR readiness.
 
@@ -123,7 +125,9 @@ Use temporary before/after corpora for redesign proof; do not install another pe
 
 Each implementation unit has one author and one coherent commit set in an isolated worktree, integrated by the primary only. Read-only reviews and gate helpers can use the held checkout.
 
-Concurrency: units 0 to 3 are strictly serial, one author. After the structural checkpoint, at most two implementation authors at once, and at most four active agents in total counting the primary, authors and reviewers. A Fable review takes one of those slots while it runs. Host units overlap with family units only where the owned files are shown to be disjoint.
+Concurrency: units 0 to 3 were strictly serial. The user now permits up to four implementation authors where file ownership is demonstrably disjoint, with reviewers and verifiers additional as needed. Graph stays single-author. The primary still owns integration, shared files, gate scheduling and publication; more authors do not authorize overlapping writes or competing measurements.
+
+Choose each check for a concrete failure it could catch. Units that do not touch layout, drawing or graph need no timing harness and no browser run unless they change UI behavior; focused tests, the local gate and independent review suffice. Layout/drawing/graph units retain artifact identity, affected full fuzz and timing proof. Reuse immutable evidence for unchanged behavior.
 
 | # | Unit | Author | Proof before integration |
 |---|------|--------|--------------------------|
@@ -138,9 +142,11 @@ Concurrency: units 0 to 3 are strictly serial, one author. After the structural 
 
 Use the authorized Codex models by default. A stalled or overly complex unit gets a smaller scope and a design review before any model substitution.
 
-## Two finish lines
+## PR 810 and series finish lines
 
-The tree above is the structural target only. The goal is still Effect owning application internals and state. The primary reports against these two lines separately and never lets the first stand in for the second.
+The tree above is the series target. Effect still owns application internals and state across the completed series; the user has chosen an earlier, explicit review boundary for PR 810.
+
+**PR 810 readiness:** all 15 family conversions and the shared graph unit are accepted, the app units integrated by graph acceptance are verified, and the small CI unit below is integrated. Resolve defects in this scope, complete the shared-graph and final 810 Fable reviews, and run the full local gate against `origin/main` before readiness and signoff. Use focused final preview proof for changed actual entrypoints. The PR body must identify every remaining mechanism row and evidence limit rather than call the whole Effect migration complete. The user reviews and merges; follow-ups then start from main.
 
 **Structural checkpoint** (units 0 to 3):
 
@@ -150,7 +156,7 @@ The tree above is the structural target only. The goal is still Effect owning ap
 - Drawings and persisted formats remain unchanged, and HTTP/MCP statuses and real consumers are preserved. All captured mindmap bodies are identical. Venn intentionally adds its document tag, owning rejection codes, Schema diagnostic wording and storage partial identity; these are recorded response changes, not blanket byte-identity claims. The product gate passes, with focused proof for the final test-only correction.
 - It makes no claim about Effect ownership beyond what was already adopted. PR 810 at this point is titled and described as a checkpoint and lists every row below that is still open.
 
-**Complete final PR** requires all of:
+**Completed Effect series** requires all of:
 
 1. Every row in the mechanism table is closed: the old mechanism and its dependency are deleted, or the residual native code is named with the specific upstream gap.
 2. All 15 families have one document schema and use the generic build; the old contract and runtime copies are gone.
@@ -158,7 +164,17 @@ The tree above is the structural target only. The goal is still Effect owning ap
 4. The Effect-native diagnostic group is error in every project, and each suppression carries a local reason. The user-approved exception is collection/string style diagnostics in pure layout and geometry: family layout/render/readout modules, shared graph algorithms and drawing geometry. Correctness and Effect-boundary diagnostics remain enforced there. Do not cosmetically rewrite these algorithms, including retroactively.
 5. Each replaced runtime has its real proof from the last column, not an in-memory test.
 6. Every retained test has a stated behaviour and one owner; the removed-test mapping exists for each unit.
-7. The PR description states the evidence gaps below that are still open. A gap is closed by evidence, not by the code compiling.
+7. Each PR description states the evidence gaps below that are still open. A gap is closed by evidence, not by the code compiling. PR 810 can reach its agreed boundary while follow-up mechanism rows remain open.
+
+## Small CI unit in PR 810
+
+A Sol/high author owns only `.github/workflows` and `scripts/ci-local.mjs`; the primary updates related instructions and docs. Remove the production workflow's push-to-main trigger and retain manual dispatch, so merging does not deploy production. Inspect the release workflow's exact manifest version/tag guard and report whether the merge could publish the CLI; leave it unchanged unless it would publish.
+
+Move the `ci.yml` typecheck and the preview/production build-deploy jobs to `depot-ubuntu-24.04`; small carry, changeset, selection and cleanup jobs remain on `ubuntu-latest`. Public-repository GitHub runners are free and Depot is paid. List the exact moved jobs in the PR for the user's cost assessment; do not claim cost savings or dispatch a deployment to test this change.
+
+Add `ci:local --base <ref>`, defaulting to `origin/main`. A unit gate with `--no-signoff` may compare with the last fully gated staging head, recorded by the primary. This avoids rerunning unchanged graph/fuzz work for every unrelated unit. Full comparison against `origin/main` remains mandatory before PR 810 is ready and for signoff; a partial-base gate must not publish a full `local-ci` status. Keep existing worktree/HEAD and gate-slot guarantees without a new baseline controller.
+
+Worker Previews already use Cloudflare's official `wrangler preview --name pr-N` path; no preview-platform migration is needed. Wrapper-script slimming belongs to the ops follow-up. Preview deployment stays on demand under the policy below.
 
 ## Mechanism disposition
 
@@ -205,6 +221,6 @@ These are open today. Code that compiles and a green local gate do not close any
 
 ## Ownership and reporting
 
-One fresh Astra/high primary owns the canonical staging branch and integration; authors own isolated worktrees. Work remains serial through units 0–3. Afterwards use at most two authors, at most four active agents including the primary and reviewers, and only demonstrably disjoint ownership. The existing Fable collaborator reviews after unit 1, after units 2–3, after the graph split and before the PR is called ready; do not spawn another Fable. Independent code reviews stay read-only and use the smallest unreviewed base. The same model in separate sessions is not self-review.
+One Astra/high primary owns the canonical staging branch and integration; authors own isolated worktrees. Units 0–3 were serial; up to four implementation authors may now work on demonstrably disjoint files, with reviewers and verifiers as needed. Graph stays single-author. The existing Fable collaborator reviews after unit 1, after units 2–3, after the graph split and finally reviews 810 with its complete graph/family scope; do not spawn another Fable. Independent code reviews stay read-only and use the smallest unreviewed base. The same model in separate sessions is not self-review.
 
-Reuse immutable passing evidence for unchanged code and verified moves. Changed behavior needs focused real-consumer proof; run the required local gate on a coherent integrated tree before publication. Keep one watcher and preserve user focus. Unfinished MCP, preference and provider candidates are evidence to port into the new ownership, not branches to merge blindly. The final PR describes completed ownership, deleted mechanisms and tests, actual proof, and every remaining limitation. Do not mark the full migration ready merely because the structural checkpoint passes.
+Reuse immutable passing evidence for unchanged code and verified moves. Changed behavior needs focused real-consumer proof; run the required local gate on a coherent integrated tree before publication. Keep one watcher and preserve user focus. Unfinished MCP, preference and provider candidates are evidence to port into the new ownership, not branches to merge blindly. Each PR describes completed ownership, deleted mechanisms and tests, actual proof, and every remaining limitation. Do not confuse PR 810's agreed scope with completion of the series.

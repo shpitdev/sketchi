@@ -26,8 +26,13 @@ Convex, Vercel, Bun, or Turborepo stack.
   reasoning for straightforward work, `gpt-6-astra` with `xhigh` where the agreed
   plan calls for architectural or graph work. Preserve explicit assignments.
 - Follow [the product structure plan](docs/plans/product-structure.md). Units
-  0–3 are serial. Afterwards use at most two authors and four active agents
-  total, including the primary and reviewers, with disjoint ownership.
+  0–3 were serial. The user now permits up to four implementation authors with
+  demonstrably disjoint files, plus reviewers and verifiers as needed. Graph
+  stays single-author; the primary coordinates shared files and verification.
+- PR 810 finishes the restructure, all 15 families and the app work integrated
+  before graph acceptance. Remaining Effect work goes to coherent follow-up
+  PRs off main after the user merges 810. The plan's seven completion criteria
+  apply to the series; 810 explicitly lists its open mechanism rows.
 - Independent code review uses a separate read-only session, normally
   `gpt-6.1-sol` with `high` reasoning and `codex review --base <parent>`.
   Findings go back to the author once; the primary decides after recheck.
@@ -45,6 +50,12 @@ Prove changes locally. Remote CI on a PR is one Nx-affected typecheck, a thin
 double check that also catches a bad merge with the base. It is not the place for
 heavy suites or timing-sensitive tests. If you find yourself fighting CI, verify
 the change locally and slim CI instead of adding to it.
+
+Choose each check for a concrete failure it could catch. Units that do not touch
+layout, drawing or graph need no timing harness and no browser run unless they
+change UI behavior; use focused tests, the gate and independent review. Changes
+to layout, drawing or graph retain artifact identity, affected fuzz and timing.
+Reuse unchanged proof by identity instead of repeating expensive checks.
 
 `pnpm ci:local` is the local CI gate (`scripts/ci-local.mjs`). Against
 `origin/main`, including uncommitted changes, it runs actionlint when workflows
@@ -91,7 +102,12 @@ apps it affects on every push (closing the PR deletes them), or dispatch
 stacked PR or a specific app such as `playground` (Studio); a dispatch also adds
 the label.
 
-For routing and rendering changes, add the `preview` label, then replay the relevant scenarios against the PR's preview MCP (`pr-<N>-sketchi-studio`) with the scenario CLI and inspect a few real PNGs before merging.
+For PR 810, keep the `preview` label off between proof runs. When a changed
+entrypoint needs a deployed preview, dispatch `app-preview` for the required
+project and remove the label it re-adds; existing previews remain available.
+Routing/rendering proof uses the normal preview MCP (`pr-<N>-sketchi-studio`),
+relevant scenario replay and a small bounded set of inspected PNGs. Official
+Cloudflare Worker Previews are already in use; no platform migration is needed.
 
 For UI-affecting changes, verify the changed flow against the real page.
 
