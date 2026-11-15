@@ -65,9 +65,7 @@ export function defineBuild<
 		{
 			readonly document: N;
 			readonly issues: (typeof PublishedBuildIssue.Type)[];
-			readonly render: (
-				scene: CanvasSpec,
-			) => Effect.Effect<{
+			readonly render: (scene: CanvasSpec) => Effect.Effect<{
 				readonly scene: CanvasSpec;
 				readonly issues: (typeof PublishedBuildIssue.Type)[];
 			}>;
