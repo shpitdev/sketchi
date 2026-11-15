@@ -53,6 +53,8 @@ const loadSource = Effect.fn("SvgWorkspace.loadSource")(
 	},
 	Effect.scoped,
 	Effect.provideService(FetchHttpClient.RequestInit, { redirect: "error" }),
+	// Public SVG CORS allows simple GETs, not tracing headers. Keep the local spans.
+	Effect.provideService(HttpClient.TracerPropagationEnabled, false),
 	Effect.catchTag("HttpClientError", (cause) =>
 		Effect.fail(
 			new SvgSourceError({

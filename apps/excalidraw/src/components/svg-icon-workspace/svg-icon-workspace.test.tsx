@@ -1,5 +1,5 @@
 import { RegistryProvider } from "@effect/atom-react";
-import { Layer } from "effect";
+import { Layer, Tracer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import type { ReactNode } from "react";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
@@ -63,6 +63,7 @@ const blockedSvg =
 function renderWorkspace(
 	fetch: typeof globalThis.fetch,
 	props: SvgIconWorkspaceProps = { handoff },
+	tracer: Tracer.Tracer = Tracer.nativeTracer,
 ) {
 	return render(<SvgIconWorkspace {...props} />, {
 		wrapper: ({ children }: { children: ReactNode }) => (
@@ -70,7 +71,12 @@ function renderWorkspace(
 				initialValues={[
 					[
 						svgHttpLayer,
-						FetchHttpClient.layer.pipe(Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch))),
+						Layer.merge(
+							FetchHttpClient.layer.pipe(
+								Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+							),
+							Layer.succeed(Tracer.Tracer, tracer),
+						),
 					],
 				]}
 			>
@@ -98,7 +104,15 @@ describe("SvgIconWorkspace", () => {
 		const click = vi
 			.spyOn(HTMLAnchorElement.prototype, "click")
 			.mockImplementation(() => undefined);
-		renderWorkspace(fetchMock);
+		const spans: Tracer.Span[] = [];
+		const tracer = Tracer.make({
+			span(options) {
+				const span = Tracer.nativeTracer.span(options);
+				spans.push(span);
+				return span;
+			},
+		});
+		renderWorkspace(fetchMock, { handoff }, tracer);
 		expect(await screen.findByLabelText("sample.svg editable canvas")).toBeTruthy();
 		expect(fetchMock).toHaveBeenCalledOnce();
 		expect(fetchMock.mock.calls[0]?.[0]).toEqual(new URL(handoff.sourceUrl));
@@ -106,6 +120,16 @@ describe("SvgIconWorkspace", () => {
 			redirect: "error",
 			signal: expect.any(AbortSignal),
 		});
+		const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
+		expect(headers.has("b3")).toBe(false);
+		expect(headers.has("traceparent")).toBe(false);
+		const clientSpan = spans.find((span) => span.kind === "client");
+		expect(clientSpan?.status._tag).toBe("Ended");
+		expect(clientSpan?.attributes.get("http.request.method")).toBe("GET");
+		expect(clientSpan?.attributes.get("http.response.status_code")).toBe(200);
+		expect(
+			spans.some((span) => span.name === "SvgWorkspace.loadSource" && span.status._tag === "Ended"),
+		).toBe(true);
 		expect(screen.getByText("Elements").parentElement?.textContent).toBe("Elements1");
 		fireEvent.click(screen.getByRole("button", { name: "Apply representative edit" }));
 		fireEvent.click(screen.getByRole("button", { name: "Download library" }));
