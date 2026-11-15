@@ -81,9 +81,16 @@ and `test` targets, sampled routing as described below, the root `effect-tsgo ts
 
 `drawing:test` retains the cross-family text-fit cases and excludes the sampled
 routing suite. `drawing:routing-sample` runs once when a unit changes graph,
-Flowchart, drawing or shared runtime/config inputs. Selection uses the gate's
+Flowchart, the eagerly loaded state-machine parser, drawing or shared runtime/config inputs. Selection uses the gate's
 actual changed files; Nx target inputs alone do not suppress execution. Full
 `origin/main` gates, signoff and `--all` always include sampled routing.
+
+Build, typecheck and test targets reuse Nx's native local cache across worktrees.
+The installed Nx version shares task artifacts and its index outside the checkout;
+project-graph data, Vite state and dependencies remain checkout-local. Do not clear
+shared caches or force cache-directory overrides for routine gates. Keep actual
+source, dependency, external fixture and environment inputs complete. Explicit
+fuzz runs that write caller-selected diagnostic paths use `--skip-nx-cache`.
 
 These larger suites remain local proof when their inputs change:
 
