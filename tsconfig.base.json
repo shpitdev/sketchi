@@ -240,7 +240,8 @@
             "include": [
               "packages/diagram/core/src/intermediate.ts",
               "packages/diagram/core/src/diagram.ts",
-              "packages/diagram/core/src/types/mindmap.ts"
+              "packages/diagram/core/src/types/mindmap.ts",
+              "packages/diagram/core/src/planarity.ts"
             ],
             "options": {
               "diagnosticSeverity": {
