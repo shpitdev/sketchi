@@ -436,27 +436,31 @@ describe("IconLibrary", () => {
 	});
 
 	// @effect-diagnostics-next-line asyncFunction:off -- The malformed HTTP-success SVG is exercised through the real detail export action.
-	it("reports malformed SVG conversion as a useful detail error", async () => {
+	it("reports warm-cache malformed SVG conversion and unlocks details", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(() => Promise.resolve(new Response("<svg>"))),
 		);
 		render(<IconLibrary data={fixtureData} />);
+		fireEvent.click(screen.getByRole("button", { name: "Copy Codex SVG" }));
+		await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
 		fireEvent.click(screen.getByRole("button", { name: "View Codex details" }));
 		fireEvent.click(screen.getByRole("button", { name: "Copy JSX" }));
 		expect(await screen.findByText("Could not complete that action for Codex.")).toBeTruthy();
 		expect(screen.getByRole("button", { name: "Copy JSX" }).hasAttribute("disabled")).toBe(false);
-		expect(writeText).not.toHaveBeenCalled();
+		expect(writeText).toHaveBeenCalledTimes(1);
 	});
 
 	it.each(["detail", "selection"])(
-		"reports a refused %s download and unlocks its controls",
+		"reports a refused warm-cache %s download and unlocks its controls",
 		// @effect-diagnostics-next-line asyncFunction:off -- The native download failure is exercised through the actual detail and selection entrypoints.
 		async (scope) => {
 			vi.spyOn(URL, "createObjectURL").mockImplementation(() => {
 				throw new DOMException("refused", "SecurityError");
 			});
 			render(<IconLibrary data={fixtureData} />);
+			fireEvent.click(screen.getByRole("button", { name: "Copy Codex SVG" }));
+			await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
 			if (scope === "detail") {
 				fireEvent.click(screen.getByRole("button", { name: "View Codex details" }));
 				fireEvent.click(screen.getByRole("button", { name: "Download SVG" }));
@@ -475,6 +479,38 @@ describe("IconLibrary", () => {
 				);
 				expect(selectionBar()?.textContent).toContain("1 selected");
 			}
+		},
+	);
+
+	it.each(["detail", "selection"])(
+		"completes a warm-cache synchronous %s download and leaves its controls usable",
+		// @effect-diagnostics-next-line asyncFunction:off -- Actual warm-cache actions finish synchronously at the native download boundary.
+		async (scope) => {
+			vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:download");
+			vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+			const clicked = vi
+				.spyOn(HTMLAnchorElement.prototype, "click")
+				.mockImplementation(() => undefined);
+			render(<IconLibrary data={fixtureData} />);
+			fireEvent.click(screen.getByRole("button", { name: "Copy Codex SVG" }));
+			await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+			if (scope === "detail") {
+				fireEvent.click(screen.getByRole("button", { name: "View Codex details" }));
+				fireEvent.click(screen.getByRole("button", { name: "Download SVG" }));
+				expect(await screen.findByText("Codex downloaded.")).toBeTruthy();
+				expect(screen.getByRole("button", { name: "Download SVG" }).hasAttribute("disabled")).toBe(
+					false,
+				);
+			} else {
+				fireEvent.click(cardCheckbox("Codex"));
+				fireEvent.click(screen.getByRole("button", { name: "Download zip" }));
+				expect(await screen.findByText("Downloaded 1 SVG as a zip.")).toBeTruthy();
+				expect(screen.getByRole("button", { name: "Download zip" }).hasAttribute("disabled")).toBe(
+					false,
+				);
+			}
+			expect(clicked).toHaveBeenCalledTimes(1);
+			expect(fetch).toHaveBeenCalledTimes(1);
 		},
 	);
 
