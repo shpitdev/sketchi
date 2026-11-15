@@ -2,14 +2,15 @@ import { assert, describe, it } from "@effect/vitest";
 import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { Cause, Effect, Exit, Layer, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, Result, Schema } from "effect";
+import { parseChartDiagram } from "@sketchi/diagram-core";
 
 import { runScenarioCli, ScenarioCliUsageError, scenarioCliExitCode } from "./cli.js";
 import { ToolProcessSpawner, ToolProcessSpawnerLive } from "./internal/tool-process.js";
 import { scenarioFlowchartDocument } from "./lib/flowchart-document.js";
 import { getFlowchartScenario } from "./lib/scenarios.js";
 import { getSequenceScenario } from "./lib/sequence-scenarios.js";
-import { diagramScenarios } from "./lib/diagram-scenarios.js";
+import { diagramScenarios, getDiagramScenario } from "./lib/diagram-scenarios.js";
 import { vi } from "vitest";
 
 const ExecuteFixture = Schema.Struct({
@@ -29,7 +30,7 @@ function generatedEnvelope() {
 }
 
 function withCandidate<E>(
-	output: string,
+	output: string | (() => string),
 	use: (directory: string) => Effect.Effect<void, E, ToolProcessSpawner>,
 ) {
 	const terminal = Effect.succeed({ exitCode: 0, signal: null });
@@ -39,7 +40,10 @@ function withCandidate<E>(
 				awaitExit: terminal,
 				awaitClose: terminal,
 				kill: () => Effect.succeed(false),
-				output: Effect.succeed({ stdout: output, stderr: "" }),
+				output: Effect.sync(() => ({
+					stdout: typeof output === "function" ? output() : output,
+					stderr: "",
+				})),
 			}),
 	});
 	return Effect.scoped(
@@ -632,6 +636,115 @@ describe("scenario CLI candidate decoding", () => {
 			}),
 		),
 	);
+
+	for (const source of ["bare IR", "response envelope", "MCP receipt"]) {
+		it.live(
+			`continues repeated ${source} reporting after native rendering and Result failures`,
+			() => {
+				const chart = getDiagramScenario("quarterly-revenue-bar-chart");
+				if (chart.diagramType !== "chart") throw new Error("Expected the chart scenario fixture.");
+				const valid = chart.expectedDiagram;
+				const tiny = {
+					...valid,
+					series: valid.series.map((series) => ({
+						...series,
+						values: series.values.map(() => 1e-200),
+					})),
+				};
+				const invalid = {
+					...valid,
+					series: valid.series.map((series) => ({ ...series, values: [] })),
+				};
+				// Tiny finite values satisfy the domain contract but hit the retained native axis formatter.
+				assert.isTrue(Result.isSuccess(parseChartDiagram(tiny)));
+				assert.isTrue(Result.isFailure(parseChartDiagram(invalid)));
+				const outputs = [tiny, invalid, valid].map((diagram) => {
+					if (source === "response envelope")
+						return JSON.stringify({ title: diagram.title, diagram });
+					if (source === "MCP receipt")
+						return JSON.stringify({
+							ok: true,
+							result: { buildId: "build_chart" },
+							builds: [
+								{
+									buildId: "build_chart",
+									operation: "buildChart",
+									ok: true,
+									status: "accepted",
+									normalizedSpec: diagram,
+									issues: [],
+								},
+							],
+						});
+					return JSON.stringify(diagram);
+				});
+				let next = 0;
+				return withCandidate(
+					() => outputs[next++] ?? "",
+					(directory) =>
+						Effect.gen(function* () {
+							const reportPath = path.join(directory, "report.json");
+							yield* runScenarioCli([
+								"--scenario",
+								chart.id,
+								"--repeat",
+								"3",
+								"--report-out",
+								reportPath,
+								"--candidate-out-dir",
+								directory,
+								"--generator-command",
+								"offline-generator",
+							]);
+							const report = yield* Schema.decodeUnknownEffect(
+								Schema.fromJsonString(
+									Schema.Struct({
+										ok: Schema.Boolean,
+										evaluationCount: Schema.Number,
+										failedEvaluations: Schema.Array(
+											Schema.Struct({ scenarioId: Schema.String, runNumber: Schema.Number }),
+										),
+										results: Schema.Array(
+											Schema.Struct({
+												ok: Schema.Boolean,
+												error: Schema.optionalKey(Schema.String),
+												errorTag: Schema.optionalKey(Schema.String),
+												checks: Schema.Array(Schema.Unknown),
+											}),
+										),
+									}),
+								),
+							)(yield* Effect.tryPromise(() => readFile(reportPath, "utf8")));
+							assert.strictEqual(next, 3);
+							assert.isFalse(report.ok);
+							assert.strictEqual(report.evaluationCount, 3);
+							assert.deepStrictEqual(report.failedEvaluations, [
+								{ scenarioId: chart.id, runNumber: 1 },
+								{ scenarioId: chart.id, runNumber: 2 },
+							]);
+							const [native, rejected, accepted] = report.results;
+							assert.include(native?.error ?? "", "toFixed");
+							assert.strictEqual(native?.errorTag, "ScenarioToolError");
+							assert.deepStrictEqual(native?.checks, []);
+							assert.isFalse(rejected?.ok);
+							assert.include(rejected?.error ?? "", 'Series "2025" has 0 values for 4 categories.');
+							assert.deepStrictEqual(rejected?.checks, []);
+							assert.strictEqual(rejected?.errorTag, "ScenarioToolError");
+							assert.isTrue(accepted?.ok);
+							assert.isUndefined(accepted?.error);
+							assert.isNotEmpty(accepted?.checks);
+							assert.strictEqual(process.exitCode, 1);
+							assert.strictEqual(
+								yield* Effect.tryPromise(() =>
+									readFile(path.join(directory, `${chart.id}.run-001.candidate.txt`), "utf8"),
+								),
+								outputs[0],
+							);
+						}),
+				);
+			},
+		);
+	}
 
 	for (const [label, output] of [
 		["invalid JSON", "not a diagram"],
