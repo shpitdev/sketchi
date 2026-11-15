@@ -11,7 +11,7 @@ import {
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasFrameElement as FrameSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { flowchartFixture } from "../families/flowchart/diagram.js";
 import { groupFixtures } from "../families/flowchart/group-fixtures.js";
@@ -23,7 +23,7 @@ type Direction = (typeof directions)[number];
 type Name = keyof typeof groupFixtures;
 const names = Object.keys(groupFixtures) as Name[];
 
-const scenes = new Map<string, RenderedDiagramScene>();
+const scenes = new Map<string, CanvasSpec>();
 function rendered(name: Name, direction: Direction = groupFixtures[name].layout.direction) {
 	const key = `${name}:${direction}`;
 	if (!scenes.has(key))
@@ -37,13 +37,13 @@ function rendered(name: Name, direction: Direction = groupFixtures[name].layout.
 	return scenes.get(key)!;
 }
 
-const framesOf = (scene: RenderedDiagramScene) =>
+const framesOf = (scene: CanvasSpec) =>
 	scene.elements.filter((e): e is FrameSceneElement => e.type === "frame");
-const nodesOf = (scene: RenderedDiagramScene) =>
+const nodesOf = (scene: CanvasSpec) =>
 	scene.elements.filter((e): e is NodeSceneElement => e.type === "node");
-const arrowsOf = (scene: RenderedDiagramScene) =>
+const arrowsOf = (scene: CanvasSpec) =>
 	scene.elements.filter((e): e is ArrowSceneElement => e.type === "arrow");
-const arrow = (scene: RenderedDiagramScene, edgeId: string) =>
+const arrow = (scene: CanvasSpec, edgeId: string) =>
 	arrowsOf(scene).find((candidate) => candidate.edgeId === edgeId)!;
 
 describe.each(directions)("grouped flowcharts %s", (direction) => {

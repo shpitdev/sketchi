@@ -1,10 +1,11 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 import { assert, describe, expect, it } from "@effect/vitest";
 import {
 	makeTelemetryTestSink,
 	makeWorkersTelemetryLayer,
 	withTelemetryCorrelation,
 } from "@sketchi/observability";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+
 import { Cause, Effect, Exit, Fiber } from "effect";
 import { TestClock } from "effect/testing";
 import { vi } from "vitest";
@@ -18,7 +19,7 @@ import {
 import { type PngRenderResult } from "./png-renderer-object.server";
 
 function renderInput(): {
-	scene: RenderedDiagramScene;
+	scene: CanvasSpec;
 	excalidraw: { appState: Record<string, unknown>; elements: never[] };
 } {
 	return {

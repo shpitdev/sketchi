@@ -8,22 +8,22 @@ import {
 	segmentsFromPoints,
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { classFixture, parseClassDiagram } from "./document.js";
 import { classStressFixtures } from "./fixtures.js";
 
 import { renderDiagram } from "../../family.js";
 
-const nodes = (scene: RenderedDiagramScene) =>
+const nodes = (scene: CanvasSpec) =>
 	scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));
-const arrows = (scene: RenderedDiagramScene) =>
+const arrows = (scene: CanvasSpec) =>
 	scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
-const text = (scene: RenderedDiagramScene, id: string) =>
+const text = (scene: CanvasSpec, id: string) =>
 	scene.elements.find((element) => element.type === "text" && element.id === id);
-const box = (scene: RenderedDiagramScene, id: string) =>
+const box = (scene: CanvasSpec, id: string) =>
 	nodes(scene).find((node) => node.id === `node:${id}`)!;
-const arrow = (scene: RenderedDiagramScene, id: string) =>
+const arrow = (scene: CanvasSpec, id: string) =>
 	arrows(scene).find((candidate) => candidate.edgeId === id)!;
 
 const orthogonal = (line: ArrowSceneElement) =>
@@ -44,7 +44,7 @@ function sideOf(node: NodeSceneElement, point: { x: number; y: number }): string
 }
 
 /** Every free label's box, as the label is drawn. */
-function labelBoxes(scene: RenderedDiagramScene) {
+function labelBoxes(scene: CanvasSpec) {
 	return scene.elements.flatMap((element) => {
 		if (
 			element.type !== "text" ||

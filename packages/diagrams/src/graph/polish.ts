@@ -65,7 +65,7 @@ import {
 import { type GraphRenderOptions } from "./options.js";
 import { groupBlocks, groupObstacles, laneBlocks } from "./containers.js";
 import { portLimit, directSegmentCrossesNode, branchLabelObstacles } from "./ports.js";
-import { placedBranchLabels, branchLabels } from "./labels.js";
+import { placedBranchLabels } from "./labels.js";
 
 /**
  * How much longer a drawing may grow, its text shrinking as much once fitted,
@@ -1828,14 +1828,14 @@ export function drawnExtent(settled: DiagramLayout): { width: number; height: nu
 	return drawnSize(
 		[...settled.nodeShapes, ...groupBlocks(settled.groups), ...laneBlocks(settled.lanes)],
 		settled.edgeArrows,
-		branchLabels(
+		placedBranchLabels(
 			[...settled.edgeArrows],
 			settled.routedEdges,
 			settled.nodeShapes,
 			settled.groups,
 			true,
 			settled.lanes,
-		),
+		).bounds,
 	);
 }
 

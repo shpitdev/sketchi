@@ -1,8 +1,8 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 import { buildResponse, type BuildRejection } from "../../build/operation.js";
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import {
 	CodeModeArtifactStorage,
@@ -71,7 +71,7 @@ describe("Code Mode native wireframe", () => {
 			screens: [{ id: "login", name: "Login", device: "mobile" }],
 		});
 		expect(built.normalizedSpec.screens[0]!.children).toEqual(loginSpec.screens[0]!.children);
-		const scene = inline(built).get("scene") as RenderedDiagramScene;
+		const scene = inline(built).get("scene") as CanvasSpec;
 		expect(scene.elements.filter((element) => element.type === "frame")).toMatchObject([
 			{ id: "frame:login", name: "Login", width: 390 },
 		]);
@@ -224,7 +224,7 @@ describe("Code Mode native wireframe", () => {
 			}),
 		);
 		if (!patched.ok) throw new Error(JSON.stringify(patched.issues));
-		const scene = inline(patched).get("scene") as RenderedDiagramScene;
+		const scene = inline(patched).get("scene") as CanvasSpec;
 		expect(scene.elements.find((element) => element.id === "wf:login:4:box")).toMatchObject({
 			fillColor: "#2f9e44",
 			rendererRole: "wireframe-widget",
@@ -345,7 +345,7 @@ describe("Code Mode native wireframe", () => {
 			"verify-email",
 			"sign-up",
 		]);
-		const scene = inline(built).get("scene") as RenderedDiagramScene;
+		const scene = inline(built).get("scene") as CanvasSpec;
 		expect(
 			scene.elements.filter((element) => element.type === "arrow").map((arrow) => arrow.id),
 		).toEqual(["nav:sign-up:0", "nav:verify-email:0"]);
@@ -394,7 +394,7 @@ it("keeps repeated tab and nav state unique through the actual native build", as
 			],
 		});
 		if (!result.ok) throw new Error(JSON.stringify(result.issues));
-		const scene = inline(result).get("scene") as RenderedDiagramScene;
+		const scene = inline(result).get("scene") as CanvasSpec;
 		const ids = scene.elements.map((element) => element.id);
 		expect(new Set(ids).size).toBe(ids.length);
 		expect(ids.filter((id) => id.endsWith(":active"))).toEqual(["wf:screen:0:active"]);

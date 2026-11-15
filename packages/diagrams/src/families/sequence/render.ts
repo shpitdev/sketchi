@@ -13,8 +13,8 @@ import {
 	wrappedLabelWidth,
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 const PADDING = 48;
@@ -283,7 +283,7 @@ export interface SequenceRenderOptions {
 export function renderSequenceDiagram(
 	diagram: SequenceDiagram,
 	{ tighten = true }: SequenceRenderOptions = {},
-): RenderedDiagramScene {
+): CanvasSpec {
 	const input = diagram;
 	const headerLabelById = new Map(
 		input.participants.map((participant) => [
@@ -370,7 +370,7 @@ export function renderSequenceDiagram(
 			}),
 		),
 	);
-	const draw = (messageGap: number, columnStep: number): RenderedDiagramScene => {
+	const draw = (messageGap: number, columnStep: number): CanvasSpec => {
 		const rowYs: number[] = [];
 		let nextRowY = firstMessageY;
 		for (const message of input.messages) {
@@ -705,11 +705,11 @@ export function renderSequenceDiagram(
  * its label, far past its lifeline, which no fixed floor foresees.
  */
 function tightened(
-	natural: RenderedDiagramScene,
+	natural: CanvasSpec,
 	target: { readonly messageGap: number; readonly columnStep: number },
 	naturalStep: number,
-	draw: (messageGap: number, columnStep: number) => RenderedDiagramScene,
-): RenderedDiagramScene {
+	draw: (messageGap: number, columnStep: number) => CanvasSpec,
+): CanvasSpec {
 	const allowed = labelClashes(natural);
 	const clear = (gap: number, step: number) => labelClashes(draw(gap, step)) <= allowed;
 	/** The least value from `from` up to `to`, which is clear, at which `clearAt` holds. */
@@ -734,7 +734,7 @@ function tightened(
 }
 
 /** The box a message label paints in: a self-message's free label where it stands, any other bound to its arrow. */
-function paintedLabels(scene: RenderedDiagramScene) {
+function paintedLabels(scene: CanvasSpec) {
 	const free = new Map(
 		scene.elements.flatMap((element) =>
 			element.type === "text" && element.containerId === undefined
@@ -776,7 +776,7 @@ function paintedLabels(scene: RenderedDiagramScene) {
 }
 
 /** Labels that touch a header, lifeline or bar, and pairs of labels that touch, within a hair. */
-function labelClashes(scene: RenderedDiagramScene): number {
+function labelClashes(scene: CanvasSpec): number {
 	const labels = paintedLabels(scene);
 	const nodes = scene.elements.flatMap((element) =>
 		element.type === "node"

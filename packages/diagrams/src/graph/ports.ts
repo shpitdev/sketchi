@@ -1,5 +1,6 @@
 import {
 	type RoutedEdge,
+	type LayoutEdge,
 	type LaneLayout,
 	type LayoutDirection,
 	type ConnectionEdge,
@@ -44,7 +45,7 @@ import {
 	canvasFrameNameBox,
 	type CanvasConnectorElement as ArrowSceneElement,
 } from "@sketchi/drawing";
-import { type DiagramEdge, type IntermediateDiagram } from "./intermediate.js";
+import { type IntermediateDiagram } from "./intermediate.js";
 import { type GraphLayout } from "./topology.js";
 import { labelBox } from "./label-geometry.js";
 import { groupChain, obstacleBox } from "./containers.js";
@@ -247,7 +248,7 @@ export function portOffsetsForRoutes(
 				? Math.max(
 						PORT_SPACING,
 						...labeled.map((r) => {
-							const metrics = branchLabelMetrics(r.edge.label!);
+							const metrics = branchLabelMetrics(r.edge);
 							return (
 								(r.sourceEdge === "top" || r.sourceEdge === "bottom"
 									? metrics.width
@@ -549,7 +550,7 @@ export function alignedPortOffsets(
 				(!branches(labeled[0]!.route.source.kind) || (sharedDecisionPitch && labeled.length > 1))
 					? Math.max(
 							...labeled.map((slot) => {
-								const metrics = branchLabelMetrics(slot.route.edge.label!);
+								const metrics = branchLabelMetrics(slot.route.edge);
 								return (slotAxis(side) === "x" ? metrics.width : metrics.height) + 24;
 							}),
 						)
@@ -606,14 +607,14 @@ function stateLabelGap(low: PortSlot, high: PortSlot, side: ConnectionEdge): num
 		const vertical = slotAxis(side) === "x";
 		if (slot.endpoint !== "source" || !route.edge.label || isSelfLoop(route)) return 0;
 		if (labelSideOf(route) !== toward) return 0;
-		const metrics = branchLabelMetrics(route.edge.label, branches(route.source.kind));
+		const metrics = branchLabelMetrics(route.edge, branches(route.source.kind));
 		return (vertical ? metrics.width : metrics.height) + 24;
 	};
 	return Math.max(reach(low, 1), reach(high, -1));
 }
 
 export function routeForEdge(
-	edge: DiagramEdge,
+	edge: LayoutEdge,
 	index: number,
 	shapesByNodeId: ReadonlyMap<string, NodeSceneElement>,
 	direction: IntermediateDiagram["layout"]["direction"],
@@ -925,7 +926,7 @@ export function stubReachForRoutes(
 			const node = route.source;
 			const box = labelBox(
 				branchLabelPosition(route, start),
-				branchLabelMetrics(route.edge.label, branches(node.kind)),
+				branchLabelMetrics(route.edge, branches(node.kind)),
 			);
 			for (const [side, beyond] of [
 				["left", node.x - box.x],
@@ -1014,11 +1015,8 @@ export function sourceStubLength(route: RoutedEdge, point: ScenePoint, distance:
 	const labelSpace =
 		route.edge.label && !isSelfLoop(route)
 			? route.sourceEdge === "left" || route.sourceEdge === "right"
-				? branchLabelMetrics(route.edge.label, branches(route.source.kind)).width + 16
-				: Math.max(
-						40,
-						branchLabelMetrics(route.edge.label, branches(route.source.kind)).height + 24,
-					)
+				? branchLabelMetrics(route.edge, branches(route.source.kind)).width + 16
+				: Math.max(40, branchLabelMetrics(route.edge, branches(route.source.kind)).height + 24)
 			: 0;
 	// A label sits past the end run.
 	return endpointClearance(
@@ -1260,7 +1258,7 @@ export function assignPairedReturns(
 }
 
 export function branchLabelPosition(route: RoutedEdge, start: ScenePoint): ScenePoint {
-	const size = branchLabelMetrics(route.edge.label ?? "", branches(route.source.kind));
+	const size = branchLabelMetrics(route.edge, branches(route.source.kind));
 	const stub = pointAwayFromEdge(
 		start,
 		route.sourceEdge,
@@ -1304,7 +1302,7 @@ export function branchLabelObstacles(
 				offsets.get(connectionKey({ edgeId: route.edge.id, endpoint: "source" })) ?? 0,
 			);
 			const position = branchLabelPosition(route, start);
-			const metrics = branchLabelMetrics(route.edge.label!, branches(route.source.kind));
+			const metrics = branchLabelMetrics(route.edge, branches(route.source.kind));
 			const width = metrics.width + 12;
 			return {
 				...route.source,

@@ -1,3 +1,5 @@
+import { measureEdges } from "./measure.js";
+import { type LayoutEdge } from "./layout-types.js";
 import { Graph, Option } from "effect";
 import type {
 	DiagramEdge,
@@ -10,12 +12,12 @@ import type {
  * Composite group endpoints may be graph vertices without being placed nodes. */
 export interface FlowGraph {
 	readonly nodes: readonly DiagramNode[];
-	readonly graph: Graph.DirectedGraph<string, DiagramEdge>;
+	readonly graph: Graph.DirectedGraph<string, LayoutEdge>;
 	readonly indices: ReadonlyMap<string, Graph.NodeIndex>;
 }
-export function flowGraph(nodes: readonly DiagramNode[], edges: readonly DiagramEdge[]): FlowGraph {
+export function flowGraph(nodes: readonly DiagramNode[], edges: readonly LayoutEdge[]): FlowGraph {
 	const indices = new Map<string, Graph.NodeIndex>();
-	const graph = Graph.directed<string, DiagramEdge>((mutable) => {
+	const graph = Graph.directed<string, LayoutEdge>((mutable) => {
 		const index = (id: string) => {
 			const existing = indices.get(id);
 			if (existing !== undefined) return existing;
@@ -28,9 +30,9 @@ export function flowGraph(nodes: readonly DiagramNode[], edges: readonly Diagram
 	});
 	return { nodes, graph, indices };
 }
-export const flowEdges = (flow: FlowGraph): DiagramEdge[] =>
+export const flowEdges = (flow: FlowGraph): LayoutEdge[] =>
 	[...Graph.values(Graph.edges(flow.graph))].map((edge) => edge.data);
-export function incomingEdges(flow: FlowGraph, id: string): DiagramEdge[] {
+export function incomingEdges(flow: FlowGraph, id: string): LayoutEdge[] {
 	const index = flow.indices.get(id);
 	return index === undefined
 		? []
@@ -38,7 +40,7 @@ export function incomingEdges(flow: FlowGraph, id: string): DiagramEdge[] {
 				(edge) => Option.getOrThrow(Graph.getEdge(flow.graph, edge)).data,
 			);
 }
-export function outgoingEdges(flow: FlowGraph, id: string): DiagramEdge[] {
+export function outgoingEdges(flow: FlowGraph, id: string): LayoutEdge[] {
 	const index = flow.indices.get(id);
 	return index === undefined
 		? []
@@ -506,7 +508,7 @@ export interface GroupLevel {
 }
 export interface GroupStructure {
 	readonly composites: ReadonlySet<string>;
-	readonly crossEdges: readonly DiagramEdge[];
+	readonly crossEdges: readonly LayoutEdge[];
 	readonly groupOf: ReadonlyMap<string, string>;
 	readonly groups: readonly GroupLevel[];
 	readonly parentOf: ReadonlyMap<string, string>;
@@ -520,7 +522,7 @@ export interface GraphLayout {
 	readonly groups?: GroupStructure;
 }
 export function prepareGraph(diagram: IntermediateDiagram, place: boolean): GraphLayout {
-	const flow = flowGraph(diagram.nodes, diagram.edges);
+	const flow = flowGraph(diagram.nodes, measureEdges(diagram.nodes, diagram.edges));
 	const global = feedbackEdgeIds(flow);
 	const groups = groupStructure(diagram, flow, global);
 	return {
@@ -540,6 +542,7 @@ function groupStructure(
 	whole: FlowGraph,
 	global: ReadonlySet<string>,
 ): { readonly structure: GroupStructure; readonly feedback: ReadonlySet<string> } | undefined {
+	const sourceEdges = flowEdges(whole);
 	const declaredParent = new Map(
 		(diagram.groups ?? []).flatMap((group) =>
 			group.parent === undefined ? [] : [[group.id, group.parent] as const],
@@ -566,7 +569,7 @@ function groupStructure(
 	);
 	const nodeIds = new Set(diagram.nodes.map((node) => node.id));
 	const composites = new Set(
-		diagram.edges.flatMap((edge) =>
+		sourceEdges.flatMap((edge) =>
 			[edge.source, edge.target].filter((id) => !nodeIds.has(id) && declared.has(id)),
 		),
 	);
@@ -601,11 +604,11 @@ function groupStructure(
 	// reads in the same direction as the diagram around it.
 	// A self-loop runs against the flow wherever it is.
 	const feedback = new Set(
-		diagram.edges.flatMap((edge) => (edge.source === edge.target ? [edge.id] : [])),
+		sourceEdges.flatMap((edge) => (edge.source === edge.target ? [edge.id] : [])),
 	);
 	const nested = groups.map((group): GroupLevel => {
 		const children = groups.filter((child) => parentOf.get(child.id) === group.id);
-		const edges = diagram.edges.flatMap((edge) => {
+		const edges = sourceEdges.flatMap((edge) => {
 			const [source, target] = [unitAt(group.id, edge.source), unitAt(group.id, edge.target)];
 			if (source === undefined || target === undefined) return [];
 			// An edge inside one nested group belongs to that group's level.
@@ -637,7 +640,7 @@ function groupStructure(
 			? loopsThroughOutside(whole, inner, innerFeedback, (id) => unitAt(group.id, id))
 			: [];
 		const crossing = new Set(
-			diagram.edges.flatMap((edge) => {
+			sourceEdges.flatMap((edge) => {
 				const [source, target] = [unitAt(group.id, edge.source), unitAt(group.id, edge.target)];
 				return source === undefined && target !== undefined
 					? [target]
@@ -670,7 +673,7 @@ function groupStructure(
 		);
 	}
 	const topUnit = (id: string) => unitAt(undefined, id) ?? id;
-	const crossEdges = diagram.edges.filter((edge) => topUnit(edge.source) !== topUnit(edge.target));
+	const crossEdges = sourceEdges.filter((edge) => topUnit(edge.source) !== topUnit(edge.target));
 	const top = flowGraph(
 		units,
 		crossEdges.map((edge) => ({

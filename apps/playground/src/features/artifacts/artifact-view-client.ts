@@ -1,19 +1,16 @@
+import { CanvasSpec } from "@sketchi/drawing";
 import { Effect, Schema, Result } from "effect";
 import { HttpClient } from "effect/http";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { projectsRuntime, StudioRequestError } from "../projects/client";
-import {
-	RenderedDiagramSceneSchema,
-	type GetArtifactResult,
-} from "@sketchi/diagrams/build/code-mode/contract";
+import { type GetArtifactResult } from "@sketchi/diagrams/build/code-mode/contract";
 import { type ArtifactProvenance } from "@sketchi/drawing/artifacts";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 export type ArtifactViewState = AsyncResult.AsyncResult<ArtifactReview, unknown>;
 
 export interface ArtifactReview {
 	provenance?: ArtifactProvenance;
-	scene: RenderedDiagramScene;
+	scene: CanvasSpec;
 }
 
 export interface ArtifactRouteUrls {
@@ -56,13 +53,11 @@ export const loadArtifactReview = Effect.fn("Studio.artifact.review")(function* 
 	);
 	if (!isGetArtifactResult(payload) || !payload.ok)
 		return yield* new StudioRequestError({ message: "Artifact could not be loaded." });
-	const parsed = Schema.decodeUnknownResult(RenderedDiagramSceneSchema, { errors: "all" })(
-		payload.inline,
-	);
+	const parsed = Schema.decodeUnknownResult(CanvasSpec, { errors: "all" })(payload.inline);
 	if (!Result.isSuccess(parsed))
 		return yield* new StudioRequestError({ message: "Artifact scene could not be rendered." });
 	return {
-		scene: parsed.success as RenderedDiagramScene,
+		scene: parsed.success,
 		...(payload.provenance ? { provenance: payload.provenance } : {}),
 	};
 });

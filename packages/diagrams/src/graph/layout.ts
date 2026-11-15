@@ -11,7 +11,13 @@ import {
 	type RouteOptions,
 } from "./layout-types.js";
 import { type IntermediateDiagram, type DiagramEdge } from "./intermediate.js";
-import { markerSize, branches, freeLabelSize, EXPORT_PADDING, createNodeShape } from "./measure.js";
+import {
+	markerSize,
+	branches,
+	branchLabelMetrics,
+	EXPORT_PADDING,
+	createNodeShape,
+} from "./measure.js";
 import {
 	isSelfLoop,
 	OPPOSITE_EDGE,
@@ -385,7 +391,13 @@ function crowdedGroups(layout: DiagramLayout): Set<string> {
 	for (const label of labels) {
 		const arrow = arrows.get(label.id.slice(0, -":label".length));
 		const group = arrow ? groups.groupOf.get(arrow.sourceNodeId) : undefined;
-		const box = labelBox(label, freeLabelSize(label.text, label.maxWidth ?? 160));
+		const box = labelBox(
+			label,
+			branchLabelMetrics(
+				routedEdges.find((route) => route.edge.id === arrow!.edgeId)!.edge,
+				label.maxWidth === 80,
+			),
+		);
 		// A label touching a zone it does not start in crowds that zone too.
 		if (groups.zoned)
 			for (const frame of groups.frames)
@@ -831,7 +843,7 @@ function layoutDiagramOnce(
 	const shapesByNodeId = new Map(
 		[...nodeShapes, ...compositeShapes(groups)].map((shape) => [shape.nodeId, shape]),
 	);
-	const routedEdges = diagram.edges.map((edge, index) =>
+	const routedEdges = flowEdges(layoutGraph.flow).map((edge, index) =>
 		routeForEdge(edge, index, shapesByNodeId, edgeDirection(edge), wrap.continuations.has(edge.id)),
 	);
 	// A zoned level's band hangs under the steps that reach it: an edge into it

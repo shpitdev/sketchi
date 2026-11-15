@@ -1,6 +1,6 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 import { DIAGRAM_TYPES } from "@sketchi/diagrams/family";
 
-import { type PatchableScene } from "@sketchi/diagrams/build/code-mode/contract";
 import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { type ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Schema } from "effect";
@@ -56,7 +56,7 @@ export interface BuiltDiagram {
 	readonly type: DiagramDocument["type"];
 	readonly title: string;
 	readonly document: DiagramDocument;
-	readonly scene: PatchableScene;
+	readonly scene: CanvasSpec;
 	readonly excalidraw: ExcalidrawFile;
 	readonly png?: Uint8Array;
 	/** The request text a generated diagram came from. */
@@ -65,11 +65,11 @@ export interface BuiltDiagram {
 
 export interface PatchSource {
 	readonly revision: number;
-	readonly scene: PatchableScene;
+	readonly scene: CanvasSpec;
 }
 
 export interface PatchedDiagramArtifacts {
-	readonly scene: PatchableScene;
+	readonly scene: CanvasSpec;
 	readonly excalidraw: ExcalidrawFile;
 }
 

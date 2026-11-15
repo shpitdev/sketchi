@@ -8,6 +8,7 @@
  * scene's text color, while brand colors stay fixed.
  */
 
+import { type IconRecipeSchema } from "./recipe-schema.js";
 import { excalifontInkBox, type InkBox } from "./excalifont-ink.js";
 
 export const ICON_RECIPE_GRID = 24;
@@ -27,70 +28,16 @@ export const ICON_RECIPE_INK = "ink";
 /** Draws in the scene's background color: the cutout of an inverted mark. */
 export const ICON_RECIPE_PAPER = "paper";
 
-export type IconRecipePoint = readonly [number, number];
-
-export interface IconRecipePaint {
-	/** Outline color, `ink` when omitted; `none` draws the fill alone. */
-	readonly stroke?: string;
-	/** Fill color, `ink`, `paper` or a hex color; omitted leaves the shape open. */
-	readonly fill?: string;
-	/** 2 draws with a marker, twice the icon's pen. */
-	readonly pen?: 1 | 2;
-}
-
-export interface IconRecipeRect extends IconRecipePaint {
-	readonly kind: "rect";
-	readonly x: number;
-	readonly y: number;
-	readonly width: number;
-	readonly height: number;
-	readonly rounded?: boolean;
-}
-
-export interface IconRecipeEllipse extends IconRecipePaint {
-	readonly kind: "ellipse";
-	readonly cx: number;
-	readonly cy: number;
-	readonly rx: number;
-	readonly ry: number;
-}
-
-/** A pen stroke through points; smooth curves through them, closed returns to the start. */
-export interface IconRecipeStroke extends IconRecipePaint {
-	readonly kind: "stroke";
-	readonly points: readonly IconRecipePoint[];
-	readonly smooth?: boolean;
-	readonly closed?: boolean;
-}
-
-/** A stroke ending in an arrowhead. */
-export interface IconRecipeArrow extends Omit<IconRecipePaint, "fill"> {
-	readonly kind: "arrow";
-	readonly points: readonly IconRecipePoint[];
-	readonly smooth?: boolean;
-}
-
-/** A short word in the scene's hand-drawn font, centered on a point. */
-export interface IconRecipeText {
-	readonly kind: "text";
-	readonly cx: number;
-	readonly cy: number;
-	readonly text: string;
-	/** Font size in grid units. */
-	readonly size: number;
-	readonly color?: string;
-}
-
-export type IconRecipePart =
-	| IconRecipeRect
-	| IconRecipeEllipse
-	| IconRecipeStroke
-	| IconRecipeArrow
-	| IconRecipeText;
-
-export interface IconRecipe {
-	readonly parts: readonly IconRecipePart[];
-}
+/** Recipe types come from the drawing primitive codec. */
+export type IconRecipe = typeof IconRecipeSchema.Type;
+export type IconRecipePart = IconRecipe["parts"][number];
+export type IconRecipeRect = Extract<IconRecipePart, { kind: "rect" }>;
+export type IconRecipeEllipse = Extract<IconRecipePart, { kind: "ellipse" }>;
+export type IconRecipeStroke = Extract<IconRecipePart, { kind: "stroke" }>;
+export type IconRecipeArrow = Extract<IconRecipePart, { kind: "arrow" }>;
+export type IconRecipeText = Extract<IconRecipePart, { kind: "text" }>;
+export type IconRecipePoint = IconRecipeStroke["points"][number];
+export type IconRecipePaint = Pick<IconRecipeRect, "stroke" | "fill" | "pen">;
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/u;
 

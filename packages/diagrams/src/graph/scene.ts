@@ -69,7 +69,7 @@ import {
 } from "./placement.js";
 import { groupBlocks, laneBlocks } from "./containers.js";
 import { drawnSize, routeLength } from "./route-geometry.js";
-import { branchLabels, clearLabels, clearOutlines } from "./labels.js";
+import { placedBranchLabels, branchLabels, clearLabels, clearOutlines } from "./labels.js";
 import { EXPORT_PADDING, NODE_LABEL_FONT_SIZE } from "./measure.js";
 import {
 	stepsClearOfEnds,
@@ -228,16 +228,14 @@ export function renderGraphDiagram(
 		const size = drawnSize(
 			[...layout.nodeShapes, ...groupBlocks(layout.groups), ...laneBlocks(layout.lanes)],
 			layout.edgeArrows,
-			[
-				...branchLabels(
-					[...layout.edgeArrows],
-					layout.routedEdges,
-					layout.nodeShapes,
-					layout.groups,
-					false,
-					layout.lanes,
-				),
-			],
+			placedBranchLabels(
+				[...layout.edgeArrows],
+				layout.routedEdges,
+				layout.nodeShapes,
+				layout.groups,
+				false,
+				layout.lanes,
+			).bounds,
 		);
 		const [along, across] = vertical ? [size.height, size.width] : [size.width, size.height];
 		const aspect = (along + 2 * EXPORT_PADDING) / (across + 2 * EXPORT_PADDING);
@@ -1229,7 +1227,7 @@ export function renderGraphDiagram(
 		],
 		nodes: drawnNodes.nodes,
 	};
-	const framed = groups && !groups.zoned ? withGroupFrames(groups, drawn) : drawn;
+	const framed = groups && !groups.zoned ? withGroupFrames(groups, drawn, routedEdges) : drawn;
 	const { arrows: edgeArrows, frames, labels } = framed;
 	const nodeShapes = framed.nodes.flatMap((shape) => drawnMarker(shape, diagram.style.accentColor));
 	// Lanes sit under everything, each band, then its header and the header's name;

@@ -6,7 +6,7 @@ import {
 	wrappedLabelWidth,
 	wrapTextToWidth,
 	type CanvasConnectorElement as ArrowSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import {
 	parseSequenceDiagram,
@@ -214,7 +214,7 @@ function labelBox(center: { x: number; y: number }, label: string): Box {
  * Where a message label paints: a self-message's free label at its own
  * position, any other label bound to its arrow's middle point or segment.
  */
-function paintedLabel(scene: RenderedDiagramScene, arrow: ArrowSceneElement): Box {
+function paintedLabel(scene: CanvasSpec, arrow: ArrowSceneElement): Box {
 	const free = scene.elements.find((element) => element.id === `${arrow.id}:label`);
 	if (free?.type === "text") return labelBox(free, free.text);
 	const { points } = arrow;
@@ -246,7 +246,7 @@ function segmentBoxes(points: readonly { x: number; y: number }[]): Box[] {
  * scene. A loop's label never touches any line: its own loop's three legs,
  * another message, a lifeline, a bar or a header.
  */
-function selfMessageIssues(diagram: SequenceDiagram, scene: RenderedDiagramScene): string[] {
+function selfMessageIssues(diagram: SequenceDiagram, scene: CanvasSpec): string[] {
 	const issues: string[] = [];
 	const arrows = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
 	const nodes = scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));
@@ -323,11 +323,7 @@ function selfMessageIssues(diagram: SequenceDiagram, scene: RenderedDiagramScene
  * and lifelines, each label stands clear of every other, and of every bar,
  * header and lifeline, nested bars included.
  */
-function labelOverlaps(
-	diagram: SequenceDiagram,
-	scene: RenderedDiagramScene,
-	nested = false,
-): string[] {
+function labelOverlaps(diagram: SequenceDiagram, scene: CanvasSpec, nested = false): string[] {
 	const arrows = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
 	const nodes = scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));
 	const labels = arrows.map((arrow) => [arrow.edgeId, paintedLabel(scene, arrow)] as const);

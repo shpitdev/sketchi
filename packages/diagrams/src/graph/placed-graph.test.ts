@@ -5,7 +5,7 @@ import {
 	segmentsFromPoints,
 	segmentsOverlapInterior,
 	SKETCHI_DIAGRAM_STYLE,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { type IntermediateDiagram } from "./intermediate.js";
 
@@ -57,9 +57,9 @@ const anchors = new Map<string, GraphAnchor>([
 	["b:target", { side: "left", offset: 40 }],
 ]);
 
-const arrows = (scene: RenderedDiagramScene) =>
+const arrows = (scene: CanvasSpec) =>
 	scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
-const boxes = (scene: RenderedDiagramScene) =>
+const boxes = (scene: CanvasSpec) =>
 	new Map(
 		scene.elements.flatMap((element) =>
 			element.type === "node" ? [[element.nodeId, element] as const] : [],

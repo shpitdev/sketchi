@@ -1,3 +1,4 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 import {
 	mindmapTopics,
 	type Mindmap,
@@ -7,8 +8,6 @@ import {
 } from "@sketchi/diagrams/families/mindmap/index";
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
-
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { type ScenarioCheck } from "./evaluate.js";
 import { type DiagramScenarioDifficulty } from "./scenarios.js";
@@ -191,7 +190,7 @@ export function mindmapScenarioChecks(
 }
 
 /** The drawn map reads: topics clear of each other, no crossing curves, no curve through a topic. */
-export function mindmapLayoutCheck(scene: RenderedDiagramScene): ScenarioCheck {
+export function mindmapLayoutCheck(scene: CanvasSpec): ScenarioCheck {
 	const issues = mindmapLayoutIssues(scene);
 	return {
 		id: "mindmap-layout",

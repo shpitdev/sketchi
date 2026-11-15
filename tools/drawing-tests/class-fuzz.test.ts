@@ -11,10 +11,10 @@ import {
 	candidateRouteQuality,
 	estimateTextWidth,
 	getCanvasValidationIssues,
-	type CanvasSpec as RenderedDiagramScene,
 	routingQualityFindings,
 	routingQualityScale,
 	segmentsFromPoints,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -167,7 +167,7 @@ function randomModels(count: number, start: number): ClassDiagram[] {
 }
 
 /** Interior crossings between arrows, counted on corners only, and reader-scale findings. */
-function routingCounts(scene: RenderedDiagramScene) {
+function routingCounts(scene: CanvasSpec) {
 	const arrows = scene.elements.flatMap((e) => (e.type === "arrow" ? [e] : []));
 	const routes = arrows.map((a) => ({
 		id: a.edgeId,

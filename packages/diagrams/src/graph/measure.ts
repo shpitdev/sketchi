@@ -14,8 +14,13 @@ import {
 	wrapTextToWidth,
 	wrappedLabelWidth,
 } from "@sketchi/drawing";
-import { type DiagramNode, type GraphNode, DIAGRAM_NODE_COLORS } from "./intermediate.js";
-import { type LabelMetrics, type DescriptionMetrics } from "./layout-types.js";
+import {
+	type DiagramNode,
+	type DiagramEdge,
+	type GraphNode,
+	DIAGRAM_NODE_COLORS,
+} from "./intermediate.js";
+import { type LayoutEdge, type LabelMetrics, type DescriptionMetrics } from "./layout-types.js";
 
 export const MIN_NODE_WIDTH = 184;
 
@@ -348,31 +353,41 @@ function createUncoloredNodeShape(
 	};
 }
 
-/**
- * Free labels measured, by wrap width and text: the router asks for a branch
- * label's size on every stub it tries, and wrapping segments the text anew.
- */
-const freeLabelSizes = new Map<string, Readonly<{ width: number; height: number }>>();
-
-/** Labels measured before the cache starts over, so a long-lived worker stays small. */
-const FREE_LABEL_SIZES = 4_096;
-
-export function freeLabelSize(
+/** The rendered text box, independent of a route's position or direction. */
+function freeLabelSize(
 	label: string,
 	maxWidth: number,
 ): Readonly<{ width: number; height: number }> {
-	const key = `${maxWidth}\u0000${label}`;
-	let size = freeLabelSizes.get(key);
-	if (!size) {
-		const text = wrapTextToWidth(label, maxWidth, 13);
-		size = {
-			width: wrappedLabelWidth(text, 13, maxWidth),
-			height: Math.ceil(text.split("\n").length * 13 * 1.35),
-		};
-		if (freeLabelSizes.size >= FREE_LABEL_SIZES) freeLabelSizes.clear();
-		freeLabelSizes.set(key, size);
-	}
-	return size;
+	const text = wrapTextToWidth(label, maxWidth, 13);
+	return {
+		width: wrappedLabelWidth(text, 13, maxWidth),
+		height: Math.ceil(text.split("\n").length * 13 * 1.35),
+	};
+}
+
+/** Each edge carries its label measurements through every arrangement and route.
+ * A decision's compact label and its wide shared-port pitch are distinct sizes. */
+export function measureEdges(
+	nodes: readonly DiagramNode[],
+	edges: readonly DiagramEdge[],
+): LayoutEdge[] {
+	const labels = new Set(edges.flatMap((edge) => (edge.label ? [edge.label] : [])));
+	const decisions = new Set(nodes.filter((node) => branches(node.kind)).map((node) => node.id));
+	const compact = new Set(
+		edges.flatMap((edge) => (edge.label && decisions.has(edge.source) ? [edge.label] : [])),
+	);
+	// These construction lookups are discarded; the measured edges share the results.
+	const sizes = new Map(
+		[...labels].map((label) => [
+			label,
+			{
+				labelSize: freeLabelSize(label, 160),
+				...(compact.has(label) ? { branchLabelSize: freeLabelSize(label, 80) } : {}),
+			},
+		]),
+	);
+	const unlabelled = { labelSize: { width: 1, height: Math.ceil(13 * 1.35) } };
+	return edges.map((edge) => ({ ...edge, ...(sizes.get(edge.label ?? "") ?? unlabelled) }));
 }
 
 /** Decision branch labels wrap narrow to stay compact beside their vertex. */
@@ -381,8 +396,8 @@ export function branchLabelMaxWidth(fromDecision: boolean | undefined): number {
 }
 
 export function branchLabelMetrics(
-	label: string,
+	edge: LayoutEdge,
 	fromDecision = false,
 ): { width: number; height: number } {
-	return freeLabelSize(label, branchLabelMaxWidth(fromDecision));
+	return (fromDecision ? edge.branchLabelSize : undefined) ?? edge.labelSize;
 }

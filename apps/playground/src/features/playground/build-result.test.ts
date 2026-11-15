@@ -5,6 +5,7 @@ import {
 	buildResultOf,
 	deriveBuildState,
 	diagramToolCardStatus,
+	sceneFromResult,
 	type DiagramToolPart,
 } from "./build-result";
 import { DEPLOY_PIPELINE_SCENE, DEPLOY_PIPELINE_SPEC } from "./deploy-pipeline-sample";
@@ -25,6 +26,46 @@ function pendingMessage(id: string): UIMessage {
 }
 
 describe("build result selectors", () => {
+	it("passes decoded scene defaults to the editor and rejects malformed geometry", () => {
+		const {
+			layers: _layers,
+			layouts: _layouts,
+			zOrder: _zOrder,
+			...inline
+		} = DEPLOY_PIPELINE_SCENE;
+		const accepted = {
+			ok: true,
+			status: "accepted",
+			buildId: "defaults",
+			issues: [],
+			normalizedSpec: { ...DEPLOY_PIPELINE_SPEC, id: "pipeline" },
+			quality: {
+				accepted: true,
+				checks: [],
+				score: 9,
+				threshold: 8,
+				summary: { nodeCount: 4, edgeCount: 3 },
+			},
+			artifact: {
+				artifactId: "defaults",
+				diagramId: "pipeline",
+				formats: [{ format: "scene", mimeType: "application/json", inline }],
+			},
+		} satisfies BuildFlowchartResult;
+		expect(sceneFromResult(accepted)).toEqual({ ...inline, layers: [], layouts: [], zOrder: [] });
+		expect(inline).not.toHaveProperty("layers");
+		expect(
+			sceneFromResult({
+				...accepted,
+				artifact: {
+					...accepted.artifact,
+					formats: [
+						{ format: "scene", mimeType: "application/json", inline: { ...inline, width: "wide" } },
+					],
+				},
+			}),
+		).toBeNull();
+	});
 	it.each([false, true])("ignores an earlier unfinished call when busy=%s", (busy) => {
 		const latest: UIMessage = {
 			id: "latest",

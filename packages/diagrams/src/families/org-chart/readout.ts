@@ -4,7 +4,7 @@ import {
 	segmentsFromPoints,
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 export interface OrgChartLayoutIssue {
@@ -23,7 +23,7 @@ export interface OrgChartLayoutIssue {
 /** Cards closer than this read as touching. */
 const CARD_GAP = 6;
 
-const isCard = (element: RenderedDiagramScene["elements"][number]): element is NodeSceneElement =>
+const isCard = (element: CanvasSpec["elements"][number]): element is NodeSceneElement =>
 	element.type === "node" && (element.kind === "person" || element.kind === "assistant");
 
 /** Whether a point lies on a box's outline. */
@@ -45,7 +45,7 @@ function onOutline(point: { x: number; y: number }, box: NodeSceneElement): bool
  * lines crossing (a line may leave another where they part, as a bus does),
  * every name and title inside its card, and no dotted line's label over a card.
  */
-export function orgChartLayoutIssues(scene: RenderedDiagramScene): OrgChartLayoutIssue[] {
+export function orgChartLayoutIssues(scene: CanvasSpec): OrgChartLayoutIssue[] {
 	const issues: OrgChartLayoutIssue[] = [];
 	const cards = scene.elements.filter(isCard);
 	const byNode = new Map(cards.map((card) => [card.nodeId, card]));

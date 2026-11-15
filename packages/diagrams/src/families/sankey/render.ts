@@ -6,9 +6,9 @@ import {
 	estimateTextWidth,
 	type CanvasLineElement as LineSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 import { formatValue, unitParts } from "../chart/scale.js";
@@ -72,10 +72,7 @@ function textElement(id: string, text: SankeyText, groupIds: string[]): TextScen
 }
 
 /** Draw a laid-out Sankey diagram: bands behind, bars over them, then every label. */
-export function sankeySceneFromLayout(
-	diagram: SankeyDiagram,
-	layout: SankeyLayout,
-): RenderedDiagramScene {
+export function sankeySceneFromLayout(diagram: SankeyDiagram, layout: SankeyLayout): CanvasSpec {
 	const labelOf = new Map(diagram.nodes.map((node) => [node.id, node.label]));
 	const flowParts = unitParts(diagram.unit);
 	const back: SceneElement[] = [];
@@ -246,6 +243,6 @@ export function sankeySceneFromLayout(
 	};
 }
 
-export function renderSankeyDiagram(diagram: SankeyDiagram): RenderedDiagramScene {
+export function renderSankeyDiagram(diagram: SankeyDiagram): CanvasSpec {
 	return sankeySceneFromLayout(diagram, layoutSankeyDiagram(diagram));
 }

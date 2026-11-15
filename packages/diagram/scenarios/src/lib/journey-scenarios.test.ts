@@ -1,8 +1,9 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { type JourneyDiagram } from "@sketchi/diagrams/families/journey/document";
 import { renderDiagram } from "@sketchi/diagrams/family";
 import { DiagramGenerationClient } from "@sketchi/diagrams/generate/client";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+
 import { Effect, Option, Result } from "effect";
 import { describe, expect, it } from "vitest";
 
@@ -197,9 +198,7 @@ describe("prompt-grounded journey scenarios", () => {
 		expect(journeyLayoutCheck(scene).passed).toBe(true);
 		const edit = (
 			id: string,
-			change: (
-				element: RenderedDiagramScene["elements"][number],
-			) => RenderedDiagramScene["elements"][number],
+			change: (element: CanvasSpec["elements"][number]) => CanvasSpec["elements"][number],
 		) => ({
 			...scene,
 			elements: scene.elements.map((element) => (element.id === id ? change(element) : element)),

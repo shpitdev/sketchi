@@ -1,6 +1,7 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { useChat } from "@ai-sdk/react";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+
 import { DrawingEditor } from "@sketchi/editor";
 import { createFileRoute } from "@tanstack/react-router";
 import { DefaultChatTransport, type UIMessage } from "ai";
@@ -152,7 +153,7 @@ function DiagramStage({
 	generating: boolean;
 	ghostLabels: string[];
 	result: StudioBuildResult | undefined;
-	scene: RenderedDiagramScene | null;
+	scene: CanvasSpec | null;
 	onCompose: () => void;
 	onStop: () => void;
 }) {

@@ -5,19 +5,18 @@ import { describe, expect, it } from "vitest";
 import {
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasPoint as ScenePoint,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { type MindmapTopic, parseMindmap, mindmapLayoutIssues } from "./index.js";
 
 import { renderMindmap } from "./layout.js";
 
-const nodes = (scene: RenderedDiagramScene) =>
+const nodes = (scene: CanvasSpec) =>
 	scene.elements.filter((element): element is NodeSceneElement => element.type === "node");
-const arrows = (scene: RenderedDiagramScene) =>
+const arrows = (scene: CanvasSpec) =>
 	scene.elements.filter((element): element is ArrowSceneElement => element.type === "arrow");
-const node = (scene: RenderedDiagramScene, id: string) =>
-	nodes(scene).find((entry) => entry.nodeId === id)!;
+const node = (scene: CanvasSpec, id: string) => nodes(scene).find((entry) => entry.nodeId === id)!;
 const centerX = (shape: NodeSceneElement) => shape.x + shape.width / 2;
 const centerY = (shape: NodeSceneElement) => shape.y + shape.height / 2;
 const leaves = (...labels: string[]): MindmapTopic[] => labels.map((label) => ({ label }));
@@ -178,9 +177,7 @@ describe("mindmapLayoutIssues", () => {
 	});
 
 	/** The scene with an arrow redrawn as a straight line to `end`. */
-	const redrawn = (
-		changes: readonly (readonly [ArrowSceneElement, ScenePoint])[],
-	): RenderedDiagramScene => ({
+	const redrawn = (changes: readonly (readonly [ArrowSceneElement, ScenePoint])[]): CanvasSpec => ({
 		...scene,
 		elements: scene.elements.map((element) => {
 			const change = changes.find(([arrow]) => arrow === element);

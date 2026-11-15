@@ -1,6 +1,6 @@
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
-import { estimateTextWidth, type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+import { estimateTextWidth, type CanvasSpec } from "@sketchi/drawing";
 import {
 	parseChartDiagram,
 	type ChartDiagram,
@@ -463,10 +463,7 @@ const BAR_TOLERANCE_PX = 0.6;
 const SLICE_TOLERANCE_DEGREES = 0.1;
 
 /** The drawn chart is to scale: bar lengths follow |value| and slice angles follow share. */
-export function chartGeometryCheck(
-	diagram: ChartDiagram,
-	scene: RenderedDiagramScene,
-): ScenarioCheck {
+export function chartGeometryCheck(diagram: ChartDiagram, scene: CanvasSpec): ScenarioCheck {
 	const marks = readChartMarks(scene);
 	if (diagram.kind === "pie") {
 		const values = diagram.series[0]?.values ?? [];
@@ -512,10 +509,7 @@ function statedShare(
  * Pie labels state each slice's share of the total at the chart's precision,
  * and slices with different values never share a label.
  */
-export function chartPieLabelCheck(
-	diagram: ChartDiagram,
-	scene: RenderedDiagramScene,
-): ScenarioCheck {
+export function chartPieLabelCheck(diagram: ChartDiagram, scene: CanvasSpec): ScenarioCheck {
 	if (diagram.kind !== "pie")
 		return { id: "chart-pie-labels", passed: true, message: "Not a pie." };
 	const values = diagram.series[0]?.values ?? [];
@@ -555,9 +549,9 @@ export function chartPieLabelCheck(
 	};
 }
 
-type SceneText = Extract<RenderedDiagramScene["elements"][number], { type: "text" }>;
+type SceneText = Extract<CanvasSpec["elements"][number], { type: "text" }>;
 
-function sceneTexts(scene: RenderedDiagramScene): SceneText[] {
+function sceneTexts(scene: CanvasSpec): SceneText[] {
 	return scene.elements.filter((element): element is SceneText => element.type === "text");
 }
 
@@ -572,7 +566,7 @@ const VALUE_TEXT = /^chart:(value|table|slice-label):/u;
 export function chartDrawnDataCheck(
 	scenario: ChartScenario,
 	diagram: ChartDiagram,
-	scene: RenderedDiagramScene,
+	scene: CanvasSpec,
 ): ScenarioCheck {
 	const texts = sceneTexts(scene);
 	const drawn = texts.map((element) => normalize(element.text.replace(/\n/gu, " ")));
@@ -608,7 +602,7 @@ export function chartDrawnDataCheck(
 }
 
 /** Gridlines, the zero baseline and the axis never run through text. */
-export function chartClearRulesCheck(scene: RenderedDiagramScene): ScenarioCheck {
+export function chartClearRulesCheck(scene: CanvasSpec): ScenarioCheck {
 	const boxes = sceneTexts(scene).map((element) => {
 		const width = element.maxWidth ?? estimateTextWidth(element.text, element.fontSize);
 		const height = element.text.split("\n").length * element.fontSize * 1.35;

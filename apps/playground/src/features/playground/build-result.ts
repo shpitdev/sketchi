@@ -1,3 +1,4 @@
+import { CanvasSpec } from "@sketchi/drawing";
 import { sequenceBuild } from "@sketchi/diagrams/families/sequence/build";
 import { familyForType } from "@sketchi/diagrams/family";
 import { stateLabel } from "@sketchi/diagrams/families/state-machine/document";
@@ -10,14 +11,12 @@ import {
 	BuildErDiagramToolInputSchema,
 	BuildClassDiagramResultSchema,
 	BuildClassDiagramToolInputSchema,
-	RenderedDiagramSceneSchema,
 	type BuildFlowchartResult,
 	type BuildStateMachineResult,
 	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
 } from "@sketchi/diagrams/build/code-mode/contract";
 
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 import { Result, Schema } from "effect";
 import { type UIMessage } from "ai";
 import { type ReadyPlaygroundArtifact } from "./surface";
@@ -302,23 +301,16 @@ export function artifactFromResponse(result: StudioBuildResult): ReadyPlayground
 	};
 }
 
-function isRenderedDiagramScene(value: unknown): value is RenderedDiagramScene {
-	return Result.isSuccess(
-		Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
-			errors: "all",
-			reportInput: true,
-		})(value),
-	);
-}
-
-export function sceneFromResult(
-	result: StudioBuildResult | undefined,
-): RenderedDiagramScene | null {
+export function sceneFromResult(result: StudioBuildResult | undefined): CanvasSpec | null {
 	if (!result?.ok) {
 		return null;
 	}
 	const scene = result.artifact.formats.find((format) => format.format === "scene")?.inline;
-	return isRenderedDiagramScene(scene) ? scene : null;
+	const decoded = Schema.decodeUnknownResult(CanvasSpec, {
+		errors: "all",
+		reportInput: true,
+	})(scene);
+	return Result.isSuccess(decoded) ? decoded.success : null;
 }
 
 export interface PlaygroundBuildState {
@@ -326,7 +318,7 @@ export interface PlaygroundBuildState {
 	acceptedResult: StudioBuildResult | undefined;
 	displayResult: StudioBuildResult | undefined;
 	buildMode: boolean;
-	scene: RenderedDiagramScene | null;
+	scene: CanvasSpec | null;
 	artifact: ReadyPlaygroundArtifact | null;
 	ghostLabels: string[];
 }

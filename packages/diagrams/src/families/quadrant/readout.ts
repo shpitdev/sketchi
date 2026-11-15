@@ -1,8 +1,8 @@
 import {
 	estimateTextWidth,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasPoint as ScenePoint,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { QUADRANT_KEYS, type QuadrantDiagram, type QuadrantKey } from "./document.js";
 
@@ -79,7 +79,7 @@ function nodeBox(element: NodeElement): QuadrantBox {
 }
 
 /** Read a rendered quadrant chart's plot, dots, labels, names and leaders back from its scene. */
-export function readQuadrantScene(scene: RenderedDiagramScene): QuadrantReadout {
+export function readQuadrantScene(scene: CanvasSpec): QuadrantReadout {
 	const nodes = scene.elements.filter((element): element is NodeElement => element.type === "node");
 	const texts = scene.elements.filter((element): element is TextElement => element.type === "text");
 	const lines = scene.elements.filter((element): element is LineElement => element.type === "line");
@@ -214,7 +214,7 @@ export const QUADRANT_MAX_ASPECT = 2.45;
  * leader or rule through text, a broken word, or a name over a dot.
  */
 export function quadrantLayoutIssues(
-	scene: RenderedDiagramScene,
+	scene: CanvasSpec,
 	diagram: Pick<QuadrantDiagram, "points">,
 ): QuadrantLayoutIssue[] {
 	const readout = readQuadrantScene(scene);

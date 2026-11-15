@@ -2,10 +2,7 @@
 import { Result } from "effect";
 import { writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import {
-	getCanvasValidationIssues,
-	type CanvasSpec as RenderedDiagramScene,
-} from "@sketchi/drawing";
+import { getCanvasValidationIssues, type CanvasSpec } from "@sketchi/drawing";
 import {
 	parseSankeyDiagram,
 	SANKEY_MAX_LINKS,
@@ -188,10 +185,10 @@ function randomDiagrams(count: number, start: number): SankeyDiagram[] {
 }
 
 /** The export's width over its height, as hosted PNGs frame it. */
-const aspect = (scene: RenderedDiagramScene) => (scene.width - 80) / (scene.height - 80);
+const aspect = (scene: CanvasSpec) => (scene.width - 80) / (scene.height - 80);
 
 /** Bands at the floor aside, every band is as wide as its value at one shared scale. */
-function scaleIssues(diagram: SankeyDiagram, scene: RenderedDiagramScene): string[] {
+function scaleIssues(diagram: SankeyDiagram, scene: CanvasSpec): string[] {
 	const { bands } = readSankeyScene(scene);
 	const valueOf = new Map(
 		diagram.links.map((link) => [`${link.source}>${link.target}`, link.value]),

@@ -1,8 +1,8 @@
 import {
 	boundLabelWidth,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 import {
@@ -98,7 +98,7 @@ const ownGroup = (element: SceneElement) => element.groupIds?.[0];
  * another text, and a component's text outside its own outline. A modal's
  * backdrop and everything over it are drawn over the screen on purpose.
  */
-export function wireframeLayoutIssues(scene: RenderedDiagramScene): WireframeLayoutIssue[] {
+export function wireframeLayoutIssues(scene: CanvasSpec): WireframeLayoutIssue[] {
 	const issues: WireframeLayoutIssue[] = [];
 	const byId = new Map(scene.elements.map((element) => [element.id, element]));
 	const bounds = new Map(

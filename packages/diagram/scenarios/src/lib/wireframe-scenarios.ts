@@ -1,3 +1,4 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
 import {
@@ -14,7 +15,6 @@ import {
 	wireframeFrameName,
 } from "@sketchi/diagrams/families/wireframe/render";
 import { wireframeLayoutIssues } from "@sketchi/diagrams/families/wireframe/readout";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { type ScenarioCheck } from "./evaluate.js";
 import { type DiagramScenarioDifficulty } from "./scenarios.js";
@@ -541,10 +541,7 @@ const CONTAINER_TYPES: ReadonlySet<string> = new Set([
  * it, and every component drawn as its own group showing its words, inside
  * its parent's box and its screen's frame.
  */
-export function wireframeDrawnCheck(
-	diagram: WireframeDiagram,
-	scene: RenderedDiagramScene,
-): ScenarioCheck {
+export function wireframeDrawnCheck(diagram: WireframeDiagram, scene: CanvasSpec): ScenarioCheck {
 	const problems: string[] = [];
 	const { layout } = renderWireframeDiagram(diagram);
 	const flat = (text: string) => text.replace(/\s+/gu, "");
@@ -612,7 +609,7 @@ export function wireframeDrawnCheck(
 }
 
 /** Components apart, every text inside its component and clear of others, every screen holding its own. */
-export function wireframeLayoutCheck(scene: RenderedDiagramScene): ScenarioCheck {
+export function wireframeLayoutCheck(scene: CanvasSpec): ScenarioCheck {
 	const issues = wireframeLayoutIssues(scene);
 	return {
 		id: "wireframe-layout",

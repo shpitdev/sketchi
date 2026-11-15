@@ -16,7 +16,7 @@ import {
 	routingQualityFindings,
 	routingQualityScale,
 	type CanvasConnectorElement as ArrowSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 import { arrowCrossings } from "../../graph/readability.js";
@@ -128,7 +128,7 @@ export function stateMachineGraph(
 }
 
 /** Crossings plus reader-scale findings, judged at the scene's export size. */
-function routingCost(scene: RenderedDiagramScene): number {
+function routingCost(scene: CanvasSpec): number {
 	const arrows = scene.elements.filter((e): e is ArrowSceneElement => e.type === "arrow");
 	return (
 		arrowCrossings(arrows) +
@@ -150,9 +150,7 @@ function routingCost(scene: RenderedDiagramScene): number {
  * whose aspect stays readable, the one with fewer crossings and reader
  * findings (left to right on a tie); otherwise the less elongated one.
  */
-export function renderStateMachineDiagram(
-	diagram: StateMachineDiagram,
-): Result.Result<RenderedDiagramScene> {
+export function renderStateMachineDiagram(diagram: StateMachineDiagram): Result.Result<CanvasSpec> {
 	const render = (direction: "TB" | "LR") =>
 		renderGraphDiagram(stateMachineGraph(diagram, direction), { pairedReturns: true });
 	if (diagram.layout) return Result.succeed(render(diagram.layout.direction));

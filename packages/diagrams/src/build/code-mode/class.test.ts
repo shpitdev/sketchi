@@ -1,8 +1,8 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 import { describe, expect, it } from "vitest";
 import { Effect, Schema } from "effect";
 import { classFixture } from "../../families/class/document.js";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
 import { BuildClassDiagramResultSchema } from "./contract.js";
@@ -187,7 +187,7 @@ describe("Code Mode native class diagram", () => {
 		const formats = new Map(
 			patched.artifact.formats.map((format) => [format.format, format.inline]),
 		);
-		const scene = formats.get("scene") as RenderedDiagramScene;
+		const scene = formats.get("scene") as CanvasSpec;
 		const roles = new Set(
 			scene.elements.flatMap((element) => (element.type === "node" ? [element.rendererRole] : [])),
 		);

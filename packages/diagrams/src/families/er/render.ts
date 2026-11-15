@@ -6,9 +6,9 @@ import {
 	routingQualityScale,
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import {
 	type ErCardinality,
@@ -503,7 +503,7 @@ function routedScene(
 	placement: ErPlacement,
 	ends: readonly PinnedEnd[],
 	packed = false,
-): RenderedDiagramScene {
+): CanvasSpec {
 	const runs = spreadPorts(ends, placement.boxes, packed);
 	loopRuns(ends, placement.boxes, runs);
 	const anchors = new Map<string, GraphAnchor>(
@@ -571,7 +571,7 @@ const PLACEMENT_MARGIN = 0.75;
  * wraps around its own table, about what a reader counts as a flaw each; and
  * a little for each table a line within a column runs past.
  */
-function routedCost(scene: RenderedDiagramScene): number {
+function routedCost(scene: CanvasSpec): number {
 	const arrows = scene.elements.filter((e): e is ArrowSceneElement => e.type === "arrow");
 	const aspect = Math.max(scene.width / scene.height, scene.height / scene.width);
 	return (
@@ -600,7 +600,7 @@ const PASSED_TABLE = 0.25;
  * Tables a line between two tables of one column runs past: those standing
  * between its two in that column, each a stretch the reader follows beside.
  */
-function passedTables(scene: RenderedDiagramScene, arrows: readonly ArrowSceneElement[]): number {
+function passedTables(scene: CanvasSpec, arrows: readonly ArrowSceneElement[]): number {
 	const boxes = scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));
 	const byId = new Map(boxes.map((box) => [box.nodeId, box]));
 	let count = 0;
@@ -629,7 +629,7 @@ function passedTables(scene: RenderedDiagramScene, arrows: readonly ArrowSceneEl
  * Ends that leave their table on the side away from a table in another
  * column, so the line wraps around its own table to get there.
  */
-function wraps(scene: RenderedDiagramScene, arrows: readonly ArrowSceneElement[]): number {
+function wraps(scene: CanvasSpec, arrows: readonly ArrowSceneElement[]): number {
 	const boxes = new Map(
 		scene.elements.flatMap((element) =>
 			element.type === "node" ? [[element.nodeId, element] as const] : [],
@@ -702,7 +702,7 @@ function endsOf(candidate: Candidate): PinnedEnd[] {
 	return pinnedEnds(candidate.links, candidate.placement);
 }
 
-function sceneOf(diagram: ErDiagram, candidate: Candidate): RenderedDiagramScene {
+function sceneOf(diagram: ErDiagram, candidate: Candidate): CanvasSpec {
 	return routedScene(
 		diagram,
 		candidate.tables,
@@ -871,7 +871,7 @@ function crowdedPorts(
  * their own table, tables a line runs past, marks on labels and the drawing's
  * long side.
  */
-function flaws(scene: RenderedDiagramScene) {
+function flaws(scene: CanvasSpec) {
 	const arrows = scene.elements.filter((e): e is ArrowSceneElement => e.type === "arrow");
 	return {
 		crossings: arrowCrossings(arrows),
@@ -904,7 +904,7 @@ function flaws(scene: RenderedDiagramScene) {
  * Ends whose bar or foot, past its tip as Excalidraw draws it, overlaps a
  * relationship's label.
  */
-function marksOnLabels(scene: RenderedDiagramScene, arrows: readonly ArrowSceneElement[]): number {
+function marksOnLabels(scene: CanvasSpec, arrows: readonly ArrowSceneElement[]): number {
 	const labels = scene.elements.flatMap((element) =>
 		element.type === "text" && element.containerId === undefined
 			? [
@@ -947,7 +947,7 @@ function marksOnLabels(scene: RenderedDiagramScene, arrows: readonly ArrowSceneE
 }
 
 /** Whether a scene draws no more of any flaw than another. */
-function drawsNoWorse(after: RenderedDiagramScene, before: RenderedDiagramScene): boolean {
+function drawsNoWorse(after: CanvasSpec, before: CanvasSpec): boolean {
 	const [next, current] = [flaws(after), flaws(before)];
 	return (Object.keys(next) as (keyof typeof next)[]).every(
 		(key) => next[key] <= current[key] + 1e-9,
@@ -994,7 +994,7 @@ function bestScene(
 const FINISHED_PLACEMENTS = 3;
 
 interface Placed {
-	readonly scene: RenderedDiagramScene;
+	readonly scene: CanvasSpec;
 	readonly candidate: Candidate;
 }
 
@@ -1268,7 +1268,7 @@ function ring(
  * with key markers and types in their own columns), each relationship an
  * orthogonal line from row to row with a crow's-foot end at each table.
  */
-export function renderErDiagram(diagram: ErDiagram): Result.Result<RenderedDiagramScene> {
+export function renderErDiagram(diagram: ErDiagram): Result.Result<CanvasSpec> {
 	const start = new Map(diagram.entities.map((entity) => [entity.id, tableOf(entity)]));
 	const {
 		scene,

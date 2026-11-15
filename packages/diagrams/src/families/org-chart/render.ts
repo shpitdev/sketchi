@@ -18,9 +18,9 @@ import {
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasFrameElement as FrameSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 import {
@@ -906,7 +906,7 @@ function dottedElements(
  * dotted-line reports dashed with a head at the second manager, and, when
  * grouping, each department below the top in a region of its own.
  */
-export function renderOrgChartDiagram(diagram: OrgChartDiagram): RenderedDiagramScene {
+export function renderOrgChartDiagram(diagram: OrgChartDiagram): CanvasSpec {
 	const regions = regionRoots(diagram);
 	const cards = measureCards(diagram, regions);
 	const layout = layoutOrgChart(buildTrees(diagram, cards, regions));

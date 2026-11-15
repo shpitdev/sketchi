@@ -7,7 +7,7 @@ import {
 	routingQualityScale,
 	wrappedLabelWidth,
 	wrapTextToWidth,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import {
 	crossingFixtures,
@@ -20,9 +20,9 @@ import { renderStateMachineDiagram } from "../families/state-machine/render";
 
 type Point = { readonly x: number; readonly y: number };
 
-const arrowsOf = (scene: RenderedDiagramScene) =>
+const arrowsOf = (scene: CanvasSpec) =>
 	scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
-const nodesOf = (scene: RenderedDiagramScene) =>
+const nodesOf = (scene: CanvasSpec) =>
 	scene.elements.flatMap((element) =>
 		element.type === "node" && !element.nodeId.endsWith(":core") ? [element] : [],
 	);
@@ -43,7 +43,7 @@ function corners(points: readonly Point[]): Point[] {
 }
 
 /** Interior crossings between the axis-aligned runs of different arrows. */
-function crossings(scene: RenderedDiagramScene): string[] {
+function crossings(scene: CanvasSpec): string[] {
 	const arrows = arrowsOf(scene).map((arrow) => ({ ...arrow, points: corners(arrow.points) }));
 	const found: string[] = [];
 	const inside = (value: number, p: number, q: number) =>
@@ -116,7 +116,7 @@ function segmentGap(a: Point, b: Point, c: Point, d: Point): number {
 }
 
 /** Each line's least gap to the outline of every node it neither leaves nor enters. */
-function outlineGaps(scene: RenderedDiagramScene): { edge: string; gap: number; node: string }[] {
+function outlineGaps(scene: CanvasSpec): { edge: string; gap: number; node: string }[] {
 	const nodes = nodesOf(scene);
 	return arrowsOf(scene).flatMap((arrow) =>
 		nodes
@@ -141,7 +141,7 @@ function outlineGaps(scene: RenderedDiagramScene): { edge: string; gap: number; 
  * Line ends that meet a rounded box within a corner's curve rather than on the
  * straight part of a side: nearer the corner, along the side, than its radius.
  */
-function cornerEnds(scene: RenderedDiagramScene): string[] {
+function cornerEnds(scene: CanvasSpec): string[] {
 	const nodes = new Map(nodesOf(scene).map((node) => [node.nodeId, node]));
 	return arrowsOf(scene).flatMap((arrow) =>
 		(
@@ -169,7 +169,7 @@ function cornerEnds(scene: RenderedDiagramScene): string[] {
  * reader sees the export: a head a line runs through reads as pointing that
  * line into the head's target.
  */
-function arrowheadsCrossed(scene: RenderedDiagramScene): string[] {
+function arrowheadsCrossed(scene: CanvasSpec): string[] {
 	const routes = arrowsOf(scene).map((arrow) => ({
 		id: arrow.edgeId,
 		points: arrow.points,
@@ -305,7 +305,7 @@ const LABEL_OWN_MARGIN = 8;
  * Labels not clearly nearer their own line than any other: less than half again
  * as near, or nearer than their own line's distance plus `LABEL_OWN_MARGIN`.
  */
-function ambiguousLabels(scene: RenderedDiagramScene): string[] {
+function ambiguousLabels(scene: CanvasSpec): string[] {
 	const arrows = arrowsOf(scene);
 	const distance = (box: ReturnType<typeof labelBox>, points: readonly Point[]) =>
 		Math.min(

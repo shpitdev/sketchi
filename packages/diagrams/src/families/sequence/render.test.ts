@@ -10,7 +10,7 @@ import {
 	wrapTextToWidth,
 	wrappedLabelWidth,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 import {
@@ -19,14 +19,14 @@ import {
 	renderSequenceDiagram,
 } from "./render";
 
-function activationBars(scene: RenderedDiagramScene): NodeSceneElement[] {
+function activationBars(scene: CanvasSpec): NodeSceneElement[] {
 	return scene.elements.filter(
 		(element): element is NodeSceneElement =>
 			element.type === "node" && element.rendererRole === SEQUENCE_ACTIVATION_ROLE,
 	);
 }
 
-function arrow(scene: RenderedDiagramScene, edgeId: string) {
+function arrow(scene: CanvasSpec, edgeId: string) {
 	const found = scene.elements.find(
 		(element) => element.type === "arrow" && element.edgeId === edgeId,
 	);

@@ -7,10 +7,10 @@ import {
 	CHART_SERIES_COLORS,
 	type CanvasLineElement as LineSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasPoint as ScenePoint,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import {
 	quadrantGroupKey,
@@ -1471,7 +1471,7 @@ function drawHeader(
  */
 export function renderQuadrantDiagram(
 	diagram: QuadrantDiagram,
-): Result.Result<RenderedDiagramScene, QuadrantValidationError> {
+): Result.Result<CanvasSpec, QuadrantValidationError> {
 	return Result.gen(function* () {
 		const surface = diagram.style.backgroundColor;
 		const builder = new SceneBuilder(surface);

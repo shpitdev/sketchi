@@ -2,8 +2,8 @@
 import { Result } from "effect";
 import {
 	estimateTextWidth,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasPoint as ScenePoint,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import {
 	formatGanttDay,
@@ -1278,10 +1278,7 @@ const DAY_TOLERANCE = 0.02;
  * the plan, and every dependency is an arrow from its predecessor's mark to
  * its successor's.
  */
-export function ganttGeometryCheck(
-	diagram: GanttDiagram,
-	scene: RenderedDiagramScene,
-): ScenarioCheck {
+export function ganttGeometryCheck(diagram: GanttDiagram, scene: CanvasSpec): ScenarioCheck {
 	const readout = readGanttScene(scene);
 	const problems: string[] = [];
 	const schedules = diagram.tasks.map((task) => ({ task, schedule: ganttTaskSchedule(task)! }));
@@ -1333,7 +1330,7 @@ export function ganttGeometryCheck(
 export function ganttDrawnDataCheck(
 	scenario: GanttScenario,
 	diagram: GanttDiagram,
-	scene: RenderedDiagramScene,
+	scene: CanvasSpec,
 ): ScenarioCheck {
 	const readout = readGanttScene(scene);
 	const matched = matchTasks(scenario, diagram);
@@ -1433,7 +1430,7 @@ function segmentEnters(box: Box, from: { x: number; y: number }, to: { x: number
  * no dependency runs through a mark or text, and no gridline, axis or Today
  * line crosses text.
  */
-export function ganttClearanceCheck(scene: RenderedDiagramScene): ScenarioCheck {
+export function ganttClearanceCheck(scene: CanvasSpec): ScenarioCheck {
 	const texts: Box[] = scene.elements.flatMap((element) => {
 		if (element.type !== "text") return [];
 		const width = element.maxWidth ?? estimateTextWidth(element.text, element.fontSize);
@@ -1557,7 +1554,7 @@ function stemStart(runs: readonly Run[]): number {
  * always has a forward route unless the predecessor is a sliver crowded by its other
  * dependencies.
  */
-function ganttRouteProblems(scene: RenderedDiagramScene, marks: readonly Box[]): string[] {
+function ganttRouteProblems(scene: CanvasSpec, marks: readonly Box[]): string[] {
 	const arrows = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
 	const runs = (points: readonly ScenePoint[]): Run[] =>
 		points.slice(1).map((to, index) => ({ from: points[index]!, to }));

@@ -1,10 +1,7 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import {
-	getCanvasValidationIssues,
-	type CanvasSpec as RenderedDiagramScene,
-} from "@sketchi/drawing";
+import { getCanvasValidationIssues, type CanvasSpec } from "@sketchi/drawing";
 import {
 	parseVennDiagram,
 	VENN_COLOR_NAMES,
@@ -131,7 +128,7 @@ function randomDiagrams(count: number, start: number): VennDiagram[] {
 	});
 }
 
-const aspect = (scene: RenderedDiagramScene) => scene.width / scene.height;
+const aspect = (scene: CanvasSpec) => scene.width / scene.height;
 
 /** CI draws a small fixed sample; `VENN_FUZZ=full` runs the local proof. */
 const FULL = process.env["VENN_FUZZ"] === "full";

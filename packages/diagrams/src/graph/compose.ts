@@ -9,7 +9,7 @@ import {
 	NODE_DESCRIPTION_LINE_HEIGHT,
 	NODE_DESCRIPTION_MAX_LINES,
 	PADDING,
-	freeLabelSize,
+	branchLabelMetrics,
 } from "./measure.js";
 import {
 	type CanvasShapeElement as NodeSceneElement,
@@ -23,7 +23,7 @@ import {
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasFrameElement as FrameSceneElement,
 } from "@sketchi/drawing";
-import { type LaneLayout, type GroupLayout } from "./layout-types.js";
+import { type RoutedEdge, type LaneLayout, type GroupLayout } from "./layout-types.js";
 import {
 	laneElementId,
 	LANE_LABEL_FONT_SIZE,
@@ -449,6 +449,7 @@ export function withGroupFrames(
 		readonly labels: readonly TextSceneElement[];
 		readonly nodes: readonly NodeSceneElement[];
 	},
+	routes: readonly RoutedEdge[],
 ): {
 	arrows: ArrowSceneElement[];
 	frames: FrameSceneElement[];
@@ -466,7 +467,12 @@ export function withGroupFrames(
 		const frame = frameOf(arrow.sourceNodeId);
 		if (!frame || frame !== frameOf(arrow.targetNodeId)) continue;
 		const label = branchLabelsById.get(`${arrow.id}:label`);
-		const size = label ? freeLabelSize(label.text, label.maxWidth ?? 160) : undefined;
+		const size = label
+			? branchLabelMetrics(
+					routes.find((route) => route.edge.id === arrow.edgeId)!.edge,
+					label.maxWidth === 80,
+				)
+			: undefined;
 		const labelInside =
 			!label ||
 			!size ||

@@ -16,11 +16,7 @@ import {
 	parseClassMethodShorthand,
 	resolveClassMultiplicity,
 } from "@sketchi/diagrams/families/class/document";
-import {
-	estimateTextWidth,
-	segmentsFromPoints,
-	type CanvasSpec as RenderedDiagramScene,
-} from "@sketchi/drawing";
+import { estimateTextWidth, segmentsFromPoints, type CanvasSpec } from "@sketchi/drawing";
 import { classRelationshipHeads } from "@sketchi/diagrams/families/class/render";
 
 import { type ScenarioCheck } from "./evaluate.js";
@@ -341,7 +337,7 @@ const END_LABEL_REACH = 110;
  * and each relationship's line runs from `from` to `to` with its kind's heads
  * and dashes, its multiplicities and roles drawn beside the right ends.
  */
-export function classDrawnCheck(diagram: ClassDiagram, scene: RenderedDiagramScene): ScenarioCheck {
+export function classDrawnCheck(diagram: ClassDiagram, scene: CanvasSpec): ScenarioCheck {
 	const texts = new Map(
 		scene.elements.flatMap((element) =>
 			element.type === "text" ? [[element.id, element] as const] : [],
@@ -415,7 +411,7 @@ export function classDrawnCheck(diagram: ClassDiagram, scene: RenderedDiagramSce
  * Every multiplicity, role and relationship name stands clear: of every class
  * box, of every line and of every other label.
  */
-export function classClearanceCheck(scene: RenderedDiagramScene): ScenarioCheck {
+export function classClearanceCheck(scene: CanvasSpec): ScenarioCheck {
 	const boxes = scene.elements.flatMap((element) =>
 		element.type === "node" && element.kind === "class" ? [element] : [],
 	);

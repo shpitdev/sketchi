@@ -2,9 +2,9 @@
 import {
 	estimateTextWidth,
 	getCanvasValidationIssues,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasPoint as ScenePoint,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -77,7 +77,7 @@ function enters(box: Box, from: { x: number; y: number }, to: { x: number; y: nu
 function expectReadableGantt(
 	diagram: GanttDiagram,
 	{ distinct = true }: { readonly distinct?: boolean } = {},
-): RenderedDiagramScene {
+): CanvasSpec {
 	const { scene, work } = layoutGanttDiagram(diagram);
 	const context = diagram.id;
 	expect(getCanvasValidationIssues(scene), context).toEqual([]);
@@ -261,7 +261,7 @@ function stemStart(runs: readonly Run[]): number {
  * last, as Excalidraw's bound stems allow; one that joined another's last run shares its arrowhead
  * too. Unless `strict`, only lying exactly on another route counts.
  */
-function distinctProblems(scene: RenderedDiagramScene, strict: boolean): string[] {
+function distinctProblems(scene: CanvasSpec, strict: boolean): string[] {
 	const problems: string[] = [];
 	const arrows = scene.elements.flatMap((element) =>
 		element.type === "arrow"
@@ -406,7 +406,7 @@ function hooks(points: readonly ScenePoint[]): boolean {
  * Whether a route doubles back: some run goes left of both its predecessor's start and the
  * corridor just before its successor's start.
  */
-function runsBack(scene: RenderedDiagramScene, arrowId: string): boolean {
+function runsBack(scene: CanvasSpec, arrowId: string): boolean {
 	const readout = readGanttScene(scene);
 	const dependency = readout.dependencies.find(
 		(entry) => `gantt:dependency:${entry.from}:${entry.to}` === arrowId,

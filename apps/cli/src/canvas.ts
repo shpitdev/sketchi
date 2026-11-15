@@ -1,6 +1,6 @@
 import {
 	formatContractSchemaError,
-	CanvasSpec,
+	CreateCanvasRequest,
 	CreateCanvasResultSchema,
 } from "@sketchi/diagrams/build/code-mode/contract";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
@@ -19,7 +19,7 @@ export const SKETCHI_CANVAS_ENDPOINT_ENV = "SKETCHI_CANVAS_ENDPOINT";
 
 export interface CreateCanvasInput {
 	readonly endpoint: string;
-	readonly spec: CanvasSpec;
+	readonly spec: CreateCanvasRequest["spec"];
 }
 
 export interface CreateCanvasDiagramResult {
@@ -47,7 +47,7 @@ function schemaDetails(error: Schema.SchemaError): ReadonlyArray<string> {
 	});
 }
 
-const decodeCanvasSpec = Schema.decodeUnknownEffect(CanvasSpec, {
+const decodeCanvasSpec = Schema.decodeUnknownEffect(CreateCanvasRequest.fields.spec, {
 	errors: "all",
 });
 const decodeCreateCanvasResult = Schema.decodeUnknownEffect(CreateCanvasResultSchema, {

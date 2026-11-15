@@ -4,7 +4,6 @@ import {
 	BuildFlowchartAccepted,
 	BuildFlowchartOptionsSchema,
 	BuildFlowchartRejected,
-	CanvasSpec,
 	CreateCanvasRequest,
 	CreateCanvasResultSchema,
 	DiagramSelector,
@@ -12,7 +11,6 @@ import {
 	EditFlowchartResultSchema,
 	GetArtifactRequest,
 	GetArtifactResultSchema,
-	SceneElementSchema,
 	SearchIconsRequest,
 	SearchIconsResultSchema,
 	toCodeModeJsonSchema,
@@ -91,10 +89,10 @@ const sharedContracts = [
 	["Artifact", BuildFlowchartAccepted.fields.artifact],
 	["PartialArtifact", BuildFlowchartRejected.fields.partial.schema],
 	["DiagramSelector", DiagramSelector],
-	["CanvasElement", SceneElementSchema],
+	["CanvasElement", CreateCanvasRequest.fields.spec.fields.elements.schema.value],
 	["IconRecipe", IconRecipeSchema],
 	["DrawnIcon", DrawnIconSchema],
-	["CanvasSpec", CanvasSpec],
+	["CanvasSpec", CreateCanvasRequest.fields.spec],
 ] as const;
 
 const record = Schema.decodeUnknownSync(Schema.Record(Schema.String, Schema.Unknown));

@@ -132,7 +132,7 @@ function sizedShapes(
 					? Math.max(
 							PORT_SPACING,
 							...outgoing.map((e) => {
-								const metrics = branchLabelMetrics(e.label ?? "");
+								const metrics = branchLabelMetrics(e);
 								return (vertical ? metrics.width : metrics.height) + 24;
 							}),
 						)
@@ -145,7 +145,7 @@ function sizedShapes(
 					: node.kind === "state"
 						? PORT_PADDING * 2 +
 							labeled.reduce((sum, e) => {
-								const metrics = branchLabelMetrics(e.label!);
+								const metrics = branchLabelMetrics(e);
 								return sum + (vertical ? metrics.width : metrics.height) + 24;
 							}, 0) +
 							Math.max(0, connections - labeled.length - 1) * ARRIVAL_SPACING
@@ -236,8 +236,7 @@ export function rankLayout(
 						)
 						.map(
 							(edge) =>
-								branchLabelMetrics(edge.label!, branches(shapesByNodeId.get(edge.source)?.kind))
-									.width +
+								branchLabelMetrics(edge, branches(shapesByNodeId.get(edge.source)?.kind)).width +
 								16 +
 								ROUTE_STUB_LENGTH * 2,
 						),
@@ -442,10 +441,10 @@ export function planWrap(
 		);
 
 	// A band also holds the stubs of the continuations into and out of it.
-	const edgeLabels = new Map(flowEdges(flow).map((edge) => [edge.id, edge.label]));
+	const edgesById = new Map(flowEdges(flow).map((edge) => [edge.id, edge]));
 	const bandLength = (from: number, to: number) => {
-		const label = edgeLabels.get(continuationAfter.get(to) ?? "");
-		const metrics = label ? branchLabelMetrics(label) : undefined;
+		const edge = edgesById.get(continuationAfter.get(to) ?? "");
+		const metrics = edge?.label ? branchLabelMetrics(edge) : undefined;
 		const departure =
 			to === last
 				? 0
@@ -1722,14 +1721,14 @@ function laneGeometry(
 			? 0
 			: Math.max(
 					0,
-					...diagram.edges
+					...flowEdges(layoutGraph.flow)
 						.filter(
 							(edge) =>
 								ids.has(edge.source) && edge.label && (columns.get(edge.target) ?? 0) > index,
 						)
 						.map(
 							(edge) =>
-								branchLabelMetrics(edge.label!, branches(shapes.get(edge.source)?.kind)).width +
+								branchLabelMetrics(edge, branches(shapes.get(edge.source)?.kind)).width +
 								16 +
 								ROUTE_STUB_LENGTH * 2,
 						),

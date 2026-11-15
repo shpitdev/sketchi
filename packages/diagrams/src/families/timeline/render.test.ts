@@ -5,7 +5,7 @@ import {
 	type CanvasLineElement,
 	type CanvasShapeElement,
 	type CanvasTextElement,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -25,16 +25,16 @@ function timeline(events: unknown[], extra: Record<string, unknown> = {}) {
 		Result.getOrThrow,
 	);
 }
-const texts = (scene: RenderedDiagramScene) =>
+const texts = (scene: CanvasSpec) =>
 	scene.elements.filter((element): element is CanvasTextElement => element.type === "text");
-const lines = (scene: RenderedDiagramScene) =>
+const lines = (scene: CanvasSpec) =>
 	scene.elements.filter((element): element is CanvasLineElement => element.type === "line");
-const markers = (scene: RenderedDiagramScene) =>
+const markers = (scene: CanvasSpec) =>
 	scene.elements.filter((element): element is CanvasShapeElement => element.type === "node");
-const marker = (scene: RenderedDiagramScene, id: string) =>
+const marker = (scene: CanvasSpec, id: string) =>
 	markers(scene).find((element) => element.nodeId === `event:${id}`)!;
 const centerX = (element: CanvasShapeElement) => element.x + element.width / 2;
-const text = (scene: RenderedDiagramScene, id: string) =>
+const text = (scene: CanvasSpec, id: string) =>
 	texts(scene).find((element) => element.id === id)?.text;
 function box(element: CanvasTextElement) {
 	const width = boundLabelWidth(element.text, element.fontSize, element.maxWidth ?? 160);
@@ -92,13 +92,13 @@ const TRAM_PROJECT: readonly (readonly [date: string, label: string, lane: strin
 ];
 
 /** Rows of a wrapped timeline: every row but the last ends in a continuation on each lane. */
-const rows = (scene: RenderedDiagramScene) =>
+const rows = (scene: CanvasSpec) =>
 	lines(scene).filter((line) => line.id.startsWith("continue-out:0:")).length + 1;
 /** Aspect of the hosted PNG, which frames the drawing 20px out instead of the scene's 40. */
-const exportAspect = (scene: RenderedDiagramScene) => (scene.width - 40) / (scene.height - 40);
+const exportAspect = (scene: CanvasSpec) => (scene.width - 40) / (scene.height - 40);
 
 /** Labels never overlap each other, and no stem or axis runs through a label. */
-function expectReadableLayout(scene: RenderedDiagramScene) {
+function expectReadableLayout(scene: CanvasSpec) {
 	expect(getCanvasValidationIssues(scene)).toEqual([]);
 	const boxes = texts(scene).map((element) => ({ id: element.id, ...box(element) }));
 	for (const [index, a] of boxes.entries())
@@ -165,7 +165,7 @@ function expectToScale(
  * and every break states, rounded, the time of the gap it stands in. Returns
  * the gaps.
  */
-function expectGapOrder(diagram: TimelineDiagram, scene: RenderedDiagramScene) {
+function expectGapOrder(diagram: TimelineDiagram, scene: CanvasSpec) {
 	const moments = new Map<string, { start: number; end?: number }>(
 		diagram.events.map((event) => {
 			const { start, end } = periodOf(event);
@@ -232,7 +232,7 @@ const periodOf = (event: TimelineDiagram["events"][number]) => ({
  * Breaks stay clear of every point marker, on any lane, and never fall between
  * simultaneous markers. A marker shares a bar only when it is dated inside that phase.
  */
-function expectHonestMarkers(diagram: TimelineDiagram, scene: RenderedDiagramScene) {
+function expectHonestMarkers(diagram: TimelineDiagram, scene: CanvasSpec) {
 	const lanes = readTimelineAxis(scene);
 	const nodes = new Map(
 		markers(scene).map((element) => [element.nodeId.slice("event:".length), element]),

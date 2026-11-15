@@ -1,8 +1,8 @@
 import {
 	estimateTextWidth,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 import {
@@ -99,7 +99,7 @@ function endAt(points: readonly Point[], side: "left" | "right") {
 }
 
 /** Read a rendered Sankey diagram's bars, bands and labels back from its scene. */
-export function readSankeyScene(scene: RenderedDiagramScene): SankeyReadout {
+export function readSankeyScene(scene: CanvasSpec): SankeyReadout {
 	const texts = new Map(
 		scene.elements.flatMap((element) =>
 			element.type === "text" ? [[element.id, element] as const] : [],
@@ -207,7 +207,7 @@ export interface SankeyCrossingPair {
  * Bands leaving one bar or entering one bar never count, since they stack.
  * A long band counts in each gap it crosses.
  */
-export function sankeyCrossingPairs(scene: RenderedDiagramScene): SankeyCrossingPair[] {
+export function sankeyCrossingPairs(scene: CanvasSpec): SankeyCrossingPair[] {
 	const { nodes, bands } = readSankeyScene(scene);
 	const lefts = [...new Set(nodes.map((node) => Math.round(node.box.left * 100) / 100))].toSorted(
 		(a, b) => a - b,
@@ -244,7 +244,7 @@ export function sankeyCrossingPairs(scene: RenderedDiagramScene): SankeyCrossing
 }
 
 /** How many pairs of bands cross, gap by gap. */
-export function sankeyCrossings(scene: RenderedDiagramScene): number {
+export function sankeyCrossings(scene: CanvasSpec): number {
 	return sankeyCrossingPairs(scene).length;
 }
 
@@ -254,7 +254,7 @@ export function sankeyCrossings(scene: RenderedDiagramScene): number {
  * value to compare drawings at different scales.
  */
 export function sankeyWeightedCrossings(
-	scene: RenderedDiagramScene,
+	scene: CanvasSpec,
 	weight: (band: SankeyReadBand) => number = (band) => band.width,
 ): number {
 	return sankeyCrossingPairs(scene).reduce((sum, pair) => sum + weight(pair.a) * weight(pair.b), 0);
@@ -267,7 +267,7 @@ export function sankeyWeightedCrossings(
  * fits its box, and no label overlaps another label, a bar, or a band other
  * than its own (a node's label may ride the leads of its own bands out).
  */
-export function sankeyLayoutIssues(scene: RenderedDiagramScene): SankeyLayoutIssue[] {
+export function sankeyLayoutIssues(scene: CanvasSpec): SankeyLayoutIssue[] {
 	const issues: SankeyLayoutIssue[] = [];
 	const { nodes, bands, texts } = readSankeyScene(scene);
 	const byId = new Map(nodes.map((node) => [node.id, node]));

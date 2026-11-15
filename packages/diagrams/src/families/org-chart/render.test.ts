@@ -7,8 +7,8 @@ import {
 	groupRegionIssues,
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import {
 	orgChartFixture,
@@ -26,24 +26,24 @@ const chart = (people: unknown[], extra: Record<string, unknown> = {}): OrgChart
 		resolveOrgChartShorthand({ id: "team", title: "Team", type: "org-chart", people, ...extra }),
 	).pipe(Result.getOrThrow);
 
-function element<T extends RenderedDiagramScene["elements"][number]["type"]>(
-	scene: RenderedDiagramScene,
+function element<T extends CanvasSpec["elements"][number]["type"]>(
+	scene: CanvasSpec,
 	id: string,
 	type: T,
-): Extract<RenderedDiagramScene["elements"][number], { type: T }> {
+): Extract<CanvasSpec["elements"][number], { type: T }> {
 	const found = scene.elements.find((candidate) => candidate.id === id);
 	if (found?.type !== type) throw new Error(`No ${type} "${id}" in the scene.`);
-	return found as Extract<RenderedDiagramScene["elements"][number], { type: T }>;
+	return found as Extract<CanvasSpec["elements"][number], { type: T }>;
 }
-const card = (scene: RenderedDiagramScene, id: string) => element(scene, `node:${id}`, "node");
-const line = (scene: RenderedDiagramScene, id: string) => element(scene, `edge:${id}`, "arrow");
-const cards = (scene: RenderedDiagramScene) =>
+const card = (scene: CanvasSpec, id: string) => element(scene, `node:${id}`, "node");
+const line = (scene: CanvasSpec, id: string) => element(scene, `edge:${id}`, "arrow");
+const cards = (scene: CanvasSpec) =>
 	scene.elements.filter(
 		(candidate): candidate is NodeSceneElement =>
 			candidate.type === "node" && (candidate.kind === "person" || candidate.kind === "assistant"),
 	);
 /** The cards of a manager's direct reports. */
-const reportsOf = (scene: RenderedDiagramScene, manager: string) =>
+const reportsOf = (scene: CanvasSpec, manager: string) =>
 	cards(scene).filter((box) =>
 		scene.elements.some(
 			(candidate) =>
@@ -56,7 +56,7 @@ const center = (box: NodeSceneElement) => box.x + box.width / 2;
 const bottom = (box: NodeSceneElement) => box.y + box.height;
 
 /** Export width over height, as hosted PNGs frame the drawing. */
-const aspect = (scene: RenderedDiagramScene) => (scene.width - 40) / (scene.height - 40);
+const aspect = (scene: CanvasSpec) => (scene.width - 40) / (scene.height - 40);
 
 describe("org chart renderer", () => {
 	it("draws a card of name over title and department, grouped so it moves as one", () => {

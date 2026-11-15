@@ -1,3 +1,4 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
 import {
@@ -8,7 +9,6 @@ import {
 	parseOrgChartDiagram,
 } from "@sketchi/diagrams/families/org-chart/document";
 import { orgChartLayoutIssues } from "@sketchi/diagrams/families/org-chart/readout";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { type ScenarioCheck } from "./evaluate.js";
 import { type DiagramScenarioDifficulty } from "./scenarios.js";
@@ -213,10 +213,7 @@ function expectedRegions(diagram: OrgChartDiagram): Map<string, string> {
  * report, each dotted-line report dashed with a head at its second manager,
  * and, when grouping, a region named for each department below the top.
  */
-export function orgChartDrawnCheck(
-	diagram: OrgChartDiagram,
-	scene: RenderedDiagramScene,
-): ScenarioCheck {
+export function orgChartDrawnCheck(diagram: OrgChartDiagram, scene: CanvasSpec): ScenarioCheck {
 	const byId = new Map(scene.elements.map((element) => [element.id, element]));
 	const text = (id: string) => {
 		const element = byId.get(id);
@@ -268,7 +265,7 @@ export function orgChartDrawnCheck(
 }
 
 /** Cards apart, lines orthogonal from card to card and through none, reporting lines never crossing. */
-export function orgChartLayoutCheck(scene: RenderedDiagramScene): ScenarioCheck {
+export function orgChartLayoutCheck(scene: CanvasSpec): ScenarioCheck {
 	const issues = orgChartLayoutIssues(scene);
 	return {
 		id: "org-chart-layout",

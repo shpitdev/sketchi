@@ -13,9 +13,9 @@ import {
 	wrapTextToWidth,
 	type CanvasLineElement as LineSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 import { timelineCaptions, timelineDurationCaption } from "./captions.js";
@@ -220,7 +220,7 @@ function widestMiddle(from: number, to: number, taken: readonly number[]): numbe
 }
 
 /** Rendered timelines: a time-scaled axis per lane with labels on both sides. */
-export function renderTimelineDiagram(input: TimelineDiagram): RenderedDiagramScene {
+export function renderTimelineDiagram(input: TimelineDiagram): CanvasSpec {
 	const events = orderedTimelineEvents(input);
 	const captions = timelineCaptions(input);
 	const laneNames = timelineLanes(input);

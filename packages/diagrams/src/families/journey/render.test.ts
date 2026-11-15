@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import {
 	getCanvasValidationIssues,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { type JourneyDiagram, journeyFixture, parseJourneyDiagram } from "./document.js";
 import { journeyStressFixtures } from "./fixtures.js";
@@ -13,8 +13,8 @@ import { journeyStressFixtures } from "./fixtures.js";
 import { journeyLayoutIssues, readJourneyScene } from "./readout.js";
 import { JOURNEY_MAX_ASPECT, renderJourneyDiagram } from "./render.js";
 
-const aspect = (scene: RenderedDiagramScene) => (scene.width - 80) / (scene.height - 80);
-const find = (scene: RenderedDiagramScene, id: string) => {
+const aspect = (scene: CanvasSpec) => (scene.width - 80) / (scene.height - 80);
+const find = (scene: CanvasSpec, id: string) => {
 	const element = scene.elements.find((entry) => entry.id === id);
 	if (!element) throw new Error(`No element ${id}`);
 	return element;
@@ -28,7 +28,7 @@ const journey = (stages: unknown[], extra: Record<string, unknown> = {}): Journe
 		...extra,
 	}).pipe(Result.getOrThrow);
 /** The rise of one score in a band, read off its level labels. */
-const pitchOf = (scene: RenderedDiagramScene, band = 0) => {
+const pitchOf = (scene: CanvasSpec, band = 0) => {
 	const level = readJourneyScene(scene).levels[band]!;
 	return level[2]! - level[3]!;
 };

@@ -2,9 +2,9 @@ import { parseGanttDay } from "./document.js";
 
 import { GANTT_MARK_ROLE } from "./render.js";
 import {
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasPoint as ScenePoint,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 type TextElement = Extract<SceneElement, { type: "text" }>;
@@ -46,7 +46,7 @@ export interface GanttReadout {
 }
 
 /** Read the dates, rows and dependencies a rendered Gantt chart draws. */
-export function readGanttScene(scene: RenderedDiagramScene): GanttReadout {
+export function readGanttScene(scene: CanvasSpec): GanttReadout {
 	const gridlines = new Map<number, number>();
 	const texts: TextElement[] = [];
 	let todayX: number | undefined;

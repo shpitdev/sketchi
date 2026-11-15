@@ -1,9 +1,9 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 import { buildResponse, type BuildRejection } from "../../build/operation.js";
 import { journeyLayoutIssues, readJourneyScene } from "./readout.js";
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import {
 	CodeModeArtifactStorage,
@@ -128,7 +128,7 @@ describe("Code Mode native journey map", () => {
 			],
 		});
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		const scene = inline(built).get("scene") as RenderedDiagramScene;
+		const scene = inline(built).get("scene") as CanvasSpec;
 		expect(journeyLayoutIssues(scene)).toEqual([]);
 		const read = readJourneyScene(scene),
 			stage = read.stages[1]!;
@@ -195,7 +195,7 @@ describe("Code Mode native journey map", () => {
 			}),
 		);
 		if (!patched.ok) throw new Error(JSON.stringify(patched.issues));
-		const scene = inline(patched).get("scene") as RenderedDiagramScene;
+		const scene = inline(patched).get("scene") as CanvasSpec;
 		expect(scene.elements.find((element) => element.id === "node:journey:step:1-0")).toMatchObject({
 			strokeColor: "#1f44c9",
 		});

@@ -26,8 +26,8 @@ import {
 	type CanvasIconAsset,
 	type CanvasValidationIssue,
 	type IconRecipe,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasPoint as ScenePoint,
+	CanvasSpec,
 } from "@sketchi/drawing";
 import {
 	getClassValidationIssues,
@@ -133,7 +133,6 @@ import {
 	formatContractSchemaError,
 	GetArtifactRejected,
 	GetArtifactRequest,
-	RenderedDiagramSceneSchema,
 	SearchIconsRejected,
 	SearchIconsRequest,
 	type ApplyDiagramPatchResult,
@@ -152,7 +151,6 @@ import {
 	type NormalizedClassSpec,
 	type NormalizedErSpec,
 	type NormalizedStateMachineSpec,
-	type PatchableScene,
 	type SearchIconsResult,
 } from "./contract.js";
 
@@ -662,7 +660,7 @@ export interface CodeModeArtifactRenderer<
 	E extends TaggedArtifactRenderFailure = TaggedArtifactRenderFailure,
 > {
 	renderPng(input: {
-		scene: RenderedDiagramScene;
+		scene: CanvasSpec;
 		excalidraw: unknown;
 	}): Effect.Effect<ArrayBuffer | Uint8Array, E>;
 }
@@ -677,7 +675,7 @@ type ArtifactExportError = CodeModeArtifactRendererNotConfigured | CodeModeArtif
 interface SelectorTargets {
 	arrows: PatchableArrow[];
 	/** Standalone icon elements, which only a translate moves. */
-	icons: Extract<PatchableScene["elements"][number], { type: "icon" }>[];
+	icons: Extract<CanvasInput["elements"][number], { type: "icon" }>[];
 	nodes: PatchableNode[];
 	texts: PatchableText[];
 }
@@ -811,7 +809,7 @@ const ApplyDiagramPatchFailure = workflowFailure(
 	})),
 );
 
-type PatchableElement = PatchableScene["elements"][number];
+type PatchableElement = CanvasInput["elements"][number];
 type PatchableNode = Extract<PatchableElement, { type: "node" }>;
 type PatchableText = Extract<PatchableElement, { type: "text" }>;
 type PatchableArrow = Extract<PatchableElement, { type: "arrow" }>;
@@ -870,7 +868,7 @@ function flowchartCoverageIssues(
 }
 
 /** A description past its line limit still draws in full; the build warns so it can be shortened. */
-function longDescriptionIssues(scene: RenderedDiagramScene): CodeModeIssue[] {
+function longDescriptionIssues(scene: CanvasSpec): CodeModeIssue[] {
 	return longNodeDescriptions(scene).map((id) =>
 		issue({
 			code: "label_too_long",
@@ -1041,7 +1039,7 @@ function requestedInlineFormats(
 
 const storedArtifactsForFormats = Effect.fn("codeMode.artifacts.exportFormats")(function* (input: {
 	formats: readonly ArtifactFormat[];
-	scene: RenderedDiagramScene;
+	scene: CanvasSpec;
 	excalidraw: ExcalidrawScene;
 	renderer?: CodeModeArtifactRenderer | undefined;
 	defaultPng?: CodeModeRuntimeOptions["defaultPng"];
@@ -1087,7 +1085,7 @@ const storedArtifactsForFormats = Effect.fn("codeMode.artifacts.exportFormats")(
 
 function dataForArtifactFormat(
 	input: {
-		scene: RenderedDiagramScene;
+		scene: CanvasSpec;
 		excalidraw: ExcalidrawScene;
 		renderer?: CodeModeArtifactRenderer | undefined;
 	},
@@ -1205,8 +1203,10 @@ function canvasIconSlug(
 	return found.slug;
 }
 
+type CanvasInput = CreateCanvasRequest["spec"];
+
 /** Warnings for canvas icons that name no slug and carry no drawable recipe. */
-function undrawableCanvasIconIssues(scene: PatchableScene): CodeModeIssue[] {
+function undrawableCanvasIconIssues(scene: CanvasInput): CodeModeIssue[] {
 	return scene.elements.flatMap((element, index) => {
 		const ref = element.type === "icon" ? element : "icon" in element ? element.icon : undefined;
 		if (!ref) return [];
@@ -1231,8 +1231,8 @@ function undrawableCanvasIconIssues(scene: PatchableScene): CodeModeIssue[] {
 	});
 }
 
-function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | null {
-	const elements: Array<RenderedDiagramScene["elements"][number]> = [];
+function normalizePatchableScene(scene: CanvasInput): CanvasSpec | null {
+	const elements: Array<CanvasSpec["elements"][number]> = [];
 	const removed = new Set<string>();
 	// A scene's drawn icons draw only from the recipes it carries, so they travel with it.
 	const drawn = new Map<string, CanvasIconAsset>(
@@ -1408,16 +1408,16 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 }
 
 /** The authored view of a scene: node icon references without derived SVG bytes. */
-function withoutIconAssets(scene: RenderedDiagramScene): RenderedDiagramScene {
+function withoutIconAssets(scene: CanvasSpec): CanvasSpec {
 	const { icons: _icons, ...rest } = scene;
 	return rest;
 }
 
-function cloneScene(scene: PatchableScene): PatchableScene {
+function cloneScene(scene: CanvasInput): CanvasInput {
 	return structuredClone(scene);
 }
 
-function sourceConnectivity(scene: PatchableScene): string[] {
+function sourceConnectivity(scene: CanvasInput): string[] {
 	return scene.elements
 		.flatMap((element) => {
 			if (element.type === "arrow") {
@@ -1437,15 +1437,15 @@ function sameConnectivity(left: readonly string[], right: readonly string[]) {
 	return left.length === right.length && left.every((entry, index) => entry === right[index]);
 }
 
-function nodeElements(scene: PatchableScene): PatchableNode[] {
+function nodeElements(scene: CanvasInput): PatchableNode[] {
 	return scene.elements.filter((element): element is PatchableNode => element.type === "node");
 }
 
-function textElements(scene: PatchableScene): PatchableText[] {
+function textElements(scene: CanvasInput): PatchableText[] {
 	return scene.elements.filter((element): element is PatchableText => element.type === "text");
 }
 
-function arrowElements(scene: PatchableScene): PatchableArrow[] {
+function arrowElements(scene: CanvasInput): PatchableArrow[] {
 	return scene.elements.filter((element): element is PatchableArrow => element.type === "arrow");
 }
 
@@ -1469,7 +1469,7 @@ function selectorHasFilters(selector: DiagramSelector | undefined): boolean {
 }
 
 function resolveTargets(
-	scene: PatchableScene,
+	scene: CanvasInput,
 	selector: DiagramSelector | undefined,
 ): SelectorTargets {
 	const scope = selector?.scope ?? "all";
@@ -1543,13 +1543,13 @@ function targetIssue(operation: DiagramPatchOperation): CodeModeIssue {
 	});
 }
 
-function textForContainer(scene: PatchableScene, containerId: string): PatchableText | undefined {
+function textForContainer(scene: CanvasInput, containerId: string): PatchableText | undefined {
 	return textElements(scene).find(
 		(text) => text.containerId === containerId || text.id === `${containerId}:label`,
 	);
 }
 
-function centerTextOnNode(scene: PatchableScene, node: PatchableNode): void {
+function centerTextOnNode(scene: CanvasInput, node: PatchableNode): void {
 	const text = textForContainer(scene, node.id);
 	if (!text) {
 		return;
@@ -1570,7 +1570,7 @@ function midpoint(points: readonly PatchablePoint[]): PatchablePoint | undefined
 	};
 }
 
-function syncArrowLabel(scene: PatchableScene, arrow: PatchableArrow): void {
+function syncArrowLabel(scene: CanvasInput, arrow: PatchableArrow): void {
 	const label = textForContainer(scene, arrow.id);
 	const point = midpoint(arrow.points);
 	if (label && !label.containerId) {
@@ -1597,7 +1597,7 @@ function translatePoint(point: PatchablePoint, dx: number, dy: number): Patchabl
 }
 
 function applyStyle(
-	scene: PatchableScene,
+	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "setDefaultStyle" | "setStyle" }>,
 ): CodeModeIssue[] {
 	if (operation.style.backgroundColor) {
@@ -1676,7 +1676,7 @@ function applyStyle(
 	return [];
 }
 
-function rerouteConnectedArrows(scene: PatchableScene, nodeIds: readonly string[]): void {
+function rerouteConnectedArrows(scene: CanvasInput, nodeIds: readonly string[]): void {
 	const movedNodeIds = new Set(nodeIds);
 	for (const arrow of arrowElements(scene)) {
 		if (movedNodeIds.has(arrow.sourceNodeId) || movedNodeIds.has(arrow.targetNodeId)) {
@@ -1686,7 +1686,7 @@ function rerouteConnectedArrows(scene: PatchableScene, nodeIds: readonly string[
 }
 
 function applyShape(
-	scene: PatchableScene,
+	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "setShape" }>,
 ): CodeModeIssue[] {
 	const targets = resolveTargets(scene, operation.selector);
@@ -1722,7 +1722,7 @@ function applyShape(
 }
 
 function applyTranslate(
-	scene: PatchableScene,
+	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "translate" }>,
 ): CodeModeIssue[] {
 	const targets = resolveTargets(scene, operation.selector);
@@ -1778,7 +1778,7 @@ function applyTranslate(
 }
 
 function applyReplaceText(
-	scene: PatchableScene,
+	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "replaceText" }>,
 ): CodeModeIssue[] {
 	const targets = resolveTargets(scene, operation.selector);
@@ -1845,7 +1845,7 @@ function edgePoint(
 	return { x: sourceCenter.x, y: source.y };
 }
 
-function rerouteArrow(scene: PatchableScene, arrow: PatchableArrow): CodeModeIssue[] {
+function rerouteArrow(scene: CanvasInput, arrow: PatchableArrow): CodeModeIssue[] {
 	const nodesById = new Map(nodeElements(scene).map((node) => [node.nodeId, node]));
 	const source = nodesById.get(arrow.sourceNodeId);
 	const target = nodesById.get(arrow.targetNodeId);
@@ -1882,7 +1882,7 @@ function rerouteArrow(scene: PatchableScene, arrow: PatchableArrow): CodeModeIss
 }
 
 function applyRerouteEdges(
-	scene: PatchableScene,
+	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "rerouteEdges" }>,
 ): CodeModeIssue[] {
 	const targets = resolveTargets(scene, operation.selector);
@@ -1892,7 +1892,7 @@ function applyRerouteEdges(
 	return targets.arrows.flatMap((arrow) => rerouteArrow(scene, arrow));
 }
 
-function recomputeSceneBounds(scene: PatchableScene): void {
+function recomputeSceneBounds(scene: CanvasInput): void {
 	let maxX = scene.width;
 	let maxY = scene.height;
 	for (const element of scene.elements) {
@@ -1913,7 +1913,7 @@ function recomputeSceneBounds(scene: PatchableScene): void {
 	scene.height = maxY + SCENE_PADDING;
 }
 
-function patchTargetIds(scene: PatchableScene, selector: DiagramSelector): Set<string> {
+function patchTargetIds(scene: CanvasInput, selector: DiagramSelector): Set<string> {
 	const targets = resolveTargets(scene, selector);
 	const ids = new Set([
 		...targets.nodes.map((element) => element.id),
@@ -1960,7 +1960,7 @@ function structuralOperationIssue(
 }
 
 function applyInsert(
-	scene: PatchableScene,
+	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "insert" }>,
 ): CodeModeIssue[] {
 	const existingIds = new Set(scene.elements.map((element) => element.id));
@@ -1987,7 +1987,7 @@ function applyInsert(
 }
 
 function applyRemove(
-	scene: PatchableScene,
+	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "remove" }>,
 ): CodeModeIssue[] {
 	const removedIds = patchTargetIds(scene, operation.selector);
@@ -2042,7 +2042,7 @@ function applyRemove(
 }
 
 function applyReplace(
-	scene: PatchableScene,
+	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "replace" }>,
 ): CodeModeIssue[] {
 	const index = scene.elements.findIndex((element) => element.id === operation.id);
@@ -2059,7 +2059,7 @@ function applyReplace(
 }
 
 function applyReorder(
-	scene: PatchableScene,
+	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "reorder" }>,
 ): CodeModeIssue[] {
 	const selected = new Set(operation.ids);
@@ -2086,7 +2086,7 @@ function applyReorder(
 }
 
 function applyGroup(
-	scene: PatchableScene,
+	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "group" | "ungroup" }>,
 ): CodeModeIssue[] {
 	const ids = new Set(operation.ids);
@@ -2113,7 +2113,7 @@ function applyGroup(
 }
 
 function applyPatchOperation(
-	scene: PatchableScene,
+	scene: CanvasInput,
 	operation: DiagramPatchOperation,
 ): CodeModeIssue[] {
 	switch (operation.op) {
@@ -2226,7 +2226,7 @@ const resolvePatchSource = Effect.fn("codeMode.patch.resolveSource")(function* (
 		});
 	}
 
-	const parsed = Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
+	const parsed = Schema.decodeUnknownResult(CanvasSpec, {
 		errors: "all",
 		reportInput: true,
 	})(artifact.data);
@@ -2276,7 +2276,7 @@ function withArtifactUrls(
 }
 
 /** The unstored scene of a failed export, with logo slugs but not their SVG bytes. */
-function scenePartial(scene: RenderedDiagramScene): PartialArtifactBundle {
+function scenePartial(scene: CanvasSpec): PartialArtifactBundle {
 	const inline = withoutIconAssets(scene);
 	return {
 		diagramId: scene.diagramId,
@@ -2306,7 +2306,7 @@ function storageFailureIssue(
 }
 
 const exportAndStoreScene = Effect.fn("codeMode.artifacts.exportAndStore")(function* (input: {
-	scene: RenderedDiagramScene;
+	scene: CanvasSpec;
 	formats: readonly ArtifactFormat[];
 	inlineFormats: InlineArtifactFormat[];
 	requestId?: string;
@@ -2402,7 +2402,7 @@ export const artifactBuildCapabilities = Effect.gen(function* () {
 	const environment = yield* CodeModeRuntimeEnvironment;
 	return {
 		createId: environment.createId,
-		exportScene: (scene: RenderedDiagramScene, request: BuildDelivery) =>
+		exportScene: (scene: CanvasSpec, request: BuildDelivery) =>
 			exportAndStoreScene({
 				scene,
 				formats: requestedFormats(request.options),

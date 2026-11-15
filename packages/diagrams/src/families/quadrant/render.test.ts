@@ -3,8 +3,8 @@ import { Result } from "effect";
 import {
 	getCanvasValidationIssues,
 	CHART_SERIES_COLORS,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import {
 	parseQuadrantDiagram,
@@ -29,22 +29,22 @@ function quadrant(points: QuadrantDiagram["points"], extra: object = {}): Quadra
 	}).pipe(Result.getOrThrow);
 }
 
-function expectReadable(diagram: QuadrantDiagram): RenderedDiagramScene {
+function expectReadable(diagram: QuadrantDiagram): CanvasSpec {
 	const scene = renderQuadrantDiagram(diagram).pipe(Result.getOrThrow);
 	expect(getCanvasValidationIssues(scene)).toEqual([]);
 	expect(quadrantLayoutIssues(scene, diagram).map((issue) => issue.message)).toEqual([]);
 	return scene;
 }
 
-const node = (scene: RenderedDiagramScene, nodeId: string) =>
+const node = (scene: CanvasSpec, nodeId: string) =>
 	scene.elements.find(
 		(element): element is NodeElement => element.type === "node" && element.nodeId === nodeId,
 	)!;
-const line = (scene: RenderedDiagramScene, id: string) =>
+const line = (scene: CanvasSpec, id: string) =>
 	scene.elements.find(
 		(element): element is LineElement => element.type === "line" && element.id === id,
 	)!;
-const text = (scene: RenderedDiagramScene, id: string) =>
+const text = (scene: CanvasSpec, id: string) =>
 	scene.elements.find((element) => element.type === "text" && element.id === id);
 
 describe("quadrant chart renderer", () => {
@@ -333,7 +333,7 @@ describe("quadrant chart renderer", () => {
 						]
 					: [element],
 			),
-		} as RenderedDiagramScene;
+		} as CanvasSpec;
 		expect(quadrantLayoutIssues(broken, quadrantFixture).map((issue) => issue.code)).toContain(
 			"broken-divider",
 		);
@@ -383,7 +383,7 @@ describe("quadrant chart renderer", () => {
 						}
 					: element,
 			),
-		} as RenderedDiagramScene;
+		} as CanvasSpec;
 		const codes = quadrantLayoutIssues(moved, diagram).map((issue) => issue.code);
 		expect(codes).toContain("misread-label");
 		expect(codes).not.toContain("detached-label");
@@ -420,7 +420,7 @@ describe("quadrant chart renderer", () => {
 				[0.15, 0.35, 0.65, 0.85].map((y, index) => ({ label: `${label}${index}`, x: 0.5, y })),
 				extra,
 			);
-		const sized = (scene: RenderedDiagramScene) => {
+		const sized = (scene: CanvasSpec) => {
 			const { plot } = readQuadrantScene(scene);
 			const label = text(scene, "quadrant:label:0");
 			return [plot!.right - plot!.left, label?.type === "text" ? label.fontSize : undefined];

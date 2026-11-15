@@ -1,3 +1,4 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
 import {
@@ -15,7 +16,7 @@ import {
 	readTimelineGaps,
 	readTimelineMomentGaps,
 } from "@sketchi/diagrams/families/timeline/readout";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+
 import { type DiagramScenarioDifficulty } from "./scenarios.js";
 import { type ScenarioCheck } from "./evaluate.js";
 
@@ -445,7 +446,7 @@ function promptMoments(scenario: TimelineScenario, diagram: TimelineDiagram) {
 export function timelineSpacingCheck(
 	scenario: TimelineScenario,
 	diagram: TimelineDiagram,
-	scene: RenderedDiagramScene,
+	scene: CanvasSpec,
 ): ScenarioCheck {
 	const moments = promptMoments(scenario, diagram);
 	const gaps = readTimelineGaps(scene, moments).filter((gap) => !gap.broken);
@@ -477,7 +478,7 @@ const BREAK_LABEL_TOLERANCE = 0.25;
 export function timelineGapOrderCheck(
 	scenario: TimelineScenario,
 	diagram: TimelineDiagram,
-	scene: RenderedDiagramScene,
+	scene: CanvasSpec,
 ): ScenarioCheck {
 	const gaps = readTimelineMomentGaps(scene, promptMoments(scenario, diagram));
 	const rate = Math.max(

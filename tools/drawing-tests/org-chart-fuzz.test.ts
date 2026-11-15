@@ -1,11 +1,7 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import {
-	getCanvasValidationIssues,
-	groupRegionIssues,
-	type CanvasSpec as RenderedDiagramScene,
-} from "@sketchi/drawing";
+import { getCanvasValidationIssues, groupRegionIssues, type CanvasSpec } from "@sketchi/drawing";
 import {
 	type OrgChartDiagram,
 	parseOrgChartDiagram,
@@ -142,7 +138,7 @@ function randomCharts(count: number, start: number): OrgChartDiagram[] {
 }
 
 /** The export's width over its height, as hosted PNGs frame it. */
-const aspect = (scene: RenderedDiagramScene) => (scene.width - 40) / (scene.height - 40);
+const aspect = (scene: CanvasSpec) => (scene.width - 40) / (scene.height - 40);
 
 /** CI draws a small fixed sample; `ORG_CHART_FUZZ=full` runs the local proof. */
 const FULL = process.env["ORG_CHART_FUZZ"] === "full";

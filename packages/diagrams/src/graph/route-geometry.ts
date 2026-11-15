@@ -17,7 +17,6 @@ import {
 	candidateRouteQuality,
 	segmentOverlapLength,
 	GROUP_OUTLINE_CLEARANCE,
-	type CanvasTextElement as TextSceneElement,
 } from "@sketchi/drawing";
 import {
 	type Box,
@@ -33,7 +32,7 @@ import {
 } from "./layout-types.js";
 import { groupBlocks, GROUP_OUTLINE, LANE_OUTLINE, LANE_OUTLINE_CLEARANCE } from "./containers.js";
 import { openEnd, ROUTE_STUB_LENGTH, reservedArrivals } from "./geometry.js";
-import { ARROWHEAD_LENGTH, freeLabelSize } from "./measure.js";
+import { ARROWHEAD_LENGTH } from "./measure.js";
 
 export function compactPoints(points: readonly ScenePoint[]): [ScenePoint, ...ScenePoint[]] {
 	const compacted: ScenePoint[] = [];
@@ -860,7 +859,7 @@ export function chooseBestRoute(
 export function drawnSize(
 	nodes: readonly NodeSceneElement[],
 	arrows: readonly ArrowSceneElement[],
-	labels: readonly TextSceneElement[] = [],
+	labels: readonly Box[] = [],
 ): { width: number; height: number } {
 	const points = [
 		...nodes.flatMap((node) => [
@@ -868,13 +867,10 @@ export function drawnSize(
 			{ x: node.x + node.width, y: node.y + node.height },
 		]),
 		...arrows.flatMap((arrow) => arrow.points),
-		...labels.flatMap((label) => {
-			const { width, height } = freeLabelSize(label.text, label.maxWidth ?? 160);
-			return [
-				{ x: label.x - width / 2, y: label.y - height / 2 },
-				{ x: label.x + width / 2, y: label.y + height / 2 },
-			];
-		}),
+		...labels.flatMap((label) => [
+			{ x: label.x, y: label.y },
+			{ x: label.x + label.width, y: label.y + label.height },
+		]),
 	];
 	return {
 		width:

@@ -1,3 +1,4 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
 import {
@@ -10,7 +11,6 @@ import {
 	parseErEnd,
 	parseErFieldShorthand,
 } from "@sketchi/diagrams/families/er/document";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { type ScenarioCheck } from "./evaluate.js";
 import { type DiagramScenarioDifficulty } from "./scenarios.js";
@@ -252,7 +252,7 @@ const DRAWN_HEADS: Readonly<Record<ErCardinality, readonly [string, boolean]>> =
  * relationship's line ends in the head of its cardinality at each table, with
  * a ring on its line at each optional end.
  */
-export function erDrawnCheck(diagram: ErDiagram, scene: RenderedDiagramScene): ScenarioCheck {
+export function erDrawnCheck(diagram: ErDiagram, scene: CanvasSpec): ScenarioCheck {
 	const texts = new Map(
 		scene.elements.flatMap((element) =>
 			element.type === "text" ? [[element.id, element.text] as const] : [],

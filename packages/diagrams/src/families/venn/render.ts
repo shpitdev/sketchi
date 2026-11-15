@@ -4,9 +4,9 @@ import {
 	CANVAS_SPEC_VERSION,
 	SKETCHI_DIAGRAM_PALETTE,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import {
 	layoutVennDiagram,
@@ -190,7 +190,7 @@ function sceneBounds(layout: VennLayout): VennBox {
  * of every outline. Each set (fill, outline, label) and each region's text is
  * one Excalidraw group.
  */
-export function renderVennDiagram(diagram: VennDiagram): RenderedDiagramScene {
+export function renderVennDiagram(diagram: VennDiagram): CanvasSpec {
 	const surface = diagram.style.backgroundColor;
 	const layout = layoutVennDiagram(diagram);
 	const bounds = sceneBounds(layout);

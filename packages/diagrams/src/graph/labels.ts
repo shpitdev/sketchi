@@ -85,7 +85,12 @@ export function placedBranchLabels(
 	groups?: GroupLayout,
 	unambiguous = true,
 	lanes?: LaneLayout,
-): { labels: TextSceneElement[]; touches: number; shortfalls: LabelShortfall[] } {
+): {
+	labels: TextSceneElement[];
+	bounds: LabelBox[];
+	touches: number;
+	shortfalls: LabelShortfall[];
+} {
 	const labels: TextSceneElement[] = [];
 	let touches = 0;
 	const segments = arrows.map((arrow) => segmentsFromPoints(arrow.points));
@@ -114,7 +119,9 @@ export function placedBranchLabels(
 	]);
 	const placed: { box: LabelBox; index: number }[] = [];
 	const sizes = arrows.map((arrow, index) =>
-		arrow.label ? branchLabelMetrics(arrow.label, branches(routes[index]?.source.kind)) : undefined,
+		arrow.label
+			? branchLabelMetrics(routes[index]!.edge, branches(routes[index]?.source.kind))
+			: undefined,
 	);
 	const positions = arrows.map((arrow, index) =>
 		arrow.label ? branchLabelPosition(routes[index]!, arrow.points[0]) : undefined,
@@ -207,7 +214,7 @@ export function placedBranchLabels(
 		});
 		arrows[index] = { ...arrow, groupIds };
 	}
-	return { labels, touches, shortfalls };
+	return { labels, bounds: placed.map((label) => label.box), touches, shortfalls };
 }
 
 /**

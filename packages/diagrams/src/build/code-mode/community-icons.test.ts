@@ -1,9 +1,9 @@
-import { type IconRecipe } from "@sketchi/drawing";
+import { type IconRecipe, CanvasSpec } from "@sketchi/drawing";
 import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts";
-import { RenderedDiagramSceneSchema } from "./contract";
+
 import {
 	CodeModeIconLoadError,
 	communityIconSlugsIn,
@@ -102,7 +102,7 @@ function sceneIcons(result: {
 	readonly artifact?: { readonly formats: ReadonlyArray<{ format: string; inline?: unknown }> };
 }) {
 	const inline = result.artifact?.formats.find(({ format }) => format === "scene")?.inline;
-	return Schema.decodeUnknownSync(RenderedDiagramSceneSchema)(inline).icons ?? {};
+	return Schema.decodeUnknownSync(CanvasSpec)(inline).icons ?? {};
 }
 
 describe("community icon slugs", () => {

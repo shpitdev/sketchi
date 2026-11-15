@@ -5,12 +5,7 @@ import { ExcalidrawFile, validateExcalidrawScene } from "@sketchi/drawing/excali
 import { describe, expect, it } from "vitest";
 import { Context, Effect, Schema, Result } from "effect";
 
-import {
-	CANVAS_LIMITS,
-	type CanvasSpec,
-	type CanvasShapeElement,
-	type CanvasSpec as RenderedDiagramScene,
-} from "@sketchi/drawing";
+import { CANVAS_LIMITS, type CanvasShapeElement, CanvasSpec } from "@sketchi/drawing";
 import {
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_ISSUES,
@@ -31,10 +26,8 @@ import {
 	type CodeModeObjectBucketObject,
 } from "./artifacts";
 import {
-	CanvasSpec as CanvasSpecContract,
 	CreateCanvasRequest,
 	toCodeModeJsonSchema,
-	RenderedDiagramSceneSchema,
 	type ApplyDiagramPatchResult,
 	type BuildFlowchartResult,
 	type CreateCanvasResult,
@@ -475,7 +468,7 @@ function throwingStore(): CodeModeArtifactStorageShape {
 }
 
 function parseInlineScene(value: unknown) {
-	return Schema.decodeUnknownSync(RenderedDiagramSceneSchema, {
+	return Schema.decodeUnknownSync(CanvasSpec, {
 		errors: "all",
 		reportInput: true,
 	})(value);
@@ -2559,14 +2552,14 @@ function densePointElements(count: number): CanvasSpec["elements"] {
 }
 
 describe("curved mindmap connectors", () => {
-	const curves = (scene: RenderedDiagramScene) =>
+	const curves = (scene: CanvasSpec) =>
 		scene.elements.flatMap((element) =>
 			element.type === "arrow" && element.curved ? [element] : [],
 		);
 	/** A returned scene, checked against the scene contract and typed as the renderer draws it. */
-	const sceneOf = (value: unknown): RenderedDiagramScene => {
+	const sceneOf = (value: unknown): CanvasSpec => {
 		parseInlineScene(value);
-		return value as RenderedDiagramScene;
+		return value as CanvasSpec;
 	};
 	/** Every step of the route runs along an axis, as an orthogonal reroute does. */
 	const orthogonal = (points: readonly { x: number; y: number }[]) =>
@@ -2862,7 +2855,7 @@ describe("canvas geometry and input bounds", () => {
 			const scene = geometryCanvas([geometryNode("a", 0, 0)]);
 			expect(
 				Result.isSuccess(
-					Schema.decodeUnknownResult(CanvasSpecContract, {
+					Schema.decodeUnknownResult(CreateCanvasRequest.fields.spec, {
 						errors: "all",
 						reportInput: true,
 					})({
@@ -2873,7 +2866,7 @@ describe("canvas geometry and input bounds", () => {
 			).toBe(true);
 			expect(
 				Result.isSuccess(
-					Schema.decodeUnknownResult(CanvasSpecContract, {
+					Schema.decodeUnknownResult(CreateCanvasRequest.fields.spec, {
 						errors: "all",
 						reportInput: true,
 					})({
@@ -2903,7 +2896,7 @@ describe("canvas geometry and input bounds", () => {
 		]);
 		expect(
 			Result.isSuccess(
-				Schema.decodeUnknownResult(CanvasSpecContract, {
+				Schema.decodeUnknownResult(CreateCanvasRequest.fields.spec, {
 					errors: "all",
 					reportInput: true,
 				})(scene),

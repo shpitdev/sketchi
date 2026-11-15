@@ -11,9 +11,9 @@ import {
 	CHART_SERIES_COLORS,
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasPoint as ScenePoint,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 /**
@@ -587,7 +587,7 @@ function tint(color: string, background: string, share: number): string {
  * sides in clockwise order, each subtree in its own color, joined by curves,
  * with label size stepping down from the center.
  */
-export function renderMindmap(diagram: Mindmap): RenderedDiagramScene {
+export function renderMindmap(diagram: Mindmap): CanvasSpec {
 	const root = measureTopics(diagram);
 	const placed = layoutMindmap(root, diagram.layout.direction === "RL");
 	const dx = Math.round(PADDING - Math.min(...placed.map((entry) => entry.x)));

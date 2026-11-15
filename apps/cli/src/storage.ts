@@ -1,8 +1,9 @@
+import { CanvasSpec } from "@sketchi/drawing";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
-import { RenderedDiagramSceneSchema } from "@sketchi/diagrams/build/code-mode/contract";
+
 import { Clock, Context, Effect, Layer, Result, Schedule, Schema } from "effect";
 
 import {
@@ -1098,7 +1099,7 @@ const DiagramStoreLive = Layer.effect(
 				const text = yield* fs.readText(scenePath);
 				const decoded = yield* Effect.sync(() => {
 					try {
-						return Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
+						return Schema.decodeUnknownResult(CanvasSpec, {
 							errors: "all",
 							reportInput: true,
 						})(JSON.parse(text));
@@ -1221,7 +1222,7 @@ const DiagramStoreLive = Layer.effect(
 				const valid =
 					kind === "scene"
 						? Result.isSuccess(
-								Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
+								Schema.decodeUnknownResult(CanvasSpec, {
 									errors: "all",
 									reportInput: true,
 								})(value),

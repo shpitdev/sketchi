@@ -17,8 +17,14 @@ import {
 
 export type ConnectionEdge = "top" | "right" | "bottom" | "left";
 
+/** Measured geometry attached to the topology edge for this render only. */
+export interface LayoutEdge extends DiagramEdge {
+	readonly labelSize: { readonly width: number; readonly height: number };
+	readonly branchLabelSize?: { readonly width: number; readonly height: number };
+}
+
 export interface RoutedEdge {
-	edge: DiagramEdge;
+	edge: LayoutEdge;
 	index: number;
 	/**
 	 * A wrap continuation's lane between its bands: a line along the flow at `at`

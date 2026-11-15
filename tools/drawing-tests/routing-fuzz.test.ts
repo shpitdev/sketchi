@@ -42,7 +42,7 @@ import {
 	wrappedLabelWidth,
 	wrapTextToWidth,
 	zoneRegionIssues,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -1589,7 +1589,7 @@ function insideNodeShape(point: Point, node: Region & { readonly shape: string }
  * ellipse's anywhere along the line, any other node's box outside the run that
  * attaches to it, where a composed shape's curve draws in from its box.
  */
-function ownEndStrays(scene: RenderedDiagramScene): string[] {
+function ownEndStrays(scene: CanvasSpec): string[] {
 	const nodes = new Map(
 		scene.elements.flatMap((e) =>
 			e.type === "node" && e.rendererRole === undefined ? [[e.nodeId, e] as const] : [],
@@ -1622,7 +1622,7 @@ function ownEndStrays(scene: RenderedDiagramScene): string[] {
  * label its square route kept clear of; into a zone or group neither end sits
  * in; or out of one both ends sit in.
  */
-function curvedStrays(curved: RenderedDiagramScene, square: RenderedDiagramScene): string[] {
+function curvedStrays(curved: CanvasSpec, square: CanvasSpec): string[] {
 	const nodes = curved.elements.flatMap((e) =>
 		e.type === "node" && e.rendererRole === undefined ? [e] : [],
 	);

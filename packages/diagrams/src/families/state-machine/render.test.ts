@@ -6,7 +6,7 @@ import {
 	getCanvasValidationIssues,
 	groupRegionIssues,
 	wrappedLabelWidth,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { crossingStateMachines } from "../flowchart/crossing-fixtures.js";
 import {
@@ -19,11 +19,11 @@ import {
 import { renderDiagram } from "../../family.js";
 import { arrowCrossings } from "../../graph/readability.js";
 
-const nodes = (scene: RenderedDiagramScene) =>
+const nodes = (scene: CanvasSpec) =>
 	scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));
-const arrows = (scene: RenderedDiagramScene) =>
+const arrows = (scene: CanvasSpec) =>
 	scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
-const texts = (scene: RenderedDiagramScene) =>
+const texts = (scene: CanvasSpec) =>
 	scene.elements.flatMap((element) => (element.type === "text" ? [element.text] : []));
 
 describe("StateMachine renderer", () => {

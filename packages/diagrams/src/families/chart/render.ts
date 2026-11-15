@@ -6,11 +6,11 @@ import {
 	wrapTextToWidth,
 	type CanvasLineElement as LineSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasPoint as ScenePoint,
 	type CanvasTextElement as TextSceneElement,
 	CHART_SERIES_COLORS,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 import {
@@ -1826,7 +1826,7 @@ function drawPie(builder: SceneBuilder, diagram: ChartDiagram): void {
 }
 
 /** Lay out a chart deterministically: axes, marks, labels and legend. */
-export function renderChartDiagram(diagram: ChartDiagram): RenderedDiagramScene {
+export function renderChartDiagram(diagram: ChartDiagram): CanvasSpec {
 	const builder = new SceneBuilder(diagram.style.backgroundColor);
 	if (diagram.kind === "pie") {
 		drawPie(builder, diagram);

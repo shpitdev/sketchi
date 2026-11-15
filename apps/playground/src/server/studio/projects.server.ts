@@ -1,8 +1,9 @@
+import { CanvasSpec } from "@sketchi/drawing";
 import "@tanstack/react-start/server-only";
 
 import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
 import { CodeModeRuntimeEnvironment, getArtifact } from "@sketchi/diagrams/build/code-mode/runtime";
-import { RenderedDiagramSceneSchema } from "@sketchi/diagrams/build/code-mode/contract";
+
 import {
 	makeStudioObjectStoreLayer,
 	MemoryStudioObjectBucket,
@@ -75,7 +76,7 @@ export const PlaygroundStudioLayer = Layer.effect(
 								status: artifact.status === "storage_failed" ? 500 : 404,
 							});
 						}
-						const scene = Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
+						const scene = Schema.decodeUnknownResult(CanvasSpec, {
 							errors: "all",
 							reportInput: true,
 						})(artifact.inline);

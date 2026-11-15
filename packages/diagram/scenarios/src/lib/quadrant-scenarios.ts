@@ -1,3 +1,4 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
 import {
@@ -10,7 +11,6 @@ import {
 	quadrantLayoutIssues,
 	readQuadrantScene,
 } from "@sketchi/diagrams/families/quadrant/readout";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { type ScenarioCheck } from "./evaluate.js";
 import { type DiagramScenarioDifficulty } from "./scenarios.js";
@@ -283,10 +283,7 @@ const DOT_TOLERANCE = 0.5;
  * in plot coordinates with its label, each quadrant's name in its own
  * quadrant, and both axes' titles and end labels.
  */
-export function quadrantDrawnCheck(
-	diagram: QuadrantDiagram,
-	scene: RenderedDiagramScene,
-): ScenarioCheck {
+export function quadrantDrawnCheck(diagram: QuadrantDiagram, scene: CanvasSpec): ScenarioCheck {
 	const readout = readQuadrantScene(scene);
 	const problems: string[] = [];
 	const { plot } = readout;
@@ -334,10 +331,7 @@ export function quadrantDrawnCheck(
 }
 
 /** No label overlaps another text or a dot, every label stays in the plot, and each reads as its own dot's. */
-export function quadrantLayoutCheck(
-	diagram: QuadrantDiagram,
-	scene: RenderedDiagramScene,
-): ScenarioCheck {
+export function quadrantLayoutCheck(diagram: QuadrantDiagram, scene: CanvasSpec): ScenarioCheck {
 	const issues = quadrantLayoutIssues(scene, diagram).filter(
 		(issue) => issue.code !== "dot-position",
 	);

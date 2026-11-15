@@ -1,3 +1,4 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
 import {
@@ -16,7 +17,6 @@ import {
 	sankeyLayoutIssues,
 	sankeyWeightedCrossings,
 } from "@sketchi/diagrams/families/sankey/readout";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { type ScenarioCheck } from "./evaluate.js";
 import { type DiagramScenarioDifficulty } from "./scenarios.js";
@@ -158,10 +158,7 @@ const flat = (text: string | undefined) => (text ?? "").replace(/\s+/gu, " ").tr
  * values (apart from the documented minimum), and each bar as tall as its
  * fuller side.
  */
-export function sankeyDrawnCheck(
-	diagram: SankeyDiagram,
-	scene: RenderedDiagramScene,
-): ScenarioCheck {
+export function sankeyDrawnCheck(diagram: SankeyDiagram, scene: CanvasSpec): ScenarioCheck {
 	const { nodes, bands } = readSankeyScene(scene);
 	const totals = sankeyNodeTotals(diagram);
 	const bars = new Map(nodes.map((node) => [node.id, node]));
@@ -226,10 +223,7 @@ export function sankeyDrawnCheck(
  * gaps, and crossings no heavier than the authored order's, each crossing
  * weighing the product of its two flows' values.
  */
-export function sankeyLayoutCheck(
-	diagram: SankeyDiagram,
-	scene: RenderedDiagramScene,
-): ScenarioCheck {
+export function sankeyLayoutCheck(diagram: SankeyDiagram, scene: CanvasSpec): ScenarioCheck {
 	const issues = sankeyLayoutIssues(scene).map((issue) => issue.message);
 	// Each crossing weighs the product of its two flows' values, as a reader sees it.
 	const valueOf = new Map(

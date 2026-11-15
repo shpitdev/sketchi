@@ -1,3 +1,4 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { Result } from "effect";
 import { flowchartDiagramFromSpec } from "@sketchi/diagrams/families/flowchart/spec";
@@ -5,7 +6,7 @@ import { type FlowchartDocument } from "@sketchi/diagrams/families/flowchart/doc
 import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
 import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 import { renderMindmap } from "@sketchi/diagrams/families/mindmap/index";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+
 import { DrawingEditor } from "@sketchi/editor";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
@@ -18,7 +19,7 @@ export const Route = createFileRoute("/examples/$exampleId")({
 
 interface CuratedExample {
 	blurb: string;
-	scene?: RenderedDiagramScene;
+	scene?: CanvasSpec;
 	spec?: FlowchartDocument;
 	title: string;
 }
@@ -63,7 +64,7 @@ const EXAMPLES: Record<string, CuratedExample> = {
 	},
 };
 
-function useCuratedScene(example: CuratedExample | undefined): RenderedDiagramScene | null {
+function useCuratedScene(example: CuratedExample | undefined): CanvasSpec | null {
 	return useMemo(() => {
 		if (!example) {
 			return null;

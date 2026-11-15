@@ -15,10 +15,10 @@ import {
 	CHART_SERIES_COLORS,
 	type CanvasLineElement as LineSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasPoint as ScenePoint,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 import { breakRulesUnderText, type RuleBox } from "../../graph/scene-rules.js";
@@ -847,7 +847,7 @@ function freeText(
  * beneath it. A journey too wide to read at JOURNEY_MAX_ASPECT narrows its
  * cards, then wraps into bands of whole stages, one under another.
  */
-export function renderJourneyDiagram(diagram: JourneyDiagram): RenderedDiagramScene {
+export function renderJourneyDiagram(diagram: JourneyDiagram): CanvasSpec {
 	measured.clear();
 	wordUnits.clear();
 	const plan = chooseJourneyPlan(diagram);

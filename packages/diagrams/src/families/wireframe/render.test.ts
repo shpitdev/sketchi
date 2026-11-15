@@ -3,8 +3,8 @@ import { wireframeStressFixtures } from "./fixtures.js";
 import {
 	getCanvasValidationIssues,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -21,16 +21,16 @@ const screen = (children: unknown[], extra: Record<string, unknown> = {}) =>
 		screens: [{ id: "s", name: "Screen", device: "desktop", children, ...extra }],
 	}).pipe(Result.getOrThrow);
 
-const nodes = (scene: RenderedDiagramScene) =>
+const nodes = (scene: CanvasSpec) =>
 	scene.elements.filter((element): element is NodeSceneElement => element.type === "node");
-const texts = (scene: RenderedDiagramScene) =>
+const texts = (scene: CanvasSpec) =>
 	scene.elements.filter((element): element is TextSceneElement => element.type === "text");
-const byId = (scene: RenderedDiagramScene, id: string) => {
+const byId = (scene: CanvasSpec, id: string) => {
 	const element = scene.elements.find((candidate) => candidate.id === id);
 	if (!element) throw new Error(`No element ${id}`);
 	return element;
 };
-const node = (scene: RenderedDiagramScene, id: string) => byId(scene, id) as NodeSceneElement;
+const node = (scene: CanvasSpec, id: string) => byId(scene, id) as NodeSceneElement;
 const boxOf = (diagram: ReturnType<typeof screen>, path: string) => {
 	const found = renderWireframeDiagram(diagram)
 		.layout.screens.flatMap((entry) => entry.components)
@@ -39,10 +39,7 @@ const boxOf = (diagram: ReturnType<typeof screen>, path: string) => {
 	return found.box;
 };
 
-function expectClean(
-	scene: RenderedDiagramScene,
-	diagram: Parameters<typeof renderWireframeDiagram>[0],
-) {
+function expectClean(scene: CanvasSpec, diagram: Parameters<typeof renderWireframeDiagram>[0]) {
 	expect(getCanvasValidationIssues(scene)).toEqual([]);
 	expect(wireframeLayoutIssues(scene)).toEqual([]);
 	expect(wireframeBoxIssues(renderWireframeDiagram(diagram).layout)).toEqual([]);
@@ -448,7 +445,7 @@ describe("wireframe renderer", () => {
 				type: "wireframe",
 				screens: screens.map((screen) => ({ device: "mobile", name: screen.id, ...screen })),
 			}).pipe(Result.getOrThrow);
-		const arrows = (scene: RenderedDiagramScene) =>
+		const arrows = (scene: CanvasSpec) =>
 			scene.elements.filter((element) => element.type === "arrow");
 		const go = (target: string, text = "Continue") => ({
 			type: "button",

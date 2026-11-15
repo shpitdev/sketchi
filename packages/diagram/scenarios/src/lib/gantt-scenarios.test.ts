@@ -7,10 +7,7 @@ import {
 import { readGanttScene } from "@sketchi/diagrams/families/gantt/readout";
 import { layoutGanttDiagram } from "@sketchi/diagrams/families/gantt/render";
 import { renderDiagram } from "@sketchi/diagrams/family";
-import {
-	type CanvasSpec as RenderedDiagramScene,
-	type CanvasPoint as ScenePoint,
-} from "@sketchi/drawing";
+import { type CanvasPoint as ScenePoint, type CanvasSpec } from "@sketchi/drawing";
 import { Option, Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { evaluateScenarioDiagram } from "./evaluate.js";
@@ -60,7 +57,7 @@ const KINK = 28;
  * either end (kinks); crossings of two routes; and runs closer than 6.5 px along the top, bottom
  * or side of a mark they don't connect to, for over 16 px along it or 10 px beside it (hugs).
  */
-function routeQuality(scene: RenderedDiagramScene) {
+function routeQuality(scene: CanvasSpec) {
 	const readout = readGanttScene(scene);
 	const routes = readout.dependencies.map((dependency) => ({
 		...dependency,
@@ -140,7 +137,7 @@ function hooks(points: readonly ScenePoint[]): boolean {
  * edge of a mark in the rows between, beyond the route's ends) and how far into its successor's
  * start it lands.
  */
-function hookTurns(scene: RenderedDiagramScene) {
+function hookTurns(scene: CanvasSpec) {
 	const readout = readGanttScene(scene);
 	const marks = [...readout.marks.values()];
 	return readout.dependencies.flatMap(({ from, to, points }) => {
@@ -351,8 +348,8 @@ describe("prompt-grounded Gantt scenarios", () => {
 		const diagram = migration.expectedDiagram;
 		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		const edit = (
-			change: (elements: RenderedDiagramScene["elements"]) => RenderedDiagramScene["elements"],
-		): RenderedDiagramScene => ({ ...scene, elements: change(scene.elements) });
+			change: (elements: CanvasSpec["elements"]) => CanvasSpec["elements"],
+		): CanvasSpec => ({ ...scene, elements: change(scene.elements) });
 		const noArrow = edit((elements) =>
 			elements.filter((element) => element.id !== "gantt:dependency:crm:finance"),
 		);

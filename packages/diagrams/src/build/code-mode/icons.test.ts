@@ -1,3 +1,4 @@
+import { CanvasSpec } from "@sketchi/drawing";
 import { buildResponse } from "../operation.js";
 import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
@@ -6,7 +7,7 @@ import type { SketchiIcon } from "@sketchi/icon-catalog";
 import { iconManifest } from "@sketchi/icon-catalog/catalog";
 
 import { makeMemoryArtifactStorage, CodeModeArtifactStorage } from "./artifacts";
-import { RenderedDiagramSceneSchema } from "./contract";
+
 import {
 	CodeModeIconLoadError,
 	makeCodeModeIconCatalog,
@@ -187,7 +188,7 @@ function inlineScene(result: {
 	};
 }) {
 	const inline = result.artifact?.formats.find(({ format }) => format === "scene")?.inline;
-	return Schema.decodeUnknownSync(RenderedDiagramSceneSchema)(inline);
+	return Schema.decodeUnknownSync(CanvasSpec)(inline);
 }
 
 describe("Code Mode icon catalog", () => {
@@ -1401,7 +1402,7 @@ describe("sequence participant logos", () => {
 				message: expect.stringContaining('participant "queue"'),
 			}),
 		]);
-		const scene = Schema.decodeUnknownSync(RenderedDiagramSceneSchema)(
+		const scene = Schema.decodeUnknownSync(CanvasSpec)(
 			result.artifact.formats.find((format) => format.format === "scene")?.inline,
 		);
 		expect(Object.keys(scene.icons ?? {}).sort()).toEqual(["docker", "github"]);

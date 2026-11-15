@@ -1,7 +1,4 @@
-import {
-	type CanvasSpec as RenderedDiagramScene,
-	type CanvasElement as SceneElement,
-} from "@sketchi/drawing";
+import { type CanvasElement as SceneElement, type CanvasSpec } from "@sketchi/drawing";
 
 type NodeElement = Extract<SceneElement, { type: "node" }>;
 
@@ -24,7 +21,7 @@ function absolutePoints(element: NodeElement): { x: number; y: number }[] {
 }
 
 /** Read a rendered chart's data marks back from its scene, for proportion checks. */
-export function readChartMarks(scene: RenderedDiagramScene): ChartReadout {
+export function readChartMarks(scene: CanvasSpec): ChartReadout {
 	const nodes = scene.elements.filter((element): element is NodeElement => element.type === "node");
 	const baseline = scene.elements.find((element) => element.id === "chart:baseline");
 	const vertical =

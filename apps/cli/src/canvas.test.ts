@@ -1,4 +1,4 @@
-import { CanvasSpec, CreateCanvasRequest } from "@sketchi/diagrams/build/code-mode/contract";
+import { CreateCanvasRequest } from "@sketchi/diagrams/build/code-mode/contract";
 import { afterEach, assert, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Schema } from "effect";
 import { TestClock } from "effect/testing";
@@ -8,7 +8,7 @@ import { type BuiltDiagram, DiagramRecordManifest, type StoredDiagram } from "./
 import { exitCodeForFailure } from "./errors.js";
 import { DiagramStore } from "./storage.js";
 
-const canvasSpec = Schema.decodeUnknownSync(CanvasSpec)({
+const canvasSpec = Schema.decodeUnknownSync(CreateCanvasRequest.fields.spec)({
 	kind: "canvas",
 	version: 1,
 	diagramId: "universal-canvas",

@@ -1,9 +1,6 @@
+import { CanvasSpec } from "@sketchi/drawing";
 import { PublishedCoverageIssue } from "@sketchi/diagrams/families/flowchart/issues";
-import {
-	ApplyDiagramPatchRequest,
-	RenderedDiagramSceneSchema,
-	type PatchableScene,
-} from "@sketchi/diagrams/build/code-mode/contract";
+import { ApplyDiagramPatchRequest } from "@sketchi/diagrams/build/code-mode/contract";
 import { type CanonicalDiagramDocument, type DIAGRAM_TYPES } from "@sketchi/diagrams/family";
 
 import { PublishedBuildIssue } from "@sketchi/diagrams/build/result";
@@ -188,8 +185,8 @@ function timeoutFailure(): CliGenerationError {
 	});
 }
 
-function decodeScene(value: unknown): Effect.Effect<PatchableScene, CliGenerationError> {
-	const decoded = Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
+function decodeScene(value: unknown): Effect.Effect<CanvasSpec, CliGenerationError> {
+	const decoded = Schema.decodeUnknownResult(CanvasSpec, {
 		errors: "all",
 		reportInput: true,
 	})(value);
@@ -272,7 +269,7 @@ const requestGeneration = Effect.fn("sketchi.cli.generate.request")(
  */
 const applyRequestedStyles = Effect.fn("sketchi.cli.generate.styles")(function* (
 	diagram: StoredDiagram,
-	scene: PatchableScene,
+	scene: CanvasSpec,
 	patch: { readonly operations: ApplyDiagramPatchRequest["operations"] } | undefined,
 ) {
 	if (patch === undefined) return diagram;

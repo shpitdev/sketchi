@@ -8,8 +8,8 @@ import {
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasFrameElement as FrameSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { type IntermediateDiagram } from "./intermediate.js";
 import { isStructurallyValidStateMarker } from "./compose";
@@ -113,13 +113,13 @@ const render = (diagram: IntermediateDiagram, direction: (typeof directions)[num
 		{ ...diagram, layout: { direction, edgeRouting: "orthogonal" } },
 		{ pairedReturns: true },
 	);
-const nodesOf = (scene: RenderedDiagramScene) =>
+const nodesOf = (scene: CanvasSpec) =>
 	scene.elements.filter((e): e is NodeSceneElement => e.type === "node");
-const arrowOf = (scene: RenderedDiagramScene, edgeId: string) =>
+const arrowOf = (scene: CanvasSpec, edgeId: string) =>
 	scene.elements.find((e): e is ArrowSceneElement => e.type === "arrow" && e.edgeId === edgeId)!;
-const nodeOf = (scene: RenderedDiagramScene, nodeId: string) =>
+const nodeOf = (scene: CanvasSpec, nodeId: string) =>
 	nodesOf(scene).find((candidate) => candidate.nodeId === nodeId)!;
-const labelOf = (scene: RenderedDiagramScene, edgeId: string) =>
+const labelOf = (scene: CanvasSpec, edgeId: string) =>
 	scene.elements.find(
 		(e): e is TextSceneElement => e.type === "text" && e.id === `edge:${edgeId}:label`,
 	)!;
@@ -131,7 +131,7 @@ const labelBox = (label: TextSceneElement) => {
 };
 
 /** Arrows overlapping another arrow or crossing a node they do not end at. */
-function routeDefects(scene: RenderedDiagramScene): string[] {
+function routeDefects(scene: CanvasSpec): string[] {
 	const arrows = scene.elements.filter((e): e is ArrowSceneElement => e.type === "arrow");
 	const defects: string[] = [];
 	for (const arrow of arrows) {

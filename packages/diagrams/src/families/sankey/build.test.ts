@@ -1,8 +1,8 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 import { buildResponse, type BuildRejection } from "../../build/operation.js";
 import { describe, expect, it, vi } from "vitest";
 import { Effect } from "effect";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import {
 	CodeModeArtifactStorage,
@@ -71,7 +71,7 @@ describe("Code Mode native Sankey diagram", () => {
 		});
 		expect(built.normalizedSpec.links).toEqual(budgetSpec.links);
 		expect(built.quality.summary).toEqual({ nodeCount: 5, edgeCount: 4 });
-		const scene = inline(built).get("scene") as RenderedDiagramScene;
+		const scene = inline(built).get("scene") as CanvasSpec;
 		const texts = scene.elements.flatMap((element) =>
 			element.type === "text" ? [element.text] : [],
 		);
@@ -169,7 +169,7 @@ describe("Code Mode native Sankey diagram", () => {
 			}),
 		);
 		if (!patched.ok) throw new Error(JSON.stringify(patched.issues));
-		const scene = inline(patched).get("scene") as RenderedDiagramScene;
+		const scene = inline(patched).get("scene") as CanvasSpec;
 		expect(scene.elements.find((element) => element.id === "node:sankey:node:eng")).toMatchObject({
 			strokeColor: "#1f44c9",
 			rendererRole: "sankey-mark",

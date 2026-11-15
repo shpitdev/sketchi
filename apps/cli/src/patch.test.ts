@@ -1,9 +1,10 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 import { mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { CodeModeArtifactStorageMemory } from "@sketchi/diagrams/build/code-mode/artifacts";
 import { makeCodeModeRuntimeEnvironmentLayer } from "@sketchi/diagrams/build/code-mode/runtime";
-import { type PatchableScene } from "@sketchi/diagrams/build/code-mode/contract";
+
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
@@ -261,7 +262,7 @@ describe("offline semantic patch workflow", () => {
 
 					const scene = JSON.parse(
 						yield* Effect.promise(() => readFile(join(root, "release-flow/scene.json"), "utf8")),
-					) as PatchableScene;
+					) as CanvasSpec;
 					const excalidraw = JSON.parse(
 						yield* Effect.promise(() =>
 							readFile(join(root, "release-flow/diagram.excalidraw"), "utf8"),

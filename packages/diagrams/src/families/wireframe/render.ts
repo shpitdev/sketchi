@@ -21,10 +21,10 @@ import {
 	type CanvasFrameElement as FrameSceneElement,
 	type CanvasLineElement as LineSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasPoint as ScenePoint,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 import { routeNavigations, type NavigationBox } from "./navigation.js";
@@ -2536,7 +2536,7 @@ const offsetElement = (element: SceneElement, dx: number, dy: number): SceneElem
 
 /** Place and paint once; scene and readout describe the same geometry. */
 export function renderWireframeDiagram(diagram: WireframeDiagram): {
-	scene: RenderedDiagramScene;
+	scene: CanvasSpec;
 	layout: WireframeLayout;
 } {
 	const { placed, origins, frames: placedFrames } = placeScreens(diagram);
@@ -2570,7 +2570,7 @@ export function renderWireframeDiagram(diagram: WireframeDiagram): {
 		...frames.map((frame) => frame.y + frame.height),
 		...points.map((point) => point.y),
 	);
-	const scene: RenderedDiagramScene = {
+	const scene: CanvasSpec = {
 		kind: "canvas",
 		version: CANVAS_SPEC_VERSION,
 		diagramId: diagram.id,

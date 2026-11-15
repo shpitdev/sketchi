@@ -8,7 +8,7 @@ import {
 	routingQualityFindings,
 	routingQualityScale,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { renderClassDiagram } from "../families/class/render";
 import { renderTimelineDiagram } from "../families/timeline/render";
@@ -19,7 +19,7 @@ import { renderIntermediateDiagram } from "./scene";
  * Width over height, either way up, of a scene in the hosted PNG's 20-unit
  * frame, in place of the scene's own padding.
  */
-const exportAspect = ({ width, height }: RenderedDiagramScene, padding: number) =>
+const exportAspect = ({ width, height }: CanvasSpec, padding: number) =>
 	(Math.max(width, height) - 2 * padding + 40) / (Math.min(width, height) - 2 * padding + 40);
 
 /**
@@ -579,12 +579,12 @@ const classScene = (spec: object) =>
 	renderClassDiagram(parseClassDiagram({ type: "class", ...spec }).pipe(Result.getOrThrow)).pipe(
 		Result.getOrThrow,
 	);
-const classBox = (scene: RenderedDiagramScene, id: string) =>
+const classBox = (scene: CanvasSpec, id: string) =>
 	scene.elements.find(
 		(element): element is NodeSceneElement =>
 			element.type === "node" && element.id === `node:${id}`,
 	)!;
-const readsClean = (scene: RenderedDiagramScene) => {
+const readsClean = (scene: CanvasSpec) => {
 	const arrows = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
 	expect(arrowCrossings(arrows)).toBe(0);
 	expect(

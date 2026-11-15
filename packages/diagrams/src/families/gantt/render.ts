@@ -17,9 +17,9 @@ import {
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasLineElement as LineSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 import {
@@ -1212,13 +1212,13 @@ export interface GanttRoutingWork {
 }
 
 /** Lay out a Gantt chart deterministically: date axis, rows, bars, labels and dependencies. */
-export function renderGanttDiagram(diagram: GanttDiagram): RenderedDiagramScene {
+export function renderGanttDiagram(diagram: GanttDiagram): CanvasSpec {
 	return layoutGanttDiagram(diagram).scene;
 }
 
 /** A layout tried, with how its routes read: how often they cross, and what else a reader would flag. */
 interface LayoutTry {
-	readonly scene: RenderedDiagramScene;
+	readonly scene: CanvasSpec;
 	readonly work: GanttRoutingWork;
 	readonly crossings: number;
 	readonly findings: Findings;
@@ -1351,7 +1351,7 @@ const EARLIER_CLEAR: Choices = { forward: false, clear: true };
  * whose wider gutters hold more lanes, and the layout with the fewest such conflicts is kept.
  */
 export function layoutGanttDiagram(diagram: GanttDiagram): {
-	readonly scene: RenderedDiagramScene;
+	readonly scene: CanvasSpec;
 	readonly work: GanttRoutingWork;
 } {
 	const tried: LayoutTry[] = [layoutAt(diagram, ROW_HEIGHT, FORWARD)];

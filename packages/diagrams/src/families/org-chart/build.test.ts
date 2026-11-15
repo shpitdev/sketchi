@@ -1,8 +1,8 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 import { buildResponse, type BuildRejection } from "../../build/operation.js";
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import {
 	CodeModeArtifactStorage,
@@ -166,7 +166,7 @@ describe("Code Mode native org chart", () => {
 			}),
 		);
 		if (!patched.ok) throw new Error(JSON.stringify(patched.issues));
-		const scene = inline(patched).get("scene") as RenderedDiagramScene;
+		const scene = inline(patched).get("scene") as CanvasSpec;
 		expect(scene.elements.find((element) => element.id === "node:cto")).toMatchObject({
 			strokeColor: "#1f44c9",
 		});

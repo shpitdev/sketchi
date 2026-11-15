@@ -5,7 +5,7 @@ import {
 	canvasOutlineContains,
 	canvasShapeOutline,
 	isCanvasComposedShape,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { groupFixtures } from "../families/flowchart/group-fixtures.js";
 import { parseIntermediateDiagram } from "./intermediate.js";
@@ -61,7 +61,7 @@ function insideNode(point: Point, node: Box & { readonly shape: string }): boole
  * included past the straight runs that meet them; into a zone or group
  * neither end sits in; or out of one both ends sit in.
  */
-function strays(scene: RenderedDiagramScene): string[] {
+function strays(scene: CanvasSpec): string[] {
 	const nodes = scene.elements.flatMap((e) =>
 		e.type === "node" && e.rendererRole === undefined ? [e] : [],
 	);

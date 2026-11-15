@@ -9,9 +9,9 @@ import {
 	segmentsFromPoints,
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import {
 	type ClassDiagram,
@@ -246,7 +246,7 @@ function routedScene(
 	diagram: ClassDiagram,
 	boxes: ReadonlyMap<string, Box>,
 	placement: ClassPlacement,
-): RenderedDiagramScene {
+): CanvasSpec {
 	const rooms = labelRooms(diagram, placement);
 	const graph = {
 		id: diagram.id,
@@ -320,7 +320,7 @@ interface RoutedCounts {
 	readonly hugging: number;
 }
 
-function routedCounts(scene: RenderedDiagramScene): RoutedCounts {
+function routedCounts(scene: CanvasSpec): RoutedCounts {
 	const arrows = scene.elements.filter((e): e is ArrowSceneElement => e.type === "arrow");
 	return {
 		crossings: arrowCrossings(arrows),
@@ -339,7 +339,7 @@ function routedCounts(scene: RenderedDiagramScene): RoutedCounts {
 }
 
 /** Crossings plus reader-scale findings at the scene's export size, any too-long side, and detours. */
-function routedCost(scene: RenderedDiagramScene, counts: RoutedCounts): number {
+function routedCost(scene: CanvasSpec, counts: RoutedCounts): number {
 	const aspect = Math.max(scene.width / scene.height, scene.height / scene.width);
 	return (
 		counts.crossings +
@@ -351,7 +351,7 @@ function routedCost(scene: RenderedDiagramScene, counts: RoutedCounts): number {
 }
 
 /** Width over height, either way up, of the scene as the PNG export pads it. */
-function exportAspect(scene: RenderedDiagramScene): number {
+function exportAspect(scene: CanvasSpec): number {
 	const [width, height] = [scene.width, scene.height].map(
 		(side) => side - 2 * PADDING + 2 * EXPORT_PADDING,
 	) as [number, number];
@@ -395,7 +395,7 @@ function detour(arrow: ArrowSceneElement): number {
 }
 
 /** A routed scene's class boxes, without the room it held for labels. */
-function classBoxes(scene: RenderedDiagramScene): NodeSceneElement[] {
+function classBoxes(scene: CanvasSpec): NodeSceneElement[] {
 	return scene.elements.filter(
 		(element): element is NodeSceneElement =>
 			element.type === "node" && !element.nodeId.startsWith(LABEL_ROOM_PREFIX),
@@ -406,7 +406,7 @@ function classBoxes(scene: RenderedDiagramScene): NodeSceneElement[] {
 function bestScene(
 	diagram: ClassDiagram,
 	boxes: ReadonlyMap<string, Box>,
-): { readonly scene: RenderedDiagramScene; readonly labels: readonly TextSceneElement[] } {
+): { readonly scene: CanvasSpec; readonly labels: readonly TextSceneElement[] } {
 	const links: ClassLayoutLink[] = diagram.relationships.map((relationship) => ({
 		id: relationship.id,
 		from: relationship.from.trim(),
@@ -428,7 +428,7 @@ function bestScene(
 	});
 	const options = diagram.classes.length > LARGE_MODEL ? PLACEMENTS.slice(0, 2) : PLACEMENTS;
 	const tried = new Set<string>();
-	type Routed = { cost: number; counts: RoutedCounts; scene: RenderedDiagramScene };
+	type Routed = { cost: number; counts: RoutedCounts; scene: CanvasSpec };
 	let best: Routed | undefined;
 	const long = ({ scene }: Routed) => exportAspect(scene) > LONG_EXPORT;
 	const longSide = ({ scene }: Routed) => Math.max(scene.width, scene.height);
@@ -958,7 +958,7 @@ function padded(elements: readonly SceneElement[]): {
  * relationship an orthogonal line with its kind's heads and dashes, its
  * multiplicities and roles beside its ends.
  */
-export function renderClassDiagram(diagram: ClassDiagram): Result.Result<RenderedDiagramScene> {
+export function renderClassDiagram(diagram: ClassDiagram): Result.Result<CanvasSpec> {
 	const boxes = new Map(diagram.classes.map((node) => [node.id, boxOf(node)]));
 	const { scene, labels } = bestScene(diagram, boxes);
 	const placed = new Map(classBoxes(scene).map((element) => [element.nodeId, element]));

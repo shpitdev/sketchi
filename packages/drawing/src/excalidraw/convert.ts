@@ -5,7 +5,7 @@ import {
 	type CanvasIconElement as IconSceneElement,
 	type CanvasLineElement as LineSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 	type CanvasElement as SceneElement,
 	type CanvasTextElement as TextSceneElement,
 	AXIS_ALIGNED_EPSILON,
@@ -262,7 +262,7 @@ function boundRoute(input: {
 	};
 }
 
-function initialZoomForScene(scene: RenderedDiagramScene): number {
+function initialZoomForScene(scene: CanvasSpec): number {
 	const zoom = Math.min(
 		1,
 		FIT_TARGET_WIDTH / Math.max(scene.width, 1),
@@ -272,7 +272,7 @@ function initialZoomForScene(scene: RenderedDiagramScene): number {
 	return Math.max(MIN_INITIAL_ZOOM, Math.round(zoom * 100) / 100);
 }
 
-function elementBase(id: string, element?: RenderedDiagramScene["elements"][number]) {
+function elementBase(id: string, element?: CanvasSpec["elements"][number]) {
 	const seed = fnv1a32(id, "seed");
 	return {
 		id,
@@ -405,7 +405,7 @@ function logoGroupId(node: NodeSceneElement): string {
  */
 function shapeStrokeElements(input: {
 	id: (index: number) => string;
-	scene: RenderedDiagramScene;
+	scene: CanvasSpec;
 	shape: NodeSceneElement;
 }): ExcalidrawElement[] {
 	const { shape } = input;
@@ -448,10 +448,7 @@ function shapeStrokeElements(input: {
 }
 
 /** What a logo sits on: its node's own solid fill, else the canvas. */
-function iconPaper(
-	node: NodeSceneElement | FrameSceneElement,
-	scene: RenderedDiagramScene,
-): string {
+function iconPaper(node: NodeSceneElement | FrameSceneElement, scene: CanvasSpec): string {
 	const solid = (node.fillStyle ?? "solid") === "solid";
 	return node.fillColor && node.fillColor !== "transparent" && solid
 		? node.fillColor
@@ -505,7 +502,7 @@ function iconElements(input: {
 	files: Record<string, ExcalidrawBinaryFile>;
 	ink: string;
 	node: NodeSceneElement | FrameSceneElement;
-	scene: RenderedDiagramScene;
+	scene: CanvasSpec;
 	usedElementIds: Set<string>;
 }): ExcalidrawElement[] {
 	const { node, scene } = input;
@@ -556,7 +553,7 @@ function iconElements(input: {
 function standaloneIconElements(input: {
 	element: IconSceneElement;
 	files: Record<string, ExcalidrawBinaryFile>;
-	scene: RenderedDiagramScene;
+	scene: CanvasSpec;
 	usedElementIds: Set<string>;
 }): ExcalidrawElement[] {
 	const { element, scene } = input;
@@ -610,7 +607,7 @@ function standaloneIconElements(input: {
 
 function shapeElement(input: {
 	arrowIds: readonly string[];
-	scene: RenderedDiagramScene;
+	scene: CanvasSpec;
 	shape: NodeSceneElement;
 	text?: TextSceneElement;
 }): ExcalidrawElement {
@@ -696,7 +693,7 @@ function lastArrowPoint(arrow: ArrowSceneElement) {
 
 function arrowElement(input: {
 	arrow: ArrowSceneElement;
-	scene: RenderedDiagramScene;
+	scene: CanvasSpec;
 	sourceShape: ExcalidrawElement | undefined;
 	targetShape: ExcalidrawElement | undefined;
 	text?: TextSceneElement;
@@ -750,7 +747,7 @@ function arrowElement(input: {
 function lineElement(input: {
 	element: LineSceneElement;
 	elementsById: ReadonlyMap<string, ExcalidrawElement>;
-	scene: RenderedDiagramScene;
+	scene: CanvasSpec;
 }): ExcalidrawElement {
 	const hasArrow =
 		input.element.startArrowhead !== undefined ||
@@ -812,10 +809,7 @@ function lineElement(input: {
 	};
 }
 
-function frameElement(input: {
-	element: FrameSceneElement;
-	scene: RenderedDiagramScene;
-}): ExcalidrawElement {
+function frameElement(input: { element: FrameSceneElement; scene: CanvasSpec }): ExcalidrawElement {
 	return {
 		...elementBase(input.element.id, input.element),
 		type: "frame",
@@ -883,27 +877,27 @@ function collectBoundArrowsByElement(
 	return result;
 }
 
-function isNode(element: RenderedDiagramScene["elements"][number]): element is NodeSceneElement {
+function isNode(element: CanvasSpec["elements"][number]): element is NodeSceneElement {
 	return element.type === "node";
 }
 
-function isText(element: RenderedDiagramScene["elements"][number]): element is TextSceneElement {
+function isText(element: CanvasSpec["elements"][number]): element is TextSceneElement {
 	return element.type === "text";
 }
 
-function isArrow(element: RenderedDiagramScene["elements"][number]): element is ArrowSceneElement {
+function isArrow(element: CanvasSpec["elements"][number]): element is ArrowSceneElement {
 	return element.type === "arrow";
 }
 
-function isLine(element: RenderedDiagramScene["elements"][number]): element is LineSceneElement {
+function isLine(element: CanvasSpec["elements"][number]): element is LineSceneElement {
 	return element.type === "line";
 }
 
-function isFrame(element: RenderedDiagramScene["elements"][number]): element is FrameSceneElement {
+function isFrame(element: CanvasSpec["elements"][number]): element is FrameSceneElement {
 	return element.type === "frame";
 }
 
-function applyLayerSemantics(scene: RenderedDiagramScene): SceneElement[] {
+function applyLayerSemantics(scene: CanvasSpec): SceneElement[] {
 	const layersById = new Map(scene.layers.map((layer) => [layer.id, layer]));
 	const layerVisibleElements = scene.elements.filter((element) => {
 		const layer = element.layerId ? layersById.get(element.layerId) : undefined;
@@ -1039,7 +1033,7 @@ function strokeElementId(
 }
 
 function buildElements(
-	scene: RenderedDiagramScene,
+	scene: CanvasSpec,
 	sourceElements: readonly SceneElement[],
 	textElements: readonly TextSceneElement[],
 	files: Record<string, ExcalidrawBinaryFile>,
@@ -1212,7 +1206,7 @@ function buildElements(
 }
 
 function applyZOrder(
-	scene: RenderedDiagramScene,
+	scene: CanvasSpec,
 	elements: ExcalidrawElement[],
 	generatedSourceIds: ReadonlyMap<string, string>,
 ): void {
@@ -1236,7 +1230,7 @@ function applyZOrder(
 	}
 }
 
-export function convertSceneToExcalidraw(scene: RenderedDiagramScene): ExcalidrawScene & {
+export function convertSceneToExcalidraw(scene: CanvasSpec): ExcalidrawScene & {
 	files: Record<string, ExcalidrawBinaryFile>;
 } {
 	const sourceElements = applyLayerSemantics(scene);

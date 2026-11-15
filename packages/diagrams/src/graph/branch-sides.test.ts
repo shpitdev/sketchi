@@ -13,7 +13,7 @@ import {
 	sharedSegments,
 	wrappedLabelWidth,
 	wrapTextToWidth,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { arrowCrossings } from "./readability";
 import { renderIntermediateDiagram } from "./scene";
@@ -21,7 +21,7 @@ import { renderIntermediateDiagram } from "./scene";
 type Point = { readonly x: number; readonly y: number };
 type Side = "top" | "right" | "bottom" | "left";
 
-function line(scene: RenderedDiagramScene, edgeId: string) {
+function line(scene: CanvasSpec, edgeId: string) {
 	const arrow = scene.elements.find(
 		(element) => element.type === "arrow" && element.edgeId === edgeId,
 	);
@@ -30,7 +30,7 @@ function line(scene: RenderedDiagramScene, edgeId: string) {
 }
 
 /** The side of a node's box a line's end lies on. */
-function sideOf(scene: RenderedDiagramScene, nodeId: string, point: Point): Side | undefined {
+function sideOf(scene: CanvasSpec, nodeId: string, point: Point): Side | undefined {
 	const node = scene.elements.find(
 		(element) => element.type === "node" && element.nodeId === nodeId,
 	);
@@ -44,7 +44,7 @@ function sideOf(scene: RenderedDiagramScene, nodeId: string, point: Point): Side
 }
 
 /** Where a line leaves its source and where it enters its target. */
-function sides(scene: RenderedDiagramScene, edgeId: string): [Side | undefined, Side | undefined] {
+function sides(scene: CanvasSpec, edgeId: string): [Side | undefined, Side | undefined] {
 	const { points, sourceNodeId, targetNodeId } = line(scene, edgeId);
 	return [sideOf(scene, sourceNodeId, points[0]), sideOf(scene, targetNodeId, points.at(-1)!)];
 }
@@ -126,7 +126,7 @@ describe("arrival sides", () => {
 	});
 });
 
-const arrowsOf = (scene: RenderedDiagramScene) =>
+const arrowsOf = (scene: CanvasSpec) =>
 	scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
 
 describe("live incident samples", () => {
@@ -152,7 +152,7 @@ describe("live incident samples", () => {
 });
 
 /** A node of the scene by its id. */
-function nodeOf(scene: RenderedDiagramScene, nodeId: string) {
+function nodeOf(scene: CanvasSpec, nodeId: string) {
 	const node = scene.elements.find(
 		(element) => element.type === "node" && element.nodeId === nodeId,
 	);

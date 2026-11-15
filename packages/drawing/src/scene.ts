@@ -1,4 +1,5 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
+import { IconRecipeSchema } from "./recipe-schema.js";
 /**
  * Canonical, renderer-independent scene IR used by every Sketchi diagram.
  *
@@ -9,7 +10,7 @@ import { Schema } from "effect";
 
 import { cubicConnectorPoints } from "./curves.js";
 import { isDiagramIconSlug, isDrawnIconSlug } from "./icon.js";
-import { iconRecipeByteLength, iconRecipeIssues, type IconRecipe } from "./icon-recipe.js";
+import { iconRecipeByteLength, iconRecipeIssues } from "./icon-recipe.js";
 import { boundLabelWidth, estimateTextWidth } from "./text-metrics.js";
 
 export const CANVAS_SPEC_VERSION = 1 as const;
@@ -60,8 +61,14 @@ export const CANVAS_ICON_ELEMENT = Object.freeze({
 	minSize: 16,
 });
 
-export type CanvasStrokeStyle = "dashed" | "dotted" | "solid";
-export type CanvasFillStyle = "cross-hatch" | "hachure" | "solid";
+const NonEmptyString = Schema.String.check(Schema.isMinLength(1));
+const FiniteNumber = Schema.Finite;
+const PositiveNumber = Schema.Finite.check(Schema.isGreaterThan(0));
+const HexColor = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/u));
+const IconSlugInput = NonEmptyString.check(Schema.isMaxLength(128));
+
+export type CanvasStrokeStyle = NonNullable<CanvasStrokeStyleFields["strokeStyle"]>;
+export type CanvasFillStyle = NonNullable<CanvasStrokeStyleFields["fillStyle"]>;
 /**
  * Excalidraw's own heads. The crow's-foot ones mark entity-relationship ends:
  * a bar for one, a foot for many, and a bar with a foot for one or many. The
@@ -79,14 +86,9 @@ export const CANVAS_ARROWHEADS = [
 	"triangle_outline",
 	"diamond_outline",
 ] as const;
-export type CanvasArrowhead = (typeof CANVAS_ARROWHEADS)[number] | null;
-export type CanvasShapeKind =
-	| "rectangle"
-	| "ellipse"
-	| "diamond"
-	| "circle"
-	| "polygon"
-	| CanvasComposedShapeKind;
+export const CanvasArrowhead = Schema.NullOr(Schema.Literals(CANVAS_ARROWHEADS));
+export type CanvasArrowhead = typeof CanvasArrowhead.Type;
+export type CanvasShapeKind = CanvasShapeElement["shape"];
 
 /**
  * Shapes Excalidraw has no element for: a cylinder (a database), a pipe (a
@@ -365,48 +367,82 @@ export function canvasShapeOutline(
 	return [...back, ...end, back[0]!];
 }
 
-export interface CanvasPoint {
-	readonly x: number;
-	readonly y: number;
-}
+export const CanvasPoint = Schema.Struct({
+	x: FiniteNumber.pipe(Schema.mutableKey),
+	y: FiniteNumber.pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
 
-export interface CanvasElementComposition {
-	readonly frameId?: string;
-	readonly groupIds?: string[];
-	readonly layerId?: string;
-	readonly locked?: boolean;
-	readonly opacity?: number;
-	readonly zIndex?: number;
-}
+export interface CanvasPoint extends Schema.Schema.Type<typeof CanvasPoint> {}
 
-export interface CanvasStrokeStyleFields {
-	readonly fillColor?: string;
-	readonly fillStyle?: CanvasFillStyle;
-	readonly roughness?: 0 | 1 | 2;
-	readonly strokeColor?: string;
-	readonly strokeStyle?: CanvasStrokeStyle;
-	readonly strokeWidth?: 1 | 2 | 4;
-}
+export const CanvasElementComposition = Schema.Struct({
+	frameId: Schema.optionalKey(NonEmptyString).pipe(Schema.mutableKey),
+	groupIds: Schema.optionalKey(
+		Schema.Array(NonEmptyString)
+			.pipe(Schema.mutable)
+			.annotate({ maxItems: CANVAS_LIMITS.maxGroupsPerElement }),
+	).pipe(Schema.mutableKey),
+	layerId: Schema.optionalKey(NonEmptyString).pipe(Schema.mutableKey),
+	locked: Schema.optionalKey(Schema.Boolean).pipe(Schema.mutableKey),
+	opacity: Schema.optionalKey(
+		Schema.Number.check(Schema.isFinite(), Schema.isBetween({ minimum: 0, maximum: 100 })),
+	).pipe(Schema.mutableKey),
+	zIndex: Schema.optionalKey(Schema.Int).pipe(Schema.mutableKey),
+});
+export interface CanvasElementComposition extends Schema.Schema.Type<
+	typeof CanvasElementComposition
+> {}
+
+export const CanvasStrokeStyleFields = Schema.Struct({
+	fillColor: Schema.optionalKey(HexColor).pipe(Schema.mutableKey),
+	fillStyle: Schema.optionalKey(Schema.Literals(["cross-hatch", "hachure", "solid"])).pipe(
+		Schema.mutableKey,
+	),
+	roughness: Schema.optionalKey(Schema.Literals([0, 1, 2])).pipe(Schema.mutableKey),
+	strokeColor: Schema.optionalKey(HexColor).pipe(Schema.mutableKey),
+	strokeStyle: Schema.optionalKey(Schema.Literals(["dashed", "dotted", "solid"])).pipe(
+		Schema.mutableKey,
+	),
+	strokeWidth: Schema.optionalKey(Schema.Literals([1, 2, 4])).pipe(Schema.mutableKey),
+});
+export interface CanvasStrokeStyleFields extends Schema.Schema.Type<
+	typeof CanvasStrokeStyleFields
+> {}
 
 /**
  * An icon-catalog mark drawn inside a node; `size` is its square edge. Marks
  * are hand-drawn when the catalog has a recipe; `exact` embeds the catalog SVG.
  */
-export interface CanvasNodeIcon {
-	readonly slug: string;
-	readonly size: number;
-	readonly exact?: boolean;
-}
+export const CanvasNodeIcon = Schema.Struct({
+	slug: IconSlugInput.pipe(Schema.mutableKey),
+	size: Schema.Number.check(
+		Schema.isFinite(),
+		Schema.isBetween(
+			{
+				minimum: CANVAS_NODE_ICON.minSize,
+				maximum: CANVAS_NODE_ICON.maxSize,
+			},
+			{
+				message: `Expected a number between ${CANVAS_NODE_ICON.minSize} and ${CANVAS_NODE_ICON.maxSize}`,
+			},
+		),
+	).pipe(Schema.mutableKey),
+	/** Embed the catalog's exact SVG instead of the hand-drawn mark. */
+	exact: Schema.optionalKey(Schema.Boolean).pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
+
+export interface CanvasNodeIcon extends Schema.Schema.Type<typeof CanvasNodeIcon> {}
 
 /**
  * One icon slug's embedded forms, so scenes render offline: the hand-drawn
  * recipe, the normalized catalog SVG, or both when the scene draws both.
  */
-export interface CanvasIconAsset {
-	readonly name: string;
-	readonly recipe?: IconRecipe;
-	readonly svg?: string;
-}
+export const CanvasIconAsset = Schema.Struct({
+	name: Schema.String,
+	recipe: Schema.optionalKey(IconRecipeSchema),
+	svg: Schema.optionalKey(Schema.String),
+}).annotate({ identifier: undefined });
+
+export interface CanvasIconAsset extends Schema.Schema.Type<typeof CanvasIconAsset> {}
 
 /** Which embedded form draws an icon: the recipe unless the icon asks for its exact SVG. */
 export function canvasIconForm(
@@ -554,178 +590,247 @@ const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
 	zone: "Zone",
 };
 
-export interface CanvasShapeElement extends CanvasElementComposition, CanvasStrokeStyleFields {
-	readonly type: "node";
-	readonly id: string;
-	readonly nodeId: string;
-	readonly kind?: string;
-	readonly icon?: CanvasNodeIcon;
-	readonly rendererRole?: CanvasRendererRole;
-	readonly shape: CanvasShapeKind;
-	readonly points?: [CanvasPoint, CanvasPoint, CanvasPoint, ...CanvasPoint[]];
-	readonly textColor?: string;
-	readonly x: number;
-	readonly y: number;
-	readonly width: number;
-	readonly height: number;
-	readonly label: string;
-}
+export const CanvasShapeElement = Schema.Struct({
+	...CanvasElementComposition.fields,
+	...CanvasStrokeStyleFields.fields,
+	type: Schema.Literal("node"),
+	id: NonEmptyString,
+	nodeId: NonEmptyString,
+	kind: Schema.optionalKey(NonEmptyString),
+	icon: Schema.optionalKey(CanvasNodeIcon).pipe(Schema.mutableKey),
+	rendererRole: Schema.optionalKey(Schema.Literals(CANVAS_RENDERER_ROLES)),
+	shape: Schema.Literals([
+		"rectangle",
+		"ellipse",
+		"diamond",
+		"circle",
+		"polygon",
+		...CANVAS_COMPOSED_SHAPES,
+	]).pipe(Schema.mutableKey),
+	points: Schema.optionalKey(
+		Schema.TupleWithRest(Schema.Tuple([CanvasPoint, CanvasPoint, CanvasPoint]), [CanvasPoint])
+			.pipe(Schema.mutable)
+			.check(Schema.isMaxLength(CANVAS_LIMITS.maxPointsPerElement)),
+	).pipe(Schema.mutableKey),
+	textColor: Schema.optionalKey(HexColor).pipe(Schema.mutableKey),
+	x: FiniteNumber.pipe(Schema.mutableKey),
+	y: FiniteNumber.pipe(Schema.mutableKey),
+	width: PositiveNumber.pipe(Schema.mutableKey),
+	height: PositiveNumber.pipe(Schema.mutableKey),
+	label: NonEmptyString.pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
 
-export interface CanvasTextElement extends CanvasElementComposition {
-	readonly type: "text";
-	readonly id: string;
-	readonly containerId?: string;
-	readonly textColor?: string;
-	readonly x: number;
-	readonly y: number;
-	readonly text: string;
-	readonly fontSize: number;
-	readonly fontFamily?: "hand" | "mono" | "sans";
-	/** Line height as a multiple of the font size; 1.35 when omitted. */
-	readonly lineHeight?: number;
-	readonly maxWidth?: number;
-	readonly textAlign?: "center" | "left" | "right";
-	readonly verticalAlign?: "bottom" | "middle" | "top";
-}
+export interface CanvasShapeElement extends Schema.Schema.Type<typeof CanvasShapeElement> {}
 
-export interface CanvasConnectorElement extends CanvasElementComposition, CanvasStrokeStyleFields {
-	readonly type: "arrow";
-	readonly id: string;
-	readonly edgeId: string;
-	readonly sourceNodeId: string;
-	readonly targetNodeId: string;
-	readonly startArrowhead?: CanvasArrowhead;
-	readonly endArrowhead?: CanvasArrowhead;
-	readonly textColor?: string;
-	readonly points: [CanvasPoint, ...CanvasPoint[]];
-	/**
-	 * Draw a smooth curve through the points, as mindmap branches do, instead
-	 * of an orthogonal route through its corners.
-	 */
-	readonly curved?: boolean;
-	readonly label?: string;
-}
+export const CanvasTextElement = Schema.Struct({
+	...CanvasElementComposition.fields,
+	type: Schema.Literal("text"),
+	id: NonEmptyString,
+	containerId: Schema.optionalKey(NonEmptyString),
+	textColor: Schema.optionalKey(HexColor).pipe(Schema.mutableKey),
+	x: FiniteNumber.pipe(Schema.mutableKey),
+	y: FiniteNumber.pipe(Schema.mutableKey),
+	text: NonEmptyString.pipe(Schema.mutableKey),
+	fontSize: PositiveNumber,
+	fontFamily: Schema.optionalKey(Schema.Literals(["hand", "mono", "sans"])),
+	lineHeight: Schema.optionalKey(PositiveNumber),
+	maxWidth: Schema.optionalKey(PositiveNumber),
+	textAlign: Schema.optionalKey(Schema.Literals(["center", "left", "right"])),
+	verticalAlign: Schema.optionalKey(Schema.Literals(["bottom", "middle", "top"])),
+}).annotate({ identifier: undefined });
+
+export interface CanvasTextElement extends Schema.Schema.Type<typeof CanvasTextElement> {}
+
+export const CanvasConnectorElement = Schema.Struct({
+	...CanvasElementComposition.fields,
+	...CanvasStrokeStyleFields.fields,
+	type: Schema.Literal("arrow"),
+	id: NonEmptyString,
+	edgeId: NonEmptyString,
+	sourceNodeId: NonEmptyString,
+	targetNodeId: NonEmptyString.pipe(Schema.mutableKey),
+	startArrowhead: Schema.optionalKey(CanvasArrowhead).pipe(Schema.mutableKey),
+	endArrowhead: Schema.optionalKey(CanvasArrowhead).pipe(Schema.mutableKey),
+	textColor: Schema.optionalKey(HexColor).pipe(Schema.mutableKey),
+	points: Schema.NonEmptyArray(CanvasPoint)
+		.pipe(Schema.mutable)
+		.check(Schema.isMinLength(2), Schema.isMaxLength(CANVAS_LIMITS.maxPointsPerElement))
+		.pipe(Schema.mutableKey),
+	curved: Schema.optionalKey(Schema.Boolean).pipe(Schema.mutableKey),
+	label: Schema.optionalKey(NonEmptyString).pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
+
+export interface CanvasConnectorElement extends Schema.Schema.Type<typeof CanvasConnectorElement> {}
 
 /** A line end bound to a node or frame; the export derives where Excalidraw keeps it. */
-export interface CanvasLineBinding {
-	readonly elementId: string;
-}
+export const CanvasLineBinding = Schema.Struct({
+	elementId: NonEmptyString,
+}).annotate({ identifier: undefined });
 
-export interface CanvasLineElement extends CanvasElementComposition, CanvasStrokeStyleFields {
-	readonly type: "line";
-	readonly id: string;
-	readonly points: [CanvasPoint, CanvasPoint, ...CanvasPoint[]];
-	readonly startBinding?: CanvasLineBinding;
-	readonly endBinding?: CanvasLineBinding;
-	readonly startArrowhead?: CanvasArrowhead;
-	readonly endArrowhead?: CanvasArrowhead;
-	readonly label?: string;
-	readonly textColor?: string;
-}
+export interface CanvasLineBinding extends Schema.Schema.Type<typeof CanvasLineBinding> {}
 
-export interface CanvasFrameElement extends CanvasElementComposition, CanvasStrokeStyleFields {
-	readonly type: "frame";
-	readonly id: string;
-	/**
-	 * The node id connectors use to start or end at this frame, as transitions
-	 * into and out of a composite state do. Unique among node ids.
-	 */
-	readonly nodeId?: string;
-	readonly name?: string;
-	/** A logo drawn before its name (see canvasGroupIconBox). */
-	readonly icon?: CanvasNodeIcon;
-	readonly x: number;
-	readonly y: number;
-	readonly width: number;
-	readonly height: number;
-}
+export const CanvasLineElement = Schema.Struct({
+	...CanvasElementComposition.fields,
+	...CanvasStrokeStyleFields.fields,
+	type: Schema.Literal("line"),
+	id: NonEmptyString,
+	points: Schema.TupleWithRest(Schema.Tuple([CanvasPoint, CanvasPoint]), [CanvasPoint])
+		.pipe(Schema.mutable)
+		.check(Schema.isMaxLength(CANVAS_LIMITS.maxPointsPerElement))
+		.pipe(Schema.mutableKey),
+	startBinding: Schema.optionalKey(CanvasLineBinding).pipe(Schema.mutableKey),
+	endBinding: Schema.optionalKey(CanvasLineBinding).pipe(Schema.mutableKey),
+	startArrowhead: Schema.optionalKey(CanvasArrowhead).pipe(Schema.mutableKey),
+	endArrowhead: Schema.optionalKey(CanvasArrowhead).pipe(Schema.mutableKey),
+	label: Schema.optionalKey(NonEmptyString).pipe(Schema.mutableKey),
+	textColor: Schema.optionalKey(HexColor).pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
+
+export interface CanvasLineElement extends Schema.Schema.Type<typeof CanvasLineElement> {}
+
+export const CanvasFrameElement = Schema.Struct({
+	...CanvasElementComposition.fields,
+	...CanvasStrokeStyleFields.fields,
+	type: Schema.Literal("frame"),
+	id: NonEmptyString,
+	nodeId: Schema.optionalKey(NonEmptyString),
+	name: Schema.optionalKey(NonEmptyString).pipe(Schema.mutableKey),
+	icon: Schema.optionalKey(CanvasNodeIcon).pipe(Schema.mutableKey),
+	x: FiniteNumber.pipe(Schema.mutableKey),
+	y: FiniteNumber.pipe(Schema.mutableKey),
+	width: PositiveNumber.pipe(Schema.mutableKey),
+	height: PositiveNumber.pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
+
+export interface CanvasFrameElement extends Schema.Schema.Type<typeof CanvasFrameElement> {}
 
 /**
  * A mark placed on its own, as a stack legend's logos or an illustration's,
  * drawn in the largest square centered in its box (see canvasIconElementBox).
  * Unlike a node's logo it may be a wordmark. Nothing binds to it.
  */
-export interface CanvasIconElement extends CanvasElementComposition {
-	readonly type: "icon";
-	readonly id: string;
-	readonly slug: string;
-	/** Embed the catalog's exact SVG instead of the hand-drawn mark. */
-	readonly exact?: boolean;
-	readonly x: number;
-	readonly y: number;
-	readonly width: number;
-	readonly height: number;
-}
+export const CanvasIconElement = Schema.Struct({
+	...CanvasElementComposition.fields,
+	type: Schema.Literal("icon"),
+	id: NonEmptyString,
+	slug: IconSlugInput.pipe(Schema.mutableKey),
+	exact: Schema.optionalKey(Schema.Boolean).pipe(Schema.mutableKey),
+	x: FiniteNumber.pipe(Schema.mutableKey),
+	y: FiniteNumber.pipe(Schema.mutableKey),
+	width: PositiveNumber.pipe(Schema.mutableKey),
+	height: PositiveNumber.pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
 
-export type CanvasElement =
-	| CanvasShapeElement
-	| CanvasTextElement
-	| CanvasConnectorElement
-	| CanvasLineElement
-	| CanvasFrameElement
-	| CanvasIconElement;
+export interface CanvasIconElement extends Schema.Schema.Type<typeof CanvasIconElement> {}
 
-export interface CanvasLayer {
-	readonly id: string;
-	readonly name?: string;
-	readonly locked?: boolean;
-	readonly visible?: boolean;
-}
+export const CanvasElement = Schema.Union(
+	[
+		CanvasShapeElement,
+		CanvasTextElement,
+		CanvasConnectorElement,
+		CanvasLineElement,
+		CanvasFrameElement,
+		CanvasIconElement,
+	],
+	{ mode: "oneOf" },
+);
+export type CanvasElement = typeof CanvasElement.Type;
 
-interface CanvasLayoutBase {
-	readonly ids: string[];
-}
+export const CanvasLayer = Schema.Struct({
+	id: NonEmptyString,
+	name: Schema.optionalKey(NonEmptyString),
+	locked: Schema.optionalKey(Schema.Boolean),
+	visible: Schema.optionalKey(Schema.Boolean),
+}).annotate({ identifier: undefined });
 
-export interface CanvasFlowLayout extends CanvasLayoutBase {
-	readonly type: "row" | "column" | "stack";
-	readonly x?: number;
-	readonly y?: number;
-	readonly gap?: number;
-}
+export interface CanvasLayer extends Schema.Schema.Type<typeof CanvasLayer> {}
 
-export interface CanvasGridLayout extends CanvasLayoutBase {
-	readonly type: "grid";
-	readonly columns: number;
-	readonly x?: number;
-	readonly y?: number;
-	readonly columnGap?: number;
-	readonly rowGap?: number;
-}
+const CanvasLayoutIds = Schema.Array(NonEmptyString)
+	.pipe(Schema.mutable)
+	.check(Schema.isMinLength(1));
 
-export interface CanvasAlignLayout extends CanvasLayoutBase {
-	readonly type: "align";
-	readonly axis: "x" | "y";
-	readonly alignment: "center" | "end" | "start";
-}
+export const CanvasFlowLayout = Schema.Struct({
+	type: Schema.Literals(["row", "column", "stack"]),
+	ids: CanvasLayoutIds,
+	x: Schema.optionalKey(FiniteNumber),
+	y: Schema.optionalKey(FiniteNumber),
+	gap: Schema.optionalKey(FiniteNumber),
+}).annotate({ identifier: undefined });
 
-export interface CanvasDistributeLayout extends CanvasLayoutBase {
-	readonly type: "distribute";
-	readonly axis: "x" | "y";
-	readonly gap?: number;
-}
+export interface CanvasFlowLayout extends Schema.Schema.Type<typeof CanvasFlowLayout> {}
 
-export type CanvasLayout =
-	| CanvasFlowLayout
-	| CanvasGridLayout
-	| CanvasAlignLayout
-	| CanvasDistributeLayout;
+export const CanvasGridLayout = Schema.Struct({
+	type: Schema.Literal("grid"),
+	ids: CanvasLayoutIds,
+	columns: Schema.Int.check(
+		Schema.isGreaterThanOrEqualTo(1, {
+			message: "Too small: expected number to be >=1",
+		}),
+	),
+	x: Schema.optionalKey(FiniteNumber),
+	y: Schema.optionalKey(FiniteNumber),
+	columnGap: Schema.optionalKey(FiniteNumber),
+	rowGap: Schema.optionalKey(FiniteNumber),
+}).annotate({ identifier: undefined });
 
-export interface CanvasSpec {
-	readonly kind: "canvas";
-	readonly version: typeof CANVAS_SPEC_VERSION;
-	readonly diagramId: string;
-	readonly title: string;
-	readonly width: number;
-	readonly height: number;
-	readonly accentColor: string;
-	readonly backgroundColor: string;
-	readonly elements: CanvasElement[];
-	/** Assets for every node icon slug, keyed by slug; derived, never authored. */
-	readonly icons?: Readonly<Record<string, CanvasIconAsset>>;
-	readonly layers: CanvasLayer[];
-	readonly layouts: CanvasLayout[];
-	readonly zOrder: string[];
-}
+export interface CanvasGridLayout extends Schema.Schema.Type<typeof CanvasGridLayout> {}
+
+export const CanvasAlignLayout = Schema.Struct({
+	type: Schema.Literal("align"),
+	ids: CanvasLayoutIds,
+	axis: Schema.Literals(["x", "y"]),
+	alignment: Schema.Literals(["center", "end", "start"]),
+}).annotate({ identifier: undefined });
+
+export interface CanvasAlignLayout extends Schema.Schema.Type<typeof CanvasAlignLayout> {}
+
+export const CanvasDistributeLayout = Schema.Struct({
+	type: Schema.Literal("distribute"),
+	ids: CanvasLayoutIds,
+	axis: Schema.Literals(["x", "y"]),
+	gap: Schema.optionalKey(FiniteNumber),
+}).annotate({ identifier: undefined });
+
+export interface CanvasDistributeLayout extends Schema.Schema.Type<typeof CanvasDistributeLayout> {}
+
+export const CanvasLayout = Schema.Union(
+	[CanvasFlowLayout, CanvasGridLayout, CanvasAlignLayout, CanvasDistributeLayout],
+	{ mode: "oneOf" },
+);
+export type CanvasLayout = typeof CanvasLayout.Type;
+
+const EmptyCanvasLayers = Schema.Array(CanvasLayer)
+	.pipe(Schema.mutable)
+	.annotate({ default: [], maxItems: CANVAS_LIMITS.maxLayers })
+	.pipe(Schema.withDecodingDefaultKey(Effect.succeed([])));
+const EmptyCanvasLayouts = Schema.Array(CanvasLayout)
+	.pipe(Schema.mutable)
+	.annotate({ default: [], maxItems: CANVAS_LIMITS.maxLayouts })
+	.pipe(Schema.withDecodingDefaultKey(Effect.succeed([])));
+const EmptyCanvasZOrder = Schema.Array(NonEmptyString)
+	.pipe(Schema.mutable)
+	.annotate({ default: [], maxItems: CANVAS_LIMITS.maxZOrderEntries })
+	.pipe(Schema.withDecodingDefaultKey(Effect.succeed([])));
+
+export const CanvasSpec = Schema.Struct({
+	kind: Schema.Literal("canvas"),
+	version: Schema.Literal(CANVAS_SPEC_VERSION),
+	diagramId: NonEmptyString,
+	title: NonEmptyString,
+	width: PositiveNumber.pipe(Schema.mutableKey),
+	height: PositiveNumber.pipe(Schema.mutableKey),
+	accentColor: HexColor.pipe(Schema.mutableKey),
+	backgroundColor: HexColor.pipe(Schema.mutableKey),
+	elements: Schema.Array(CanvasElement)
+		.pipe(Schema.mutable)
+		.annotate({ maxItems: CANVAS_LIMITS.maxElements }),
+	icons: Schema.optionalKey(Schema.Record(Schema.String, CanvasIconAsset)).pipe(Schema.mutableKey),
+	layers: EmptyCanvasLayers,
+	layouts: EmptyCanvasLayouts,
+	zOrder: EmptyCanvasZOrder,
+}).annotate({ identifier: undefined });
+
+export interface CanvasSpec extends Schema.Schema.Type<typeof CanvasSpec> {}
 
 /** Scene-check failures cross the shared build workflow without losing their domain code or path. */
 export const CanvasValidationIssue = Schema.Struct({

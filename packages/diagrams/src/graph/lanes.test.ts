@@ -11,7 +11,7 @@ import {
 	routingQualityScale,
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { arrowCrossings } from "./readability";
 import { renderIntermediateDiagram } from "./scene";
@@ -21,7 +21,7 @@ type Direction = (typeof directions)[number];
 type Name = keyof typeof laneFixtures;
 const names = Object.keys(laneFixtures) as Name[];
 
-const scenes = new Map<string, RenderedDiagramScene>();
+const scenes = new Map<string, CanvasSpec>();
 function rendered(name: Name, direction: Direction = laneFixtures[name].layout.direction) {
 	const key = `${name}:${direction}`;
 	if (!scenes.has(key))
@@ -35,13 +35,13 @@ function rendered(name: Name, direction: Direction = laneFixtures[name].layout.d
 	return scenes.get(key)!;
 }
 
-const nodesOf = (scene: RenderedDiagramScene) =>
+const nodesOf = (scene: CanvasSpec) =>
 	scene.elements.filter((e): e is NodeSceneElement => e.type === "node");
-const arrowsOf = (scene: RenderedDiagramScene) =>
+const arrowsOf = (scene: CanvasSpec) =>
 	scene.elements.filter((e): e is ArrowSceneElement => e.type === "arrow");
-const arrow = (scene: RenderedDiagramScene, edgeId: string) =>
+const arrow = (scene: CanvasSpec, edgeId: string) =>
 	arrowsOf(scene).find((candidate) => candidate.edgeId === edgeId)!;
-const node = (scene: RenderedDiagramScene, nodeId: string) =>
+const node = (scene: CanvasSpec, nodeId: string) =>
 	nodesOf(scene).find((candidate) => candidate.nodeId === nodeId)!;
 
 describe.each(directions)("swimlane flowcharts %s", (direction) => {
@@ -294,7 +294,7 @@ describe("swimlane layout", () => {
 });
 
 /** Width over height, either way up, of a scene in the hosted PNG's 20-unit frame. */
-const exportAspect = ({ width, height }: RenderedDiagramScene) =>
+const exportAspect = ({ width, height }: CanvasSpec) =>
 	(Math.max(width, height) - 96 + 40) / (Math.min(width, height) - 96 + 40);
 
 /** Round 19's swimlane-incident-response (Sol s2): 2.61:1 before its columns closed up. */
@@ -366,7 +366,7 @@ const ORDER = {
 } as const;
 
 /** Lanes stay intact: every step in its band, every band the pool's full length, and clean lines. */
-function expectIntactLanes(scene: RenderedDiagramScene, fixture: typeof INCIDENT | typeof ORDER) {
+function expectIntactLanes(scene: CanvasSpec, fixture: typeof INCIDENT | typeof ORDER) {
 	expect(laneRegionIssues(scene, fixture)).toEqual([]);
 	expect(getCanvasValidationIssues(scene)).toEqual([]);
 	const bands = nodesOf(scene).filter((shape) => shape.rendererRole === "swimlane");

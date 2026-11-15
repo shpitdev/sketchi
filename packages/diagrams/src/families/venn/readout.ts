@@ -1,9 +1,9 @@
 import { String as Str, Array as Arr, Option } from "effect";
 import {
 	estimateTextWidth,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import {
 	insideClearance,
@@ -33,7 +33,7 @@ export interface VennReadout {
 const isText = (element: SceneElement): element is TextSceneElement => element.type === "text";
 const unwrap = (text: string) => Arr.join(Str.split(text, "\n"), " ");
 /** Read a rendered Venn diagram back from its scene: circles, set labels and region texts. */
-export function readVennScene(scene: RenderedDiagramScene): VennReadout {
+export function readVennScene(scene: CanvasSpec): VennReadout {
 	const texts = new Map(
 		Arr.map(Arr.filter(scene.elements, isText), (element) => [element.id, element]),
 	);
@@ -127,7 +127,7 @@ function boxesOverlap(a: VennBox, b: VennBox): boolean {
  * outside every other, clear of each outline; no two texts overlapping; every
  * set label outside every circle; and fills translucent so overlaps show.
  */
-export function vennLayoutIssues(scene: RenderedDiagramScene): VennLayoutIssue[] {
+export function vennLayoutIssues(scene: CanvasSpec): VennLayoutIssue[] {
 	const issues: VennLayoutIssue[] = [];
 	const { sets } = readVennScene(scene);
 	const circles = Arr.map(sets, (set) => set.circle);

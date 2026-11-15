@@ -9,22 +9,22 @@ import {
 	type CanvasConnectorElement as ArrowSceneElement,
 	type AxisAlignedSegment,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { erFixture, orgChartEr, parseErDiagram, parseErFieldShorthand } from "./document.js";
 import { erStressFixtures } from "./fixtures.js";
 
 import { renderDiagram } from "../../family.js";
 
-const nodes = (scene: RenderedDiagramScene) =>
+const nodes = (scene: CanvasSpec) =>
 	scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));
-const arrows = (scene: RenderedDiagramScene) =>
+const arrows = (scene: CanvasSpec) =>
 	scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
-const text = (scene: RenderedDiagramScene, id: string) =>
+const text = (scene: CanvasSpec, id: string) =>
 	scene.elements.find((element) => element.type === "text" && element.id === id);
-const table = (scene: RenderedDiagramScene, id: string) =>
+const table = (scene: CanvasSpec, id: string) =>
 	nodes(scene).find((node) => node.id === `node:${id}`)!;
-const arrow = (scene: RenderedDiagramScene, id: string) =>
+const arrow = (scene: CanvasSpec, id: string) =>
 	arrows(scene).find((candidate) => candidate.edgeId === id)!;
 
 /** Where a field's row meets its table's side: 40 for the name band, 6 above the rows, 28 a row. */
@@ -81,7 +81,7 @@ function crossings(lines: readonly ArrowSceneElement[]): number {
  * Neighboring ends on one side of a table whose heads touch: Excalidraw draws
  * a bar or foot 17 across, so two ports nearer than 20 run them together.
  */
-function bunchedEnds(scene: RenderedDiagramScene): number {
+function bunchedEnds(scene: CanvasSpec): number {
 	const sides = new Map<string, number[]>();
 	for (const line of arrows(scene))
 		for (const [node, point] of [
@@ -98,7 +98,7 @@ function bunchedEnds(scene: RenderedDiagramScene): number {
 }
 
 /** Ends that leave their table on the side away from a table in another column. */
-function wraps(scene: RenderedDiagramScene): number {
+function wraps(scene: CanvasSpec): number {
 	let count = 0;
 	for (const line of arrows(scene)) {
 		const [source, target] = [table(scene, line.sourceNodeId), table(scene, line.targetNodeId)];
@@ -119,7 +119,7 @@ function wraps(scene: RenderedDiagramScene): number {
  * its band spaces a mark apart may still bunch them; no line from another
  * row, or passing by, may cross a mark.
  */
-function foreignMarks(scene: RenderedDiagramScene): string[] {
+function foreignMarks(scene: CanvasSpec): string[] {
 	const lines = arrows(scene);
 	const rowAt = (node: string, y: number) => {
 		const box = table(scene, node);
@@ -170,7 +170,7 @@ function foreignMarks(scene: RenderedDiagramScene): string[] {
 	);
 }
 
-const aspectOf = (scene: RenderedDiagramScene) =>
+const aspectOf = (scene: CanvasSpec) =>
 	Math.max(scene.width / scene.height, scene.height / scene.width);
 
 /**
@@ -178,7 +178,7 @@ const aspectOf = (scene: RenderedDiagramScene) =>
  * names: one text per column holds every row 28 apart, or, where a row grew,
  * one text per row stands at that row's middle.
  */
-function fieldLines(scene: RenderedDiagramScene, id: string): number[] {
+function fieldLines(scene: CanvasSpec, id: string): number[] {
 	const box = table(scene, id);
 	const column = text(scene, `text:${id}:fields`);
 	if (column?.type === "text")
@@ -192,7 +192,7 @@ function fieldLines(scene: RenderedDiagramScene, id: string): number[] {
 }
 
 /** The tinted band behind a grown row, from its table's top and sides. */
-function keyBand(scene: RenderedDiagramScene, id: string, row: number) {
+function keyBand(scene: CanvasSpec, id: string, row: number) {
 	const box = table(scene, id);
 	const band = nodes(scene).find((node) => node.id === `node:${id}:row:${row}`);
 	return band

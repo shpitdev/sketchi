@@ -1,4 +1,5 @@
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+import { type CanvasSpec } from "@sketchi/drawing";
+
 import { TIMELINE_MARKER_ROLE } from "./render.js";
 import { TIMELINE_DURATION_UNITS } from "./captions.js";
 
@@ -40,7 +41,7 @@ export interface TimelineLaneReadout {
  * Read a rendered timeline back as one straight axis per lane: each row's solid
  * axis is laid end to end, so a gap split across a row wrap is measured whole.
  */
-export function readTimelineAxis(scene: RenderedDiagramScene): readonly TimelineLaneReadout[] {
+export function readTimelineAxis(scene: CanvasSpec): readonly TimelineLaneReadout[] {
 	const rows = new Map<
 		string,
 		{ lane: number; row: number; y: number; start: number; end: number }
@@ -162,7 +163,7 @@ export interface TimelineGapReadout {
  * real start and phase end. Simultaneous events read at the leftmost marker.
  */
 export function readTimelineGaps(
-	scene: RenderedDiagramScene,
+	scene: CanvasSpec,
 	moments: ReadonlyMap<string, { readonly start: number; readonly end?: number }>,
 ): TimelineGapReadout[] {
 	return readTimelineAxis(scene).flatMap((lane, laneIndex) => {
@@ -213,7 +214,7 @@ export interface TimelineMomentGapReadout {
  * leftmost marker.
  */
 export function readTimelineMomentGaps(
-	scene: RenderedDiagramScene,
+	scene: CanvasSpec,
 	moments: ReadonlyMap<string, { readonly start: number; readonly end?: number }>,
 ): TimelineMomentGapReadout[] {
 	const lanes = readTimelineAxis(scene);

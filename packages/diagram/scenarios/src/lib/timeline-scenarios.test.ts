@@ -1,7 +1,8 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { type TimelineDiagram } from "@sketchi/diagrams/families/timeline/document";
 import { renderDiagram } from "@sketchi/diagrams/family";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { evaluateScenarioDiagram } from "./evaluate.js";
@@ -249,7 +250,7 @@ describe("prompt-grounded timeline scenarios", () => {
 	it("library-releases rejects equal breaks for unequal gaps and breaks that hide their time", () => {
 		const scenario = byId("library-releases-timeline-v2");
 		const scene = renderDiagram(scenario.expectedDiagram).pipe(Result.getOrThrow);
-		const check = (candidate: RenderedDiagramScene) =>
+		const check = (candidate: CanvasSpec) =>
 			timelineGapOrderCheck(scenario, scenario.expectedDiagram, candidate);
 		expect(check(scene)).toMatchObject({ passed: true });
 		const texts = scene.elements.filter((element) => element.type === "text");
@@ -258,7 +259,7 @@ describe("prompt-grounded timeline scenarios", () => {
 				.filter((element) => element.id.startsWith("break-label:"))
 				.map((element) => element.text),
 		).toEqual(["5 months", "20 months"]);
-		type Element = RenderedDiagramScene["elements"][number];
+		type Element = CanvasSpec["elements"][number];
 		const markerX = (id: string) => {
 			const marker = scene.elements.find(
 				(element) => element.type === "node" && element.nodeId === `event:${id}`,
@@ -309,7 +310,7 @@ describe("prompt-grounded timeline scenarios", () => {
 		};
 		const week = position("v02") - position("v01");
 		const shift = position("v03") + 5 * week - position("v10");
-		type Element = RenderedDiagramScene["elements"][number];
+		type Element = CanvasSpec["elements"][number];
 		type Line = Extract<Element, { type: "line" }>;
 		const tick = (id: string, from: number, to: number): Line => ({
 			type: "line",

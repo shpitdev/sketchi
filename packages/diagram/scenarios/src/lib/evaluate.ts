@@ -1,3 +1,4 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 import { sequenceActivations } from "@sketchi/diagrams/families/sequence/layout";
 import { parseChartDiagram } from "@sketchi/diagrams/families/chart/document";
 import { parseClassDiagram } from "@sketchi/diagrams/families/class/document";
@@ -25,7 +26,7 @@ import { lineCrossings, unavoidableCrossings } from "@sketchi/diagrams/graph/pla
 import { Result, Schema } from "effect";
 
 import { renderDiagram } from "@sketchi/diagrams/family";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+
 import {
 	type ExcalidrawScene,
 	type ExcalidrawSceneValidationResult,
@@ -107,7 +108,7 @@ export interface ScenarioEvaluation {
 	excalidrawValidation: ExcalidrawSceneValidationResult;
 	ok: boolean;
 	scenarioId: string;
-	scene: RenderedDiagramScene;
+	scene: CanvasSpec;
 }
 
 function normalizeLabel(label: string): string {
@@ -903,7 +904,7 @@ export function extractJsonCandidate(
 	});
 }
 
-function excalidrawCheck(scene: RenderedDiagramScene) {
+function excalidrawCheck(scene: CanvasSpec) {
 	const excalidrawScene = convertSceneToExcalidraw(scene);
 	const excalidrawValidation = validateExcalidrawScene(excalidrawScene);
 	return {
@@ -924,7 +925,7 @@ function evaluation(
 	scenarioId: string,
 	diagram: CanonicalDiagram,
 	familyChecks: readonly ScenarioCheck[],
-	sceneChecks: (scene: RenderedDiagramScene) => readonly ScenarioCheck[] = () => [],
+	sceneChecks: (scene: CanvasSpec) => readonly ScenarioCheck[] = () => [],
 ): Result.Result<ScenarioEvaluation, ScenarioEvaluationError | MindmapInputError> {
 	return Result.map(renderDiagram(diagram), (scene) => {
 		const { check, excalidrawScene, excalidrawValidation } = excalidrawCheck(scene);
@@ -1316,7 +1317,7 @@ export function evaluateScenarioDiagram(
 }
 
 /** A prompt that asks for curved lines gets them: every line drawn as a curve. */
-function flowchartCurvedCheck(scene: RenderedDiagramScene) {
+function flowchartCurvedCheck(scene: CanvasSpec) {
 	const lines = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
 	const square = lines.filter((line) => line.curved !== true);
 	return {
@@ -1334,7 +1335,7 @@ function flowchartCurvedCheck(scene: RenderedDiagramScene) {
  * could be drawn crossing none. A graph that is not planar forces at least
  * unavoidableCrossings, a lower bound only, so its drawing is not failed.
  */
-function flowchartCrossingCheck(diagram: FlowchartDiagram, scene: RenderedDiagramScene) {
+function flowchartCrossingCheck(diagram: FlowchartDiagram, scene: CanvasSpec) {
 	const drawn = lineCrossings(
 		scene.elements.flatMap((element) => (element.type === "arrow" ? [element.points] : [])),
 	);

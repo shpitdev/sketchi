@@ -1,3 +1,4 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 import { Array } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { resourceError } from "../projects/client";
@@ -6,14 +7,14 @@ import {
 	createExcalidrawFile,
 	type ExcalidrawScene,
 } from "@sketchi/drawing/excalidraw";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+
 import { DrawingEditor } from "@sketchi/editor";
 import { useCallback, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { IconActionBar, IconButton, IconLink } from "@/components/sketch-icons";
 import { StudioHeader } from "@/components/studio-header";
 import { artifactRouteUrls, type ArtifactViewState } from "./artifact-view-client";
 
-export function useEditedDrawingDownload(scene: RenderedDiagramScene) {
+export function useEditedDrawingDownload(scene: CanvasSpec) {
 	const baseScene = useMemo(() => convertSceneToExcalidraw(scene), [scene]);
 	const latestScene = useRef<ExcalidrawScene>(baseScene);
 	const [dirty, setDirty] = useState(false);
@@ -105,7 +106,7 @@ function ReadyEditor({
 	artifactId: string;
 	downloadName: string;
 	headerLinks: ReactNode;
-	scene: RenderedDiagramScene;
+	scene: CanvasSpec;
 	showSceneFile: boolean;
 }) {
 	const { dirty, onSceneChange, onDownload } = useEditedDrawingDownload(scene);

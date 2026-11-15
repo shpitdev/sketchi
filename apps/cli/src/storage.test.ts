@@ -1,7 +1,7 @@
+import { CanvasSpec } from "@sketchi/drawing";
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-import { CanvasSpec } from "@sketchi/diagrams/build/code-mode/contract";
 import { assert, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Ref, Schema } from "effect";
 import { TestClock } from "effect/testing";

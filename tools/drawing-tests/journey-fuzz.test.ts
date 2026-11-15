@@ -1,10 +1,7 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import {
-	getCanvasValidationIssues,
-	type CanvasSpec as RenderedDiagramScene,
-} from "@sketchi/drawing";
+import { getCanvasValidationIssues, type CanvasSpec } from "@sketchi/drawing";
 import {
 	JOURNEY_MAX_STAGE_STEPS,
 	JOURNEY_MAX_STAGES,
@@ -132,7 +129,7 @@ function randomJourneys(count: number, start: number): JourneyDiagram[] {
 }
 
 /** The export's width over its height, as hosted PNGs frame it. */
-const aspect = (scene: RenderedDiagramScene) => (scene.width - 80) / (scene.height - 80);
+const aspect = (scene: CanvasSpec) => (scene.width - 80) / (scene.height - 80);
 
 /** CI draws a small fixed sample; `JOURNEY_FUZZ=full` runs the local proof. */
 const FULL = process.env["JOURNEY_FUZZ"] === "full";

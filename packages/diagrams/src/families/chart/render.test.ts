@@ -4,8 +4,8 @@ import {
 	estimateTextWidth,
 	getCanvasValidationIssues,
 	type CanvasPoint,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -120,7 +120,7 @@ interface Readout {
 	readonly lines: LineElement[];
 }
 
-function read(scene: RenderedDiagramScene): Readout {
+function read(scene: CanvasSpec): Readout {
 	const texts = scene.elements.flatMap((element) =>
 		element.type === "text" ? [{ element, box: textBox(element) }] : [],
 	);
@@ -149,7 +149,7 @@ const VALUE_TEXT = /^chart:(value|table|slice-label):/u;
  * Every authored number, category, series name and axis title is drawn as
  * text, formatted as the renderer formats it: nothing is left to subtraction.
  */
-function expectDrawnData(diagram: ChartDiagram, scene: RenderedDiagramScene): void {
+function expectDrawnData(diagram: ChartDiagram, scene: CanvasSpec): void {
 	const texts = scene.elements.filter((element): element is TextElement => element.type === "text");
 	const drawn = texts.map((element) => element.text.replace(/\n/gu, " "));
 	const counts = new Map<string, number>();
@@ -177,7 +177,7 @@ function expectDrawnData(diagram: ChartDiagram, scene: RenderedDiagramScene): vo
 		).toBe(true);
 }
 
-function expectReadableChart(diagram: ChartDiagram): RenderedDiagramScene {
+function expectReadableChart(diagram: ChartDiagram): CanvasSpec {
 	const scene = renderChartDiagram(diagram);
 	const label = `${diagram.id}`;
 	expectDrawnData(diagram, scene);
@@ -241,11 +241,7 @@ function expectReadableChart(diagram: ChartDiagram): RenderedDiagramScene {
 	return scene;
 }
 
-function expectProportionalBars(
-	diagram: ChartDiagram,
-	scene: RenderedDiagramScene,
-	readout: Readout,
-): void {
+function expectProportionalBars(diagram: ChartDiagram, scene: CanvasSpec, readout: Readout): void {
 	const vertical = chartBarOrientation(diagram) === "vertical";
 	const rates = readout.bars.map(({ element, category, series }) => {
 		const value = Math.abs(diagram.series[series]!.values[category]!);
@@ -277,11 +273,7 @@ function expectProportionalBars(
 	}
 }
 
-function expectPieAngles(
-	diagram: ChartDiagram,
-	scene: RenderedDiagramScene,
-	readout: Readout,
-): void {
+function expectPieAngles(diagram: ChartDiagram, scene: CanvasSpec, readout: Readout): void {
 	const values = diagram.series[0]!.values;
 	const total = values.reduce((sum, value) => sum + value, 0);
 	const all = readout.slices.flatMap(({ element }) => polygonPoints(element));

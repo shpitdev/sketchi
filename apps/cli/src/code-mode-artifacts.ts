@@ -1,7 +1,5 @@
-import {
-	formatContractSchemaError,
-	RenderedDiagramSceneSchema,
-} from "@sketchi/diagrams/build/code-mode/contract";
+import { CanvasSpec } from "@sketchi/drawing";
+import { formatContractSchemaError } from "@sketchi/diagrams/build/code-mode/contract";
 import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
 import { CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
@@ -117,7 +115,7 @@ const decodeArtifacts = Effect.fn("sketchi.cli.codeMode.decodeArtifacts")(functi
 	const scene =
 		operation === "export" && !sceneRef
 			? undefined
-			: Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
+			: Schema.decodeUnknownResult(CanvasSpec, {
 					errors: "all",
 					reportInput: true,
 				})(yield* inline("scene"));

@@ -10,7 +10,7 @@ import {
 	getCanvasValidationIssues,
 	routingQualityFindings,
 	routingQualityScale,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -146,7 +146,7 @@ function randomSchemas(count: number, start: number): ErDiagram[] {
 }
 
 /** Interior crossings between arrows, counted on corners only, and reader-scale findings. */
-function routingCounts(scene: RenderedDiagramScene) {
+function routingCounts(scene: CanvasSpec) {
 	const arrows = scene.elements.flatMap((e) => (e.type === "arrow" ? [e] : []));
 	const routes = arrows.map((a) => ({
 		id: a.edgeId,
@@ -194,7 +194,7 @@ function routingCounts(scene: RenderedDiagramScene) {
  * worse may still bunch its ends, but no line from another row, or passing by,
  * may cross a mark.
  */
-function foreignMarks(scene: RenderedDiagramScene): string[] {
+function foreignMarks(scene: CanvasSpec): string[] {
 	const arrows = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
 	const tables = new Map(
 		scene.elements.flatMap((element) =>
@@ -260,7 +260,7 @@ function foreignMarks(scene: RenderedDiagramScene): string[] {
  * Neighboring ends on one side of a table whose heads run together: Excalidraw
  * draws a bar or foot 17 across, so two ports nearer than 20 read as one end.
  */
-function bunchedEnds(scene: RenderedDiagramScene): number {
+function bunchedEnds(scene: CanvasSpec): number {
 	const sides = new Map<string, number[]>();
 	for (const arrow of scene.elements)
 		if (arrow.type === "arrow")
@@ -287,7 +287,7 @@ function bunchedEnds(scene: RenderedDiagramScene): number {
 const BESIDE_TABLE = 24;
 const CORNER = 16;
 
-function runsBesideTables(scene: RenderedDiagramScene): string[] {
+function runsBesideTables(scene: CanvasSpec): string[] {
 	const tables = scene.elements.flatMap((element) =>
 		element.type === "node" && element.rendererRole === "er-table" && element.kind === "entity"
 			? [element]

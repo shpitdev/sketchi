@@ -1,10 +1,11 @@
-import type { PatchableScene } from "@sketchi/diagrams/build/code-mode/contract";
+import { type CanvasSpec } from "@sketchi/drawing";
+
 import { Context, Effect, Layer } from "effect";
 
 import { HeadlessPngRenderError } from "./render-diagnostics.js";
 
 export interface PngRenderInput {
-	readonly scene?: PatchableScene;
+	readonly scene?: CanvasSpec;
 	readonly excalidraw: unknown;
 }
 

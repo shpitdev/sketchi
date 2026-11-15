@@ -11,7 +11,7 @@ import {
 	embedCanvasIcons,
 	isIconRecipe,
 	type CanvasIconAsset,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 import { renderSequenceDiagram } from "@sketchi/diagrams/families/sequence/render";
@@ -45,7 +45,7 @@ function nodeLogo(slug: string): CanvasIconAsset | undefined {
 }
 
 /** The deploy-pipeline fixture with real catalog marks embedded. */
-export function nodeLogoScene(direction: LayoutDirection = "TB"): RenderedDiagramScene {
+export function nodeLogoScene(direction: LayoutDirection = "TB"): CanvasSpec {
 	return embedCanvasIcons(
 		renderIntermediateDiagram({
 			...deployPipelineLogoFlowchart,
@@ -59,7 +59,7 @@ export function nodeLogoScene(direction: LayoutDirection = "TB"): RenderedDiagra
  * The deploy-pipeline fixture as diagrams draw it: marks with a catalog recipe
  * drawn by hand, the rest as their embedded SVG.
  */
-export function handDrawnLogoScene(): RenderedDiagramScene {
+export function handDrawnLogoScene(): CanvasSpec {
 	return embedCanvasIcons(
 		renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
 		(slug) => {
@@ -71,7 +71,7 @@ export function handDrawnLogoScene(): RenderedDiagramScene {
 }
 
 /** The deploy-webhook sequence with real catalog marks in its participant headers. */
-export function participantLogoScene(): RenderedDiagramScene {
+export function participantLogoScene(): CanvasSpec {
 	return embedCanvasIcons(renderSequenceDiagram(deployWebhookLogoSequence), nodeLogo).scene;
 }
 
@@ -79,7 +79,7 @@ export function participantLogoScene(): RenderedDiagramScene {
  * The request-flow fixture: its Vercel group draws the Vercel logo before its
  * name, as a frame or, with a kind, as a zone.
  */
-export function groupLogoScene(zoned = false): RenderedDiagramScene {
+export function groupLogoScene(zoned = false): CanvasSpec {
 	const groups = requestFlowGroupLogoFlowchart.groups?.map((group) =>
 		zoned ? { ...group, kind: "cloud" as const } : group,
 	);

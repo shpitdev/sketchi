@@ -2,9 +2,9 @@ import {
 	estimateTextWidth,
 	type CanvasLineElement as LineSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasPoint as ScenePoint,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 interface Box {
@@ -117,7 +117,7 @@ const inside = (inner: Box, outer: Box, margin = 0) =>
 const flat = (text: string | undefined) => text?.replace(/\s*\n\s*/gu, " ").trim();
 
 /** Read a journey's stages, step cards, faces, notes, curves and baselines from its scene. */
-export function readJourneyScene(scene: RenderedDiagramScene): JourneyReadout {
+export function readJourneyScene(scene: CanvasSpec): JourneyReadout {
 	const byId = new Map(scene.elements.map((element) => [element.id, element]));
 	const text = (id: string) => {
 		const element = byId.get(id);
@@ -253,7 +253,7 @@ export function journeyCurveSamples(points: readonly ScenePoint[], steps = 12): 
  * that smiles, sets flat or frowns as its score says, and each band's curve
  * through its faces in order, inside its row.
  */
-export function journeyLayoutIssues(scene: RenderedDiagramScene): JourneyLayoutIssue[] {
+export function journeyLayoutIssues(scene: CanvasSpec): JourneyLayoutIssue[] {
 	const issues: JourneyLayoutIssue[] = [];
 	const push = (code: JourneyLayoutIssue["code"], elementId: string, message: string) =>
 		issues.push({ code, elementId, message });

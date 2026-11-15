@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
 	getCanvasValidationIssues,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { type Mindmap, parseMindmap, renderMindmap, mindmapLayoutIssues } from "./index.js";
 
@@ -103,12 +103,12 @@ function toDiagram(outline: Outline, id: string, direction: "LR" | "RL"): Mindma
 	);
 }
 
-function nodesOf(scene: RenderedDiagramScene): NodeSceneElement[] {
+function nodesOf(scene: CanvasSpec): NodeSceneElement[] {
 	return scene.elements.filter((element) => element.type === "node");
 }
 
 /** Width over height and height over width of the exported drawing. */
-function exportAspects(scene: RenderedDiagramScene): { wide: number; tall: number } {
+function exportAspects(scene: CanvasSpec): { wide: number; tall: number } {
 	const nodes = nodesOf(scene);
 	const width =
 		Math.max(...nodes.map((node) => node.x + node.width)) -
@@ -125,7 +125,7 @@ function exportAspects(scene: RenderedDiagramScene): { wide: number; tall: numbe
  * Each side's stack of main branches, as tall as their drawn subtrees and the
  * gaps between them (lone topics sit closer), and the tallest branch.
  */
-function sideStacks(scene: RenderedDiagramScene): { right: number; left: number; tallest: number } {
+function sideStacks(scene: CanvasSpec): { right: number; left: number; tallest: number } {
 	const nodes = nodesOf(scene);
 	const root = nodes.find((node) => node.kind === "root")!;
 	const center = root.x + root.width / 2;

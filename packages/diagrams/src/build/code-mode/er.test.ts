@@ -1,11 +1,11 @@
+import { CanvasSpec } from "@sketchi/drawing";
 import { describe, expect, it } from "vitest";
 import { Effect, Schema } from "effect";
 import { erFixture, orgChartEr } from "../../families/er/document.js";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { BuildErDiagramResultSchema, RenderedDiagramSceneSchema } from "./contract.js";
+import { BuildErDiagramResultSchema } from "./contract.js";
 import { canonicalDocumentFromDiagram } from "./documents.js";
 import { applyDiagramPatch, buildErDiagram, CodeModeRuntimeEnvironment } from "./runtime.js";
 
@@ -111,7 +111,7 @@ describe("Code Mode native ER diagram", () => {
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
 		const formats = new Map(built.artifact.formats.map((format) => [format.format, format.inline]));
 		// The scene decodes as the CLI and MCP read it: no empty text where a row has no key or type.
-		const scene = Schema.decodeUnknownSync(RenderedDiagramSceneSchema)(formats.get("scene"));
+		const scene = Schema.decodeUnknownSync(CanvasSpec)(formats.get("scene"));
 		const cells = scene.elements.flatMap((element) =>
 			element.type === "text" && element.id.startsWith("text:organizations:") ? [element.id] : [],
 		);
@@ -202,7 +202,7 @@ describe("Code Mode native ER diagram", () => {
 		const formats = new Map(
 			patched.artifact.formats.map((format) => [format.format, format.inline]),
 		);
-		const scene = formats.get("scene") as RenderedDiagramScene;
+		const scene = formats.get("scene") as CanvasSpec;
 		const roles = scene.elements.flatMap((element) =>
 			element.type === "node" ? [[element.id, element.rendererRole]] : [],
 		);

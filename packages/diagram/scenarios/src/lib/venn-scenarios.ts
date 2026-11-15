@@ -1,3 +1,4 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
 import {
@@ -11,7 +12,6 @@ import {
 	vennLayoutIssues,
 	vennTextLineBoxes,
 } from "@sketchi/diagrams/families/venn/readout";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { type ScenarioCheck } from "./evaluate.js";
 import { type DiagramScenarioDifficulty } from "./scenarios.js";
@@ -144,7 +144,7 @@ const LABEL_REACH = 40;
  * item, region label and count drawn once, wholly inside each of its sets and
  * outside every other set.
  */
-export function vennDrawnCheck(diagram: VennDiagram, scene: RenderedDiagramScene): ScenarioCheck {
+export function vennDrawnCheck(diagram: VennDiagram, scene: CanvasSpec): ScenarioCheck {
 	const problems: string[] = [];
 	const readout = readVennScene(scene);
 	const circles = readout.sets.map((set) => set.circle);
@@ -200,7 +200,7 @@ export function vennDrawnCheck(diagram: VennDiagram, scene: RenderedDiagramScene
 }
 
 /** No text overlapping, items clear of every outline by a margin, set labels clear of every circle. */
-export function vennLayoutCheck(scene: RenderedDiagramScene): ScenarioCheck {
+export function vennLayoutCheck(scene: CanvasSpec): ScenarioCheck {
 	const issues = vennLayoutIssues(scene);
 	return {
 		id: "venn-layout",

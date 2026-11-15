@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Schema } from "effect";
-import { groupRegionIssues, type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+import { groupRegionIssues, type CanvasSpec } from "@sketchi/drawing";
 import { mediaPlayerStateMachine } from "../../families/state-machine/document.js";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
@@ -394,7 +394,7 @@ describe("Code Mode native state machine", () => {
 		const built = await build(spec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
 		const scene = built.artifact.formats.find((format) => format.format === "scene")!
-			.inline as RenderedDiagramScene;
+			.inline as CanvasSpec;
 		for (const label of labels) {
 			expect(built.normalizedSpec.states.find((state) => state.id === label)?.label).toBe(label);
 			expect(scene.elements).toContainEqual(expect.objectContaining({ type: "text", text: label }));
@@ -434,7 +434,7 @@ describe("Code Mode native state machine", () => {
 			{ id: "End", kind: "final" },
 		]);
 		const scene = built.artifact.formats.find((format) => format.format === "scene")!
-			.inline as RenderedDiagramScene;
+			.inline as CanvasSpec;
 		expect(groupRegionIssues(scene)).toEqual([]);
 		expect(scene.elements).toContainEqual(
 			expect.objectContaining({ type: "frame", name: "Active" }),
@@ -517,7 +517,7 @@ describe("Code Mode native state machine", () => {
 		]);
 		expect(built.quality.summary).toEqual({ nodeCount: 5, edgeCount: 6 });
 		const formats = new Map(built.artifact.formats.map((format) => [format.format, format.inline]));
-		const scene = formats.get("scene") as RenderedDiagramScene;
+		const scene = formats.get("scene") as CanvasSpec;
 		expect(groupRegionIssues(scene)).toEqual([]);
 		const excalidraw = formats.get("excalidraw") as Parameters<typeof validateExcalidrawScene>[0];
 		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
@@ -580,7 +580,7 @@ describe("Code Mode native state machine", () => {
 		const formats = new Map(
 			patched.artifact.formats.map((format) => [format.format, format.inline]),
 		);
-		const scene = formats.get("scene") as RenderedDiagramScene;
+		const scene = formats.get("scene") as CanvasSpec;
 		const choice = scene.elements.find(
 			(element) => element.type === "node" && element.nodeId === "route",
 		);

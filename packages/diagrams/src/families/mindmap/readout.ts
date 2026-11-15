@@ -1,8 +1,8 @@
 import {
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasPoint as ScenePoint,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 
 export interface MindmapLayoutIssue {
@@ -117,7 +117,7 @@ function joints(left: ArrowSceneElement, right: ArrowSceneElement): ScenePoint[]
  * crossing, or a connector running through a topic (its own ends included,
  * away from where it binds), judged on the curves Excalidraw paints.
  */
-export function mindmapLayoutIssues(scene: RenderedDiagramScene): MindmapLayoutIssue[] {
+export function mindmapLayoutIssues(scene: CanvasSpec): MindmapLayoutIssue[] {
 	const nodes = scene.elements.filter((element) => element.type === "node");
 	const arrows = scene.elements.filter((element) => element.type === "arrow");
 	const issues: MindmapLayoutIssue[] = [];

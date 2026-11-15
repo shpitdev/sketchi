@@ -1,3 +1,4 @@
+import { CanvasSpec } from "@sketchi/drawing";
 import { DIAGRAM_TYPES, diagramFixtures, familyForType } from "@sketchi/diagrams/family";
 
 import {
@@ -5,7 +6,7 @@ import {
 	type CloudflareAiGatewayProvider,
 } from "@sketchi/cloudflare/ai-gateway";
 import { diagramScenarios, scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
-import { RenderedDiagramSceneSchema } from "@sketchi/diagrams/build/code-mode/contract";
+
 import {
 	FLOWCHART_MAX_NODES,
 	type FlowchartDiagram,
@@ -176,7 +177,7 @@ describe("generate responses installed CLIs can decode", () => {
 			decoded.add(diagram.type);
 			const decode = (schema: Schema.Top & { readonly DecodingServices: never }, value: unknown) =>
 				Schema.decodeUnknownSync(schema)(value);
-			expect(() => decode(RenderedDiagramSceneSchema, body.diagram?.scene)).not.toThrow();
+			expect(() => decode(CanvasSpec, body.diagram?.scene)).not.toThrow();
 			expect(() => decode(ExcalidrawFile, body.diagram?.excalidraw)).not.toThrow();
 			expect(() =>
 				decode(familyForType(diagram.type).spec, body.diagram?.document.spec),

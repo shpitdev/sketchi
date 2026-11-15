@@ -15,7 +15,7 @@ import {
 	routingWideBend,
 	zoneRegionIssues,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import {
 	bypassingHybridFlowcharts,
@@ -46,7 +46,7 @@ const fixtures: Record<string, IntermediateDiagram> = {
 	...requestPathFlowcharts,
 };
 
-const scenes = new Map<string, RenderedDiagramScene>();
+const scenes = new Map<string, CanvasSpec>();
 function rendered(
 	name: string,
 	direction: Direction = fixtures[name]!.layout.direction,
@@ -64,12 +64,12 @@ function rendered(
 	return scenes.get(key)!;
 }
 
-const zonesOf = (scene: RenderedDiagramScene) =>
+const zonesOf = (scene: CanvasSpec) =>
 	scene.elements.filter(
 		(e): e is NodeSceneElement => e.type === "node" && e.rendererRole === "zone",
 	);
 /** Zones that hang under a sibling zone: one's span along a row overlaps the other's, one above the other. */
-const stackedZones = (scene: RenderedDiagramScene) => {
+const stackedZones = (scene: CanvasSpec) => {
 	const zones = zonesOf(scene);
 	const holds = (outer: NodeSceneElement, inner: NodeSceneElement) =>
 		outer !== inner &&
@@ -93,11 +93,11 @@ const stackedZones = (scene: RenderedDiagramScene) => {
 			),
 	);
 };
-const nodeOf = (scene: RenderedDiagramScene, id: string) =>
+const nodeOf = (scene: CanvasSpec, id: string) =>
 	scene.elements.find((e): e is NodeSceneElement => e.type === "node" && e.nodeId === id)!;
 
 // Width over height, either way up, of what the export draws: zones, nodes and lines.
-const drawnAspect = (scene: RenderedDiagramScene) => {
+const drawnAspect = (scene: CanvasSpec) => {
 	const points = scene.elements.flatMap((element) =>
 		element.type === "arrow"
 			? element.points
@@ -141,7 +141,7 @@ describe.each(directions)("zoned flowcharts %s", (direction) => {
 
 describe("zone layout", () => {
 	it("styles each zone by its kind", () => {
-		const style = (scene: RenderedDiagramScene, id: string) => {
+		const style = (scene: CanvasSpec, id: string) => {
 			const zone = zonesOf(scene).find((candidate) => candidate.id === `group:${id}`)!;
 			return [zone.kind, zone.strokeStyle, zone.strokeWidth, zone.fillColor ?? "none"];
 		};
@@ -188,7 +188,7 @@ describe("zone layout", () => {
 	it("keeps the stated direction at every level of zones", () => {
 		// Top to bottom, the namespaces a request crosses stack in its order.
 		const k8s = rendered("kubernetes-cluster");
-		const zone = (scene: RenderedDiagramScene, id: string) =>
+		const zone = (scene: CanvasSpec, id: string) =>
 			zonesOf(scene).find((candidate) => candidate.id === `group:${id}`)!;
 		const [edge, frontend, backend] = ["edge", "frontend", "backend"].map((id) => zone(k8s, id));
 		expect(edge!.y + edge!.height).toBeLessThan(frontend!.y);
@@ -240,7 +240,7 @@ describe("zone layout", () => {
 		// The order API sits two zones deeper than the queue it feeds, the ingress
 		// controller two deeper than the client, the load balancer three deeper than
 		// the users; no line jogs.
-		const straight = (scene: RenderedDiagramScene, source: string, target: string) =>
+		const straight = (scene: CanvasSpec, source: string, target: string) =>
 			scene.elements.find(
 				(e) => e.type === "arrow" && e.sourceNodeId === source && e.targetNodeId === target,
 			)!;
@@ -444,10 +444,10 @@ describe("zone layout", () => {
 });
 
 describe("lines into a hanging zone band", () => {
-	const arrowOf = (scene: RenderedDiagramScene, edgeId: string) =>
+	const arrowOf = (scene: CanvasSpec, edgeId: string) =>
 		scene.elements.find((e) => e.type === "arrow" && e.edgeId === edgeId)!;
 	// Corners only: a point where a run continues straight on is no turn.
-	const turns = (scene: RenderedDiagramScene, edgeId: string) => {
+	const turns = (scene: CanvasSpec, edgeId: string) => {
 		const arrow = arrowOf(scene, edgeId);
 		if (arrow.type !== "arrow") return -1;
 		const horizontal = arrow.points
@@ -742,12 +742,12 @@ describe("lines past an infrastructure shape", () => {
 
 describe("line ends from generated samples", () => {
 	type Point = { readonly x: number; readonly y: number };
-	const arrow = (scene: RenderedDiagramScene, edgeId: string) => {
+	const arrow = (scene: CanvasSpec, edgeId: string) => {
 		const found = scene.elements.find((e) => e.type === "arrow" && e.edgeId === edgeId);
 		if (found?.type !== "arrow") throw new Error(`No arrow for ${edgeId}`);
 		return found;
 	};
-	const node = (scene: RenderedDiagramScene, nodeId: string) => {
+	const node = (scene: CanvasSpec, nodeId: string) => {
 		const found = scene.elements.find((e) => e.type === "node" && e.nodeId === nodeId);
 		if (found?.type !== "node") throw new Error(`No node ${nodeId}`);
 		return found;

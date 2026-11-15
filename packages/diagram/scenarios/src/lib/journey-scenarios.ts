@@ -1,3 +1,4 @@
+import { type CanvasSpec } from "@sketchi/drawing";
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
 import {
@@ -6,7 +7,6 @@ import {
 	parseJourneyDiagram,
 } from "@sketchi/diagrams/families/journey/document";
 import { journeyLayoutIssues, readJourneyScene } from "@sketchi/diagrams/families/journey/readout";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { type ScenarioCheck } from "./evaluate.js";
 import { type DiagramScenarioDifficulty } from "./scenarios.js";
@@ -247,10 +247,7 @@ const MISDRAWN = new Set([
  * that smiles, sets flat or frowns as the score says, the curve through the
  * faces, and each pain point and opportunity in its stage's column.
  */
-export function journeyDrawnCheck(
-	diagram: JourneyDiagram,
-	scene: RenderedDiagramScene,
-): ScenarioCheck {
+export function journeyDrawnCheck(diagram: JourneyDiagram, scene: CanvasSpec): ScenarioCheck {
 	const read = readJourneyScene(scene);
 	const problems: string[] = [];
 	if (
@@ -293,7 +290,7 @@ export function journeyDrawnCheck(
 }
 
 /** Nothing overlaps, every text fits its box, and every card, note and face keeps to its stage. */
-export function journeyLayoutCheck(scene: RenderedDiagramScene): ScenarioCheck {
+export function journeyLayoutCheck(scene: CanvasSpec): ScenarioCheck {
 	const issues = journeyLayoutIssues(scene);
 	return {
 		id: "journey-layout",

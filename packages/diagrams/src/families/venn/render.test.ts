@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 import {
 	getCanvasValidationIssues,
 	SKETCHI_DIAGRAM_PALETTE,
-	type CanvasSpec as RenderedDiagramScene,
 	type CanvasTextElement as TextSceneElement,
+	type CanvasSpec,
 } from "@sketchi/drawing";
 import { parseVennDiagram, VENN_COLORS, vennFixture, type VennDiagram } from "./document.js";
 import { vennStressFixtures } from "./fixtures.js";
@@ -22,11 +22,10 @@ import {
 	vennRegionFill,
 } from "./render.js";
 
-const texts = (scene: RenderedDiagramScene) =>
+const texts = (scene: CanvasSpec) =>
 	scene.elements.filter((element): element is TextSceneElement => element.type === "text");
-const text = (scene: RenderedDiagramScene, id: string) =>
-	texts(scene).find((element) => element.id === id)!;
-const element = (scene: RenderedDiagramScene, id: string) =>
+const text = (scene: CanvasSpec, id: string) => texts(scene).find((element) => element.id === id)!;
+const element = (scene: CanvasSpec, id: string) =>
 	scene.elements.find((candidate) => candidate.id === id)!;
 
 const all: VennDiagram[] = [vennFixture, ...Object.values(vennStressFixtures)];
