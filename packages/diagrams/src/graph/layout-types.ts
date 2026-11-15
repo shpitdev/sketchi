@@ -1,3 +1,4 @@
+/** Owns trusted per-render measurement, placement, routing and candidate records. */
 import {
 	type DiagramEdge,
 	type DiagramZoneKind,

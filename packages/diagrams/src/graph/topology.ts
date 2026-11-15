@@ -1,3 +1,4 @@
+/** Owns native graph adjacency, feedback and selected rank orders, including nested group levels. */
 import { measureEdges } from "./measure.js";
 import { type LayoutEdge } from "./layout-types.js";
 import { Graph, Option } from "effect";

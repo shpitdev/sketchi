@@ -1,3 +1,4 @@
+/** Owns splitting decorative rules around text boxes in composed scenes. */
 import {
 	type CanvasLineElement as LineSceneElement,
 	type CanvasElement as SceneElement,

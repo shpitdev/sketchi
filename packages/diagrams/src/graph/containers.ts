@@ -1,3 +1,4 @@
+/** Owns group, zone and lane geometry: bounds, labels, obstacles and boundary defects. */
 import {
 	CANVAS_ZONE_HEADER,
 	CANVAS_FRAME_NAME,

@@ -1,3 +1,4 @@
+/** Owns graph crossing lower bounds and the public geometric line-crossing readout. */
 import { Array, Graph, MutableHashMap, MutableHashSet, Option } from "effect";
 
 /**

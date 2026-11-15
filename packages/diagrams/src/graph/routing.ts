@@ -1,3 +1,4 @@
+/** Owns bounded geometric route search, self-loops, paired returns and route-order repairs. */
 import {
 	type RoutedEdge,
 	type RouteOptions,

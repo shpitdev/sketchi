@@ -1,3 +1,4 @@
+/** Owns crossing repairs, branch-side search and endpoint polish, with candidate admission rules. */
 import {
 	type DiagramLayout,
 	type ConnectionEdge,

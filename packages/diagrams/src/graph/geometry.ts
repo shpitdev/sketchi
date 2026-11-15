@@ -1,3 +1,4 @@
+/** Owns shape-side geometry, port coordinates, endpoint reservations and shared spacing. */
 import { type ConnectionEdge, type RoutedEdge } from "./layout-types.js";
 import { type IntermediateDiagram } from "./intermediate.js";
 import {

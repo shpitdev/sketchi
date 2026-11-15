@@ -1,3 +1,4 @@
+/** Owns family-supplied placement, anchors and routing choices for the shared graph engine. */
 /** A point on a node's side a line's end is pinned to: its offset from the middle of that side. */
 export interface GraphAnchor {
 	readonly side: "top" | "right" | "bottom" | "left";

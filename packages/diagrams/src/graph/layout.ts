@@ -1,3 +1,5 @@
+/** Owns one arrangement attempt: placement, ports, routing and its polish passes.
+ * Also computes lane tightening, zone cut edges and room for outline clearance. */
 import {
 	type RoutingPolish,
 	type RoutedEdge,

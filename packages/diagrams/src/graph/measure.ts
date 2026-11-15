@@ -1,3 +1,4 @@
+/** Owns node/text sizing and distinct edge-label measurements reused within one render. */
 import {
 	DEFAULT_GLYPH_UNITS,
 	type CanvasShapeKind as NodeSceneShape,

@@ -1,3 +1,4 @@
+/** Owns node-side and port assignment, including lane handoffs, branches and paired returns. */
 import {
 	type RoutedEdge,
 	type LayoutEdge,

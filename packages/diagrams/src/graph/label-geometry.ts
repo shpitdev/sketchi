@@ -1,3 +1,4 @@
+/** Owns branch-label boxes and candidate positions along routed segments. */
 import { type LabelBox, type Box, type RoutedEdge } from "./layout-types.js";
 import {
 	type CanvasPoint as ScenePoint,

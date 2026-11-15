@@ -1,3 +1,4 @@
+/** Owns rank, group, zone and lane positions, including flow/pool/zone wrap plans. */
 import { Graph } from "effect";
 import { type DiagramGroup, type IntermediateDiagram, type DiagramEdge } from "./intermediate.js";
 import {

@@ -1,3 +1,4 @@
+/** Owns internal candidate readouts: export defects, crossings, reader findings and touches. */
 import { EXPORT_PADDING, MIN_NODE_HEIGHT, PADDING } from "./measure.js";
 import { type GroupLayout, type LaneLayout, type DiagramLayout } from "./layout-types.js";
 import { ownEndRunCount, straightRuns, drawnSize, routeLength } from "./route-geometry.js";

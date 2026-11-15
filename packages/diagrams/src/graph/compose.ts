@@ -1,3 +1,4 @@
+/** Owns Canvas node/text/marker and group/lane/zone elements, frames and export bounds. */
 import {
 	NODE_LABEL_FONT_SIZE,
 	NODE_LABEL_HORIZONTAL_PADDING,

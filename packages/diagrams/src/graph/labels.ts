@@ -1,3 +1,4 @@
+/** Owns branch-label placement and clearing routes from labels and container outlines. */
 import {
 	type RoutedEdge,
 	type GroupLayout,

@@ -1,3 +1,4 @@
+/** Owns rounding orthogonal routes into curves while preserving outline and label clearance. */
 import {
 	canvasFrameNameBox,
 	canvasOutlineContains,

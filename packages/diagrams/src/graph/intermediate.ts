@@ -1,3 +1,4 @@
+/** Owns the current authored graph schema and validation, pending the family-document split. */
 import {
 	DIAGRAM_ICON_SLUG_MAX_LENGTH,
 	DIAGRAM_ICON_SLUG_PATTERN,

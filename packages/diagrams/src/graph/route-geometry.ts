@@ -1,3 +1,4 @@
+/** Owns route segments, intersections, clearance predicates, lengths and drawn extents. */
 import {
 	type CanvasPoint as ScenePoint,
 	type CanvasShapeElement as NodeSceneElement,

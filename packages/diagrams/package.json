@@ -363,10 +363,6 @@
 			"types": "./dist/graph/scene.d.ts",
 			"default": "./dist/graph/scene.js"
 		},
-		"./graph/readability": {
-			"types": "./dist/graph/readability.d.ts",
-			"default": "./dist/graph/readability.js"
-		},
 		"./families/class/render": {
 			"types": "./dist/families/class/render.d.ts",
 			"default": "./dist/families/class/render.js"
