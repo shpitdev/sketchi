@@ -4,8 +4,8 @@ import {
 	type ClassRelationshipKind,
 	parseClassDiagram,
 	resolveClassShorthand,
-} from "./document";
-import { renderDiagram } from "../../family";
+} from "../document";
+import { renderDiagram } from "../../../family";
 import {
 	type AxisAlignedSegment,
 	candidateRouteQuality,
