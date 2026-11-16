@@ -16,18 +16,18 @@ import {
 	studioModelResult,
 	type StudioBuildTurn,
 } from "./studio-build-tool.server";
-function buildTool<Input, Output>(
-	family: Pick<FamilyOperation<Output>, "build"> & {
-		readonly studioInput: Schema.Codec<Input, unknown>;
+function buildTool<Output>(
+	family: {
+		readonly studioInput: Schema.Top;
 		readonly contracts: { readonly output: Schema.Codec<Output, unknown> };
 		readonly docs: { readonly toolDescription: string; readonly toolName: string };
 	},
-	executor: { readonly execute: (input: Input) => PlaygroundCallbackEffect<Output> },
+	executor: { readonly execute: (input: unknown) => PlaygroundCallbackEffect<Output> },
 ) {
 	const tool = Tool.dynamic(family.docs.toolName, {
 		description: family.docs.toolDescription,
 		// The non-strict OpenAI adapter opens object properties by default. Use the
-		// canonical family schema for the wire, and decode with that same contract below.
+		// canonical tool schema for the wire; the executor owns preparation and validation.
 		parameters: toCodeModeJsonSchema(family.studioInput),
 		success: family.contracts.output,
 		toModelOutput: (output) => [
@@ -41,16 +41,7 @@ function buildTool<Input, Output>(
 	return Effect.gen(function* () {
 		const context = yield* Effect.context<Effect.Services<ReturnType<typeof executor.execute>>>();
 		const handlers = yield* toolkit.toHandlers({
-			[tool.name]: (input: unknown) =>
-				Schema.decodeUnknownEffect(family.studioInput)(input).pipe(
-					Effect.matchEffect({
-						// Invalid input never reaches Studio's typed grounding functions. The
-						// canonical operation returns the same paths and repair hints as HTTP/MCP.
-						onFailure: () => buildResponse(family.build(Build)(input)),
-						onSuccess: executor.execute,
-					}),
-					Effect.provide(context),
-				),
+			[tool.name]: (input: unknown) => executor.execute(input).pipe(Effect.provide(context)),
 		});
 		return { toolkit, handlers };
 	});
@@ -113,14 +104,15 @@ type PlainFamily = Exclude<
 	}
 >;
 type PlainFamilyResult = PlainFamily["contracts"]["output"]["Type"];
-export function makeStudioFamilyExecutor<F extends PlainFamily, E, R>(
-	family: F,
+export function makeStudioFamilyExecutor<E, R>(
+	family: PlainFamily,
 	build: (input: unknown) => Effect.Effect<PlainFamilyResult, E, R>,
 	options: {
 		readonly turn?: StudioBuildTurn;
 	} = {},
 ) {
-	return makeStudioBuildToolExecutor<F["studioInput"]["Type"], PlainFamilyResult, E, R>({
+	return makeStudioBuildToolExecutor<PlainFamily["request"]["Type"], PlainFamilyResult, E, R>({
+		decode: family.decode,
 		build,
 		operation: family.operation,
 		...options,

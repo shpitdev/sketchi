@@ -162,6 +162,7 @@ function family<
 		studioInput: build.toolInput,
 		counts: definition.canonical.counts,
 		prepare: build.prepare,
+		decode: build.decode,
 		document,
 		decodeDocument: (input: unknown) =>
 			Effect.fromResult(build.prepare({ spec: input })).pipe(

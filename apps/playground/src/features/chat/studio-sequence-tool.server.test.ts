@@ -87,7 +87,7 @@ describe("Studio build_sequence_diagram host", () => {
 		const accepted = await Effect.runPromise(executor.execute(checkout));
 		const reused = await Effect.runPromise(executor.execute(checkout));
 
-		expect(requests).toEqual([{ ...checkout, options: STUDIO_ARTIFACT_OPTIONS }]);
+		expect(requests).toMatchObject([{ ...checkout, options: STUDIO_ARTIFACT_OPTIONS }]);
 		expect(accepted).toMatchObject({ ok: true, status: "accepted" });
 		expect(reused).toBe(accepted);
 		expect(runtime.writes()).toBe(1);
