@@ -6,6 +6,7 @@
 			"default",
 			"!{projectRoot}/**/*.test.ts",
 			"!{projectRoot}/**/*.test.tsx",
+			"!{projectRoot}/**/tests/**/*",
 			"!{projectRoot}/**/*.stories.tsx",
 			"!{projectRoot}/.storybook/**/*",
 			"!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)",
