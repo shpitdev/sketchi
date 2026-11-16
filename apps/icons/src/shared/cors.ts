@@ -7,7 +7,7 @@ export const ICONS_CORS_HEADERS: Readonly<Record<string, string>> = {
 	"Cross-Origin-Resource-Policy": "cross-origin",
 };
 
-export function corsHeaders(initial?: HeadersInit, additional?: HeadersInit): Headers {
+function corsHeaders(initial?: HeadersInit, additional?: HeadersInit): Headers {
 	const headers = new Headers(initial);
 	for (const [name, value] of Object.entries(ICONS_CORS_HEADERS)) {
 		headers.set(name, value);
@@ -19,14 +19,7 @@ export function corsHeaders(initial?: HeadersInit, additional?: HeadersInit): He
 	return headers;
 }
 
-export function corsJson(value: unknown, init: ResponseInit = {}): Response {
-	return Response.json(value, {
-		...init,
-		headers: corsHeaders(init.headers),
-	});
-}
-
-export function corsText(value: string | null, init: ResponseInit = {}): Response {
+function corsText(value: string | null, init: ResponseInit = {}): Response {
 	return new Response(value, {
 		...init,
 		headers: corsHeaders(init.headers),

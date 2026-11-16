@@ -39,10 +39,13 @@ import {
 } from "effect/http";
 import { HttpApi, HttpApiBuilder, OpenApi } from "effect/http-api";
 
-import { IconSource } from "./api.server";
-import { IconCatalogHttpHandlers } from "./catalog-http.server";
-import { createIconSourceLoader, type IconAssetsBinding } from "./catalog.server";
-import { ICONS_CORS_HEADERS } from "./cors-policy";
+import {
+	createIconSourceLoader,
+	type IconAssetsBinding,
+	IconSource,
+} from "./features/catalog/catalog.server";
+import { IconCatalogHttpHandlers } from "./features/catalog/http.server";
+import { ICONS_CORS_HEADERS } from "./shared/cors";
 
 export interface IconsHttpEnv extends CommunityEnv {
 	readonly ASSETS: IconAssetsBinding;

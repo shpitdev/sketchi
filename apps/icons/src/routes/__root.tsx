@@ -1,7 +1,7 @@
 import { RegistryProvider } from "@effect/atom-react";
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 
-import { pageMeta, SITE_DESCRIPTION, SITE_IMAGE, SITE_TITLE } from "../lib/site-meta";
+import { pageMeta, SITE_DESCRIPTION, SITE_IMAGE, SITE_TITLE } from "../shared/site";
 import appStyles from "../styles/app.css?url";
 
 export const Route = createRootRoute({

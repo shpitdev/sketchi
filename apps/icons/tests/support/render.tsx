@@ -2,7 +2,7 @@ import { RegistryContext } from "@effect/atom-react";
 import { render as renderReact, type RenderOptions } from "@testing-library/react";
 import { Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
-import { queryHttpLayer } from "../../src/lib/query-atoms";
+import { queryHttpLayer } from "../../src/features/browser/query";
 import { AtomRegistry } from "effect/reactivity";
 import type { ReactElement } from "react";
 import { afterEach } from "vitest";

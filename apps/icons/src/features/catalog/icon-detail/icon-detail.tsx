@@ -6,11 +6,17 @@ import { Dialog as Modal } from "radix-ui";
 
 import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
 
-import { formatBytes } from "../../../lib/format-bytes";
 import { IconMark } from "../../../components/icon-mark/icon-mark";
 import { DrawnIcon } from "../../../components/drawn-icon/drawn-icon";
 import { NamesToggle } from "../../../components/names-toggle/names-toggle";
 import { PreviewToggle } from "../../../components/preview-toggle/preview-toggle";
+
+function formatBytes(bytes: number): string {
+	if (bytes < 1024) {
+		return `${bytes} B`;
+	}
+	return `${(bytes / 1024).toFixed(1)} KB`;
+}
 
 export type IconDetailAction =
 	| "copy-data-uri"

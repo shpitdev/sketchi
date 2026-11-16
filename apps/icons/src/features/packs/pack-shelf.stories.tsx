@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import type { PackIcon } from "../../lib/packs";
+import type { PackIcon } from "./packs";
 import { PackShelf } from "./pack-shelf";
 
 const shapes: PackIcon[] = [

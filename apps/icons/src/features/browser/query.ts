@@ -1,10 +1,6 @@
 import { Cause, Effect, Layer, Schedule, Schema, Stream } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { Atom, AsyncResult } from "effect/reactivity";
-import { decodeIconManifest } from "@sketchi/icon-catalog";
-
-import { decodeDrawings, DRAWINGS_PATH } from "./drawings";
-import { decodePackIcons, packIconsPath } from "./packs";
 
 export class IconQueryError extends Schema.TaggedError<
 	IconQueryError,
@@ -18,7 +14,8 @@ export class IconQueryError extends Schema.TaggedError<
 export const queryHttpLayer = Atom.make<Layer.Layer<HttpClient.HttpClient>>(FetchHttpClient.layer);
 export const queryRuntime = Atom.runtime((get) => get(queryHttpLayer));
 
-const loadPublished = Effect.fn("Icons.assets.load")(
+/** One published site asset, decoded by its owner. */
+export const loadPublished = Effect.fn("Icons.assets.load")(
 	function* <A>(path: string, what: string, decode: (payload: unknown) => A) {
 		const client = yield* HttpClient.HttpClient;
 		const response = yield* client.get(new URL(path, window.location.origin).href);
@@ -39,28 +36,7 @@ const loadPublished = Effect.fn("Icons.assets.load")(
 	Effect.provideService(FetchHttpClient.RequestInit, { cache: "no-cache" }),
 );
 
-const retryOnce = Schedule.spaced("1 second").pipe(Schedule.upTo({ times: 1 }));
-export const manifestQuery = queryRuntime
-	.atom(loadPublished("/icons-manifest.json", "Icon library", decodeIconManifest))
-	.pipe(Atom.setIdleTTL(0), Atom.withServerValueInitial);
-export const drawingsQuery = queryRuntime
-	.atom((get) =>
-		get
-			.result(manifestQuery)
-			.pipe(
-				Effect.andThen(
-					loadPublished(DRAWINGS_PATH, "Drawings", decodeDrawings).pipe(Effect.retry(retryOnce)),
-				),
-			),
-	)
-	.pipe(Atom.setIdleTTL(0), Atom.withServerValueInitial);
-export const packQuery = Atom.family((id: string) =>
-	queryRuntime
-		.atom(
-			loadPublished(packIconsPath(id), "Pack icons", decodePackIcons).pipe(Effect.retry(retryOnce)),
-		)
-		.pipe(Atom.setIdleTTL(0), Atom.withServerValueInitial),
-);
+export const retryOnce = Schedule.spaced("1 second").pipe(Schedule.upTo({ times: 1 }));
 
 // Community queries revalidate on reconnect, unlike published assets. The stream
 // owns its event subscription and removes it when the last query unmounts.

@@ -3,7 +3,7 @@ import { HttpApiClient } from "effect/http-api";
 import { HttpClient, HttpClientRequest } from "effect/http";
 import { PackPublicationApi } from "./publication-api";
 import { PublishPayload } from "./publication";
-import { IconQueryError } from "../../lib/query-atoms";
+import { IconQueryError } from "../browser/query";
 const formatValidationIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 const decode = HttpApiClient.decodeResponse(PackPublicationApi, {
 	group: "packs",

@@ -4,8 +4,8 @@ import { Download, Search, X } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
 import { copyText, downloadBlob } from "../export/actions";
-import { bareSlug, type CommunityIconEntry } from "../../lib/community-client";
-import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url";
+import { bareSlug, type CommunityIconEntry } from "./entry";
+import { SKETCHI_WEB_HOME_URL } from "../../shared/site";
 import { useAtom, useAtomSet } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
 import { useExportFeedback } from "../browser/feedback";

@@ -5,15 +5,18 @@ import {
 	withTelemetryCorrelation,
 	withTelemetryExport,
 	type TelemetryExportTarget,
+	type TelemetryPipeline,
 } from "@sketchi/observability";
 import { Context, Effect, Layer, Predicate, Scheduler } from "effect";
 import { SecureRandom } from "effect/crypto";
 import { McpProtocol, McpSchema, McpServer } from "effect/ai";
 import { HttpMiddleware, HttpRouter, HttpServer, HttpServerRequest } from "effect/http";
-import { IconSource } from "./api.server";
-import { createIconSourceLoader } from "./catalog.server";
-import { corsPreflight, withCors } from "./cors-policy";
-import type { IconsHttpEnv } from "./http.server";
+import {
+	createIconSourceLoader,
+	type IconAssetsBinding,
+	IconSource,
+} from "../catalog/catalog.server";
+import { corsPreflight, withCors } from "../../shared/cors";
 import { IconToolkit, IconToolHandlers } from "./toolkit.server";
 
 /** Request-owned export target, never captured in registrations or session state. */
@@ -76,7 +79,7 @@ export function makeIconMcpHandler(origin: string | null) {
 	});
 	return {
 		dispose: runtime.dispose,
-		fetch(request: Request, env: IconsHttpEnv, waitUntil: (promise: Promise<unknown>) => void) {
+		fetch(request: Request, env: IconsMcpEnv, waitUntil: (promise: Promise<unknown>) => void) {
 			return runtime.handler(
 				request,
 				Context.make(IconSource, {
@@ -88,8 +91,10 @@ export function makeIconMcpHandler(origin: string | null) {
 	};
 }
 
-export interface IconsMcpEnv extends IconsHttpEnv {
+export interface IconsMcpEnv {
+	readonly ASSETS: IconAssetsBinding;
 	readonly ICONS_MCP_SESSION: McpSessionNamespace;
+	readonly TELEMETRY_SPANS?: TelemetryPipeline;
 }
 
 /** Cloudflare fetch callback; native McpServer owns the HTTP protocol inside the session. */

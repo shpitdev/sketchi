@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterAll, describe, expect, it } from "vitest";
 
-import { makeIconsHttpHandler } from "../src/lib/http.server";
+import { makeIconsHttpHandler } from "../src/http.server";
 
 const runtime = makeIconsHttpHandler();
 afterAll(() => runtime.dispose());

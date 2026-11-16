@@ -4,14 +4,13 @@ import { dirname, resolve } from "node:path";
 
 import { ICON_SOURCE_URL_PREFIX, iconManifest } from "@sketchi/icon-catalog/catalog";
 
-import { catalogDrawings, DRAWINGS_PATH } from "../src/lib/drawings";
+import { catalogDrawings, DRAWINGS_PATH } from "../src/features/catalog/drawings";
 import { excalidrawLibrary } from "../src/features/export/excalidraw-export";
 import {
 	ALL_ICONS_PACK_ID,
 	ICON_PACKS,
 	PACK_INDEX_PATH,
 	type PackIcon,
-	SITE_CARD_PATH,
 	packCardPath,
 	packIcons,
 	packIconsPath,
@@ -20,7 +19,8 @@ import {
 	packPreviewImagePath,
 	packSummary,
 	packVersion,
-} from "../src/lib/packs";
+} from "../src/features/packs/packs";
+import { SITE_CARD_PATH } from "../src/shared/site";
 import { packPreviewImage } from "./pack-preview-image";
 import { packCard, siteCard } from "./social-cards";
 

@@ -4,11 +4,11 @@ import { useHotkeys, type UseHotkeyDefinition } from "@tanstack/react-hotkeys";
 import { useCallback, useContext, useMemo, useRef, useState } from "react";
 
 import { formatCollectionLabel, type IconManifest, type SketchiIcon } from "@sketchi/icon-catalog";
-import { DRAWINGS_LIBRARY_PATH, type IconDrawings } from "../../lib/drawings";
+import { DRAWINGS_LIBRARY_PATH, type IconDrawings } from "./drawings";
 import { filterIcons, toggleCollection } from "./filter";
-import { PLAYGROUND_URL, REPO_URL, SKETCHI_WEB_HOME_URL } from "../../lib/home-url";
-import type { PackShelfData } from "../../lib/packs-rpc";
-import { permanentSvgUrl } from "../../lib/permanent-svg-url";
+import { PLAYGROUND_URL, REPO_URL, SKETCHI_WEB_HOME_URL } from "../../shared/site";
+import type { PackShelfData } from "../packs/shelf";
+import { permanentSvgUrl } from "./permanent-svg-url";
 import { RegistryContext, useAtom } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
 import { drawnNames } from "../browser/drawn-names";

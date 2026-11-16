@@ -21,7 +21,7 @@ ignored copies into `public/`:
 - `public/sketchi-icons.excalidrawlib` is the same set as one Excalidraw
   library (about 8.5 MB, 570 KB with gzip), built with the elements the
   "Copy for Excalidraw" actions paste.
-- `public/packs/` holds the packs `src/lib/packs.ts` defines by collection:
+- `public/packs/` holds the packs `src/features/packs/packs.ts` defines by collection:
   each as a library (`<id>.excalidrawlib`; the whole catalog keeps the URL
   above), a pack listed for Excalidraw's library collection also as its
   preview (`<id>.preview.jpg`), plus `index.json`, which the home page and
@@ -83,7 +83,7 @@ first goes there the way excalidraw.com's "Publish library" dialog sends one.
   bot mentions it on GitHub, and nothing here shows the visitor owns it.
 - `POST /api/packs/:id/excalidraw` takes those fields (2 KB at most, 3 a client
   an hour) and sends the rest itself: the built library pretty-printed, its
-  preview, and the pack's listing (`excalidrawListing` in `src/lib/packs.ts`).
+  preview, and the pack's listing (`excalidrawListing` in `src/features/packs/packs.ts`).
   The preview is the dialog's: 6 marks a row in 128 px boxes 8 px apart, as a
   JPEG at most 5000 px a side, each mark drawn as the pages draw it.
 - Each pack version opens at most one pull request. The Worker claims the

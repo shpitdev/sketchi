@@ -2,9 +2,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { McpProtocol, McpServer, McpTest } from "effect/ai";
-import { IconSource } from "../src/lib/api.server";
-import type { IconSourceLoader } from "../src/lib/catalog.server";
-import { IconMcpRegistrations } from "../src/lib/mcp.server";
+import { IconSource } from "../src/features/catalog/catalog.server";
+import type { IconSourceLoader } from "../src/features/catalog/catalog.server";
+import { IconMcpRegistrations } from "../src/features/mcp/mcp.server";
 
 const clientFor = (origin: string, sourceLoader: IconSourceLoader) =>
 	McpTest.makeClient(
