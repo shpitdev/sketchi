@@ -58,12 +58,12 @@ to layout, drawing or graph retain artifact identity, affected fuzz and timing.
 Reuse unchanged proof by identity instead of repeating expensive checks.
 
 `pnpm ci:local` is the local CI gate (`scripts/ci-local.mjs`). It defaults to
-`origin/main`, including staged, unstaged and untracked changes, and runs actionlint when workflows
-change, a frozen install, `pnpm run check`, the scenario CLI smoke, deployment/process
-behavior and domain/font integration tests, the Nx-affected native `typecheck`,
-`build` and `test` targets, sampled routing as described below, the root
-`effect-tsgo tsc@7.0.2 -b`, and
-`pnpm nx build-storybook editor` when `editor` is affected.
+`origin/main`, including staged, unstaged and untracked changes. After a frozen
+install and `nx sync:check`, native Nx affected targets own lint/format, tools
+(including custom-rule, domain and font tests), deployment/process behavior,
+scenario CLI smoke, typecheck/build/test, root TypeScript references and the
+editor Storybook build. Checks reuse the native local task cache. Workflow
+changes select the native actionlint target. Full gates also run sampled routing.
 
 - Before publishing an accepted unit, run `pnpm ci:local --no-signoff`.
   A unit may use `--base <last-fully-gated-staging-head>`; record that verified
@@ -80,14 +80,15 @@ behavior and domain/font integration tests, the Nx-affected native `typecheck`,
 - Logs are in `.memory/ci-local/`. `--all` runs every project instead of the
   affected graph. At most two gates run at once per machine (`CI_LOCAL_SLOTS`).
 
-`diagrams:test` owns shared build/generation tests. `diagrams:test-<family>` and
-`diagrams:test-graph` own family and graph tests; `pnpm test` and the local gate
-select all these native targets, with Nx 24 input-based affected selection.
-`drawing:test` retains the cross-family text-fit cases and excludes the sampled
-routing suite. `drawing:routing-sample` runs once when a unit changes graph,
-Flowchart, the eagerly loaded state-machine parser, drawing or shared runtime/config inputs. Selection uses the gate's
-actual changed files; Nx target inputs alone do not suppress execution. Full
-`origin/main` gates, signoff and `--all` always include sampled routing.
+`diagrams:test` owns shared build/generation tests. `diagrams:test-<family>`,
+`diagrams:test-graph` and `diagrams:test-text-fit` own family, graph and cross-family
+text-fit tests. `pnpm test` uses `diagrams:verify-tests` with wildcard dependencies;
+the gate derives individual target names from their configuration so native Nx 24
+input selection keeps family changes narrow. Nx CLI target lists do not expand
+wildcards, and an affected aggregate would pull every family dependency in.
+`drawing:test` owns only drawing tests. `diagrams:routing-sample` is selected by
+its native inputs in unit gates: graph, Flowchart, drawing, fonts and shared
+runtime/config. Full `origin/main`, signoff and `--all` always run it once.
 
 Build, typecheck and test targets reuse Nx's native local cache across worktrees.
 The installed Nx version shares task artifacts and its index outside the checkout;
@@ -105,16 +106,16 @@ These larger suites remain local proof when their inputs change:
 - `pnpm nx run diagrams:gantt-fuzz` (300 plans per Gantt fuzz; the gate runs 4)
 - `pnpm nx run diagrams:chart-fuzz` (300 chart seeds; the gate runs 1–12 plus decimal seed 27)
 - `pnpm nx run diagrams:mindmap-fuzz` (2,000 mindmap seeds; the gate runs 8)
-- `pnpm nx run drawing:routing-fuzz` (full flowchart, grouped, state, label and text-fit matrices; the gate samples 4–8 cases, retaining all 30 wrapping cases)
-- `pnpm nx run drawing:er-fuzz` (240 schemas; the gate runs 16)
-- `pnpm nx run drawing:class-fuzz` (240 models and 120 text-fit rounds; the gate runs 16 and 12)
-- `pnpm nx run drawing:org-chart-fuzz` (900 random charts across three seeds; the gate runs 6)
+- `pnpm nx run diagrams:routing-fuzz` (full flowchart, grouped, state, label and text-fit matrices; the gate samples 4–8 cases, retaining all 30 wrapping cases)
+- `pnpm nx run diagrams:er-fuzz` (240 schemas; the gate runs 16)
+- `pnpm nx run diagrams:class-fuzz` (240 models and 120 text-fit rounds; the gate runs 16 and 12)
+- `pnpm nx run diagrams:org-chart-fuzz` (900 random charts across three seeds; the gate runs 6)
 - `pnpm nx run diagrams:venn-fuzz` (900 random Venn diagrams across three seeds; the gate runs 12)
-- `pnpm nx run drawing:journey-fuzz` (900 random journeys across three seeds; the gate runs 8)
-- `pnpm nx run drawing:sankey-fuzz` (1,200 random flows across three seeds; the gate runs 10)
-- `pnpm nx run drawing:wireframe-fuzz` (1,200 random wireframes across three seeds; the gate runs 8)
-- `pnpm nx run drawing:sequence-fuzz` (400 sequences with self-messages; the gate runs 12)
-- `pnpm nx run drawing:quadrant-fuzz` (700 random quadrant charts; the gate runs 14)
+- `pnpm nx run diagrams:journey-fuzz` (900 random journeys across three seeds; the gate runs 8)
+- `pnpm nx run diagrams:sankey-fuzz` (1,200 random flows across three seeds; the gate runs 10)
+- `pnpm nx run diagrams:wireframe-fuzz` (1,200 random wireframes across three seeds; the gate runs 8)
+- `pnpm nx run diagrams:sequence-fuzz` (400 sequences with self-messages; the gate runs 12)
+- `pnpm nx run diagrams:quadrant-fuzz` (700 random quadrant charts; the gate runs 14)
 - `pnpm run test:wrangler-dry-runs` after app builds
 
 Worker Previews are opt-in. Add the `preview` label to a PR to deploy the Worker

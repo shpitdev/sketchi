@@ -208,7 +208,7 @@ test("contending gates never hold more slots than there are", async (t) => {
 				rmSync(marker);
 				release();
 			}
-			console.log(most);`,
+			console.log(JSON.stringify(most));`,
 			dir,
 			active,
 		),
@@ -297,15 +297,21 @@ function gateFixture(t) {
 import { appendFileSync } from "node:fs";
 const args = process.argv.slice(2);
 appendFileSync(process.env.GATE_CALLS, JSON.stringify({ command: ${JSON.stringify(name)}, args }) + "\\n");
-if (${JSON.stringify(name)} === "pnpm" && args.includes("show")) console.log(process.env.GATE_PROJECTS);
 if (${JSON.stringify(name)} === "gh" && args[0] === "pr") console.log(JSON.stringify({ number: 7, state: "OPEN", headRefOid: process.env.GATE_HEAD }));
 `,
 			{ mode: 0o755 },
 		);
 	}
-	const cli = join(repo.cwd, "packages/diagram/scenarios/dist");
-	mkdirSync(cli, { recursive: true });
-	writeFileSync(join(cli, "cli.js"), "// Scenario CLI fixture: exits successfully.\n");
+	mkdirSync(join(repo.cwd, "scripts"));
+	writeFileSync(
+		join(repo.cwd, "scripts/project.json"),
+		JSON.stringify({ targets: { "check-process": {} } }),
+	);
+	mkdirSync(join(repo.cwd, "packages/diagrams"), { recursive: true });
+	writeFileSync(
+		join(repo.cwd, "packages/diagrams/project.json"),
+		JSON.stringify({ targets: { "test-timeline": {}, "test-graph": {} } }),
+	);
 	writeFileSync(join(repo.cwd, ".gitignore"), ".memory/\n");
 	const routing = "packages/diagrams/src/graph/routing.ts";
 	mkdirSync(join(repo.cwd, "packages/diagrams/src/graph"), { recursive: true });
@@ -326,7 +332,7 @@ if (${JSON.stringify(name)} === "gh" && args[0] === "pr") console.log(JSON.strin
 			mkdirSync(join(repo.cwd, file, ".."), { recursive: true });
 			writeFileSync(join(repo.cwd, file), content);
 		},
-		run(args, projects = ["diagrams", "drawing"]) {
+		run(args) {
 			writeFileSync(calls, "");
 			const output = execFileSync(
 				process.execPath,
@@ -339,7 +345,6 @@ if (${JSON.stringify(name)} === "gh" && args[0] === "pr") console.log(JSON.strin
 						PATH: `${bin}:${process.env.PATH}`,
 						XDG_CACHE_HOME: join(state, "cache"),
 						GATE_CALLS: calls,
-						GATE_PROJECTS: JSON.stringify(projects),
 						GATE_HEAD: repo.head(),
 						CI_LOCAL_SLOTS: "1",
 					},
@@ -354,26 +359,33 @@ if (${JSON.stringify(name)} === "gh" && args[0] === "pr") console.log(JSON.strin
 			return {
 				output,
 				commands,
-				routing: commands.filter(({ args }) => args.includes("drawing:routing-sample")),
+				routing: commands.filter(({ args }) => args.includes("diagrams:routing-sample")),
 			};
 		},
 	};
 }
 
-test("unit gates include committed, staged, unstaged and untracked routing inputs", (t) => {
-	for (const state of ["committed", "staged", "unstaged", "untracked"]) {
-		const fixture = gateFixture(t);
-		const file = state === "untracked" ? "packages/drawing/src/new-schema.ts" : fixture.routing;
-		fixture.write(file);
-		if (state === "committed" || state === "staged") fixture.git("add", file);
-		if (state === "committed") fixture.git("commit", "--quiet", "-m", "routing change");
-		const result = fixture.run(["--no-signoff", "--base", fixture.unitBase]);
-		assert.equal(result.routing.length, 1, state);
-		assert.match(result.output, /✓ sampled routing/, state);
-	}
+test("unit gates pass Nx the merge base without a HEAD override, preserving dirty/untracked selection", (t) => {
+	const fixture = gateFixture(t);
+	fixture.write(fixture.routing);
+	fixture.git("add", fixture.routing);
+	fixture.git("commit", "--quiet", "-m", "routing change");
+	fixture.write("a.txt", "unstaged\n");
+	fixture.write("new.txt", "untracked\n");
+	const result = fixture.run(["--no-signoff", "--base", fixture.unitBase]);
+	const nx = result.commands.find(({ args }) => args.includes("affected"));
+	assert.ok(nx.args.includes(`--base=${fixture.unitBase}`));
+	assert.ok(!nx.args.some((arg) => arg.startsWith("--head")));
+	assert.ok(
+		nx.args.includes(
+			"typecheck,build,test,check-scenario,check-storybook,test-timeline,test-graph,check-process,routing-sample",
+		),
+	);
+	assert.equal(result.routing.length, 0, "unit routing is selected by Nx, not forced");
+	assert.ok(!result.commands.some(({ command }) => command === "gh"));
 });
 
-test("unit gates use the committed merge base, not a direct diff of divergent refs", (t) => {
+test("unit gates use the committed merge base for divergent refs", (t) => {
 	const fixture = gateFixture(t);
 	fixture.git("branch", "verified");
 	fixture.write(fixture.routing);
@@ -382,49 +394,10 @@ test("unit gates use the committed merge base, not a direct diff of divergent re
 	fixture.write("a.txt", "other staging work\n");
 	fixture.git("commit", "--quiet", "-am", "other staging work");
 	fixture.git("checkout", "--quiet", "unit");
-	assert.equal(fixture.run(["--no-signoff", "--base", "verified"]).routing.length, 1);
-});
-
-test("an edited state document retains default tests without selecting sampled routing", (t) => {
-	const fixture = gateFixture(t);
-	const parser = "packages/diagrams/src/families/state-machine/document.ts";
-	fixture.write(parser, "// original state parser\n");
-	fixture.git("add", parser);
-	fixture.git("commit", "--quiet", "-m", "state parser fixture");
-	const base = fixture.head();
-	fixture.write(parser, "// changed state parser\n");
-	const result = fixture.run(["--no-signoff", "--base", base]);
-	assert.equal(result.routing.length, 0);
-	assert.match(result.output, /sampled routing: not affected/);
-	for (const target of ["test", "typecheck,build"]) {
-		assert.ok(
-			result.commands.some(
-				({ args }) =>
-					args.includes("affected") &&
-					args.some((arg) => arg === target || arg.startsWith(`${target},`)),
-			),
-			target,
-		);
-	}
-});
-
-test("a plain-family unit gate retains default tests without running sampled routing", (t) => {
-	const fixture = gateFixture(t);
-	fixture.write("packages/diagrams/src/families/timeline/render.ts");
-	const result = fixture.run(["--no-signoff", "--base", fixture.unitBase]);
-	assert.equal(result.routing.length, 0);
-	assert.match(result.output, /sampled routing: not affected/);
-	for (const target of ["test", "typecheck,build"]) {
-		assert.ok(
-			result.commands.some(
-				({ args }) =>
-					args.includes("affected") &&
-					args.some((arg) => arg === target || arg.startsWith(`${target},`)),
-			),
-			target,
-		);
-	}
-	assert.ok(!result.commands.some(({ command }) => command === "gh"));
+	const { args } = fixture
+		.run(["--no-signoff", "--base", "verified"])
+		.commands.find(({ args }) => args.includes("affected"));
+	assert.ok(args.includes(`--base=${fixture.unitBase}`));
 });
 
 test("origin/main, an equivalent explicit base, --all and signoff always run routing once", (t) => {
@@ -435,7 +408,7 @@ test("origin/main, an equivalent explicit base, --all and signoff always run rou
 		["--no-signoff", "--all", "--base", fixture.unitBase],
 		[],
 	]) {
-		const result = fixture.run(args, []);
+		const result = fixture.run(args);
 		assert.equal(result.routing.length, 1, JSON.stringify(args));
 		assert.equal(
 			result.commands.filter(({ args }) => args.includes("POST")).length,
@@ -463,6 +436,6 @@ test("a unit base still cannot sign off, even with --all", (t) => {
 test("help explains sampled routing without executing checks", (t) => {
 	const result = gateFixture(t).run(["--help"]);
 	assert.match(result.output, /sampled routing/);
-	assert.match(result.output, /always for origin\/main and --all/);
+	assert.match(result.output, /Full origin\/main and --all/);
 	assert.deepEqual(result.commands, []);
 });

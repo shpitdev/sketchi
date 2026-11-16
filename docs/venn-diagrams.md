@@ -34,4 +34,4 @@ Maintained scenarios, from Frontierclimb's eval prompts: `team-skills-venn` (Des
 
 ## Fuzz
 
-`pnpm nx run drawing:venn-fuzz` draws 900 random diagrams over three seeds (CI draws 12): two or three sets with short, long and non-Latin labels and colors, regions empty, sparse or packed to the caps with phrases up to 60 characters, sometimes labeled or counted. Every export validates before and after a reload, every item is drawn once, whole and inside exactly its region, no text overlaps, set labels stay outside every circle, fills stay translucent, and every diagram reads between 1:1.4 and 2.45:1.
+`pnpm nx run diagrams:venn-fuzz` draws 900 random diagrams over three seeds (CI draws 12): two or three sets with short, long and non-Latin labels and colors, regions empty, sparse or packed to the caps with phrases up to 60 characters, sometimes labeled or counted. Every export validates before and after a reload, every item is drawn once, whole and inside exactly its region, no text overlaps, set labels stay outside every circle, fills stay translucent, and every diagram reads between 1:1.4 and 2.45:1.

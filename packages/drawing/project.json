@@ -17,13 +17,7 @@
 			"outputs": ["{workspaceRoot}/coverage/packages/drawing"],
 			"options": {
 				"command": "vitest run --config packages/drawing/vitest.config.ts"
-			},
-			"inputs": [
-				"default",
-				"^production",
-				"testEnvironment",
-				"{workspaceRoot}/packages/diagrams/src/**/*"
-			]
+			}
 		},
 		"typecheck": {
 			"executor": "nx:run-commands",
@@ -34,114 +28,6 @@
 				],
 				"parallel": false
 			}
-		},
-		"routing-sample": {
-			"executor": "nx:run-commands",
-			"options": {
-				"command": "vitest run --config packages/drawing/vitest.routing.config.ts packages/diagrams/src/graph/tests/routing"
-			},
-			"inputs": [
-				"production",
-				"^production",
-				{
-					"env": "ROUTING_FUZZ"
-				},
-				{
-					"env": "PRINT_ROUTING"
-				},
-				{
-					"env": "LANG"
-				},
-				{
-					"env": "LC_ALL"
-				},
-				{
-					"env": "TZ"
-				},
-				"{workspaceRoot}/packages/diagrams/src/graph/tests/routing*-fuzz.test.ts",
-				"{workspaceRoot}/packages/diagrams/src/graph/tests/routing-fuzz-helpers.ts",
-				"{workspaceRoot}/packages/diagrams/src/graph/tests/text-fit-helpers.ts",
-				"{workspaceRoot}/packages/diagrams/src/graph/**/*",
-				"{workspaceRoot}/packages/diagrams/src/families/flowchart/**/*",
-				"{workspaceRoot}/packages/diagrams/src/*.ts",
-				"{workspaceRoot}/packages/diagrams/project.json",
-				"{workspaceRoot}/packages/diagrams/tsconfig*.json",
-				"{workspaceRoot}/packages/diagrams/vitest.config.ts",
-				"{workspaceRoot}/packages/editor/public/fonts/**/*"
-			],
-			"cache": true,
-			"outputs": []
-		},
-		"routing-fuzz": {
-			"executor": "nx:run-commands",
-			"options": {
-				"command": "ROUTING_FUZZ=full vitest run --config packages/drawing/vitest.routing.config.ts"
-			},
-			"inputs": [
-				"default",
-				"^production",
-				"testEnvironment",
-				"{workspaceRoot}/packages/diagrams/src/**/*",
-				"{workspaceRoot}/packages/diagrams/src/graph/tests/**/*"
-			],
-			"cache": true,
-			"outputs": []
-		},
-		"er-fuzz": {
-			"executor": "nx:run-commands",
-			"options": {
-				"command": "ER_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/er/er-fuzz.test.ts"
-			},
-			"inputs": ["default", "{workspaceRoot}/packages/diagrams/src/**/*"]
-		},
-		"class-fuzz": {
-			"executor": "nx:run-commands",
-			"options": {
-				"command": "CLASS_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/class/class-fuzz.test.ts"
-			},
-			"inputs": ["default", "{workspaceRoot}/packages/diagrams/src/**/*"]
-		},
-		"sequence-fuzz": {
-			"executor": "nx:run-commands",
-			"options": {
-				"command": "SEQUENCE_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/sequence/sequence-fuzz.test.ts"
-			},
-			"inputs": ["default", "{workspaceRoot}/packages/diagrams/src/**/*"]
-		},
-		"org-chart-fuzz": {
-			"executor": "nx:run-commands",
-			"options": {
-				"command": "ORG_CHART_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/org-chart/org-chart-fuzz.test.ts"
-			},
-			"inputs": ["default", "{workspaceRoot}/packages/diagrams/src/**/*"]
-		},
-		"journey-fuzz": {
-			"executor": "nx:run-commands",
-			"options": {
-				"command": "JOURNEY_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/journey/journey-fuzz.test.ts"
-			},
-			"inputs": ["default", "{workspaceRoot}/packages/diagrams/src/**/*"]
-		},
-		"sankey-fuzz": {
-			"executor": "nx:run-commands",
-			"options": {
-				"command": "SANKEY_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/sankey/sankey-fuzz.test.ts"
-			},
-			"inputs": ["default", "{workspaceRoot}/packages/diagrams/src/**/*"]
-		},
-		"wireframe-fuzz": {
-			"executor": "nx:run-commands",
-			"options": {
-				"command": "WIREFRAME_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/wireframe/wireframe-fuzz.test.ts"
-			},
-			"inputs": ["default", "{workspaceRoot}/packages/diagrams/src/**/*"]
-		},
-		"quadrant-fuzz": {
-			"executor": "nx:run-commands",
-			"options": {
-				"command": "QUADRANT_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/quadrant/quadrant-fuzz.test.ts"
-			},
-			"inputs": ["default", "{workspaceRoot}/packages/diagrams/src/**/*"]
 		}
 	}
 }

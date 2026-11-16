@@ -18,8 +18,6 @@ import { DatabaseSync } from "node:sqlite";
 import { setTimeout as sleep } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 
-import { ciScope } from "./ci-scope.mjs";
-
 const DEFAULT_BASE = "origin/main";
 const STATUS_CONTEXT = "local-ci";
 const SQLITE_BUSY = 5;
@@ -85,9 +83,7 @@ export async function runTests({ runAll, runTask }) {
 	const onlyTimeouts =
 		failed.length > 0 &&
 		failed.every(
-			(task) =>
-				(task.endsWith(":test") || task.startsWith("diagrams:test-")) &&
-				onlyVitestTimeouts(outputs.get(task) ?? ""),
+			(task) => /:test(?:-|$)/.test(task) && onlyVitestTimeouts(outputs.get(task) ?? ""),
 		);
 	if (!onlyTimeouts) return { ok: false, reruns: [], logs: [first.log] };
 	const reruns = [];
@@ -230,14 +226,13 @@ function printLogTail(log, lines = 80) {
 
 const HELP = `Usage: pnpm ci:local [--no-signoff] [--all] [--base <ref>]
 
-Runs actionlint when workflows changed, a frozen install, lint/format/custom-rule checks, the
-scenario CLI smoke, deployment/process behavior and domain/font integration tests, the Nx-affected typecheck, build and test
-targets, sampled routing (always for origin/main and --all; otherwise when its inputs change),
-the root TypeScript project references, and the diagram UI Storybook build when
-editor is affected. Changes are compared with the base (default origin/main), including
-uncommitted and untracked ones. Logs go to .memory/ci-local/.
-Nx reuses its native local task cache across worktrees; graph and Vite state stay local.
-For caller-selected fuzz diagnostic outputs, run the Nx target with --skip-nx-cache.
+Installs frozen dependencies, checks Nx reference sync, and runs native Nx affected checks:
+lint/format, scenario CLI smoke, deployment/process and domain/font tests, typecheck/build/test,
+root TypeScript references and the editor Storybook. Full origin/main and --all gates also run
+sampled routing; unit gates select routing from its native target inputs.
+Changes include committed, staged, unstaged and untracked files. Logs go to .memory/ci-local/.
+Nx reuses its native local task cache across worktrees. For caller-selected fuzz diagnostic
+outputs, run the Nx target with --skip-nx-cache.
 
 On success it posts a "${STATUS_CONTEXT}" commit status on the pushed PR head.
 
@@ -358,63 +353,34 @@ async function main(argv) {
 		throw new GateFailure();
 	};
 
-	const changed = [
-		...git(cwd, ["diff", "--name-only", mergeBase]).split("\n"),
-		...git(cwd, ["ls-files", "--others", "--exclude-standard"]).split("\n"),
-	].filter(Boolean);
-	const workflowsChanged = changed.some((file) => file.startsWith(".github/"));
 	const nxScope = all ? ["run-many"] : ["affected", `--base=${mergeBase}`];
-
-	const command =
-		(name, ...commands) =>
-		async () => {
-			const logs = [];
-			for (const [index, args] of commands.entries()) {
-				const result = await run(args[0], args.slice(1), logFile(`${name}-${index}`));
-				logs.push(result.log);
-				if (result.code !== 0) return { ok: false, logs: [result.log] };
-			}
-			return { ok: true, logs };
-		};
-
-	// Scoped after the install, which `nx show projects` needs.
-	let scope;
-	const resolveScope = async () => {
-		const projects = all
-			? []
-			: JSON.parse(
-					execFileSync(
-						"pnpm",
-						["--silent", "nx", "show", "projects", "--affected", `--base=${mergeBase}`, "--json"],
-						{ cwd, encoding: "utf8", env },
-					),
-				);
-		scope = ciScope({
-			all,
-			full,
-			projects,
-			changedFiles: changed,
-		});
-		return {
-			ok: true,
-			label: `scope: ${all ? "all projects" : projects.join(", ") || "no affected projects"}`,
-		};
+	// Nx 24 expands wildcards in dependsOn, but not in CLI -t. Derive names from the
+	// owning configuration: an aggregate dependency would force every family to run.
+	const configuredTargets = (file) =>
+		Object.keys(JSON.parse(readFileSync(path.join(cwd, file), "utf8")).targets);
+	const targets = [
+		"typecheck",
+		"build",
+		"test",
+		"check-scenario",
+		"check-storybook",
+		...configuredTargets("packages/diagrams/project.json").filter((name) =>
+			name.startsWith("test-"),
+		),
+		...configuredTargets("scripts/project.json").filter((name) => name.startsWith("check-")),
+		...(!full && !all ? ["routing-sample"] : []),
+	];
+	const command = (name, args) => async () => {
+		const result = await run(args[0], args.slice(1), logFile(name));
+		return { ok: result.code === 0, logs: [result.log] };
 	};
-
-	const tests = async () => {
+	const checks = async () => {
 		const result = await runTests({
 			runAll: async () => {
 				const first = await run(
 					"pnpm",
-					[
-						"nx",
-						...nxScope,
-						"-t",
-						"test,test-chart,test-class,test-er,test-flowchart,test-gantt,test-journey,test-mindmap,test-org-chart,test-quadrant,test-sankey,test-sequence,test-state-machine,test-timeline,test-venn,test-wireframe,test-graph",
-						"--parallel=4",
-						"--outputStyle=static",
-					],
-					logFile("test"),
+					["nx", ...nxScope, "-t", targets.join(","), "--parallel=4", "--outputStyle=static"],
+					logFile("nx"),
 				);
 				return { ...first, output: readFileSync(first.log, "utf8") };
 			},
@@ -422,111 +388,47 @@ async function main(argv) {
 				run(
 					"pnpm",
 					["nx", "run", task, "--outputStyle=static"],
-					logFile(`test-rerun-${task.replace(/[^\w-]/g, "_")}`),
+					logFile(`rerun-${task.replace(/[^\w-]/g, "_")}`),
 				),
 		});
-		const notes = result.reruns.map(
-			({ task, passed }) =>
-				`    ↻ ${task} timed out under load; ${passed ? "passed" : "failed again"} when rerun alone`,
-		);
-		return { ok: result.ok, logs: result.logs, notes };
+		return {
+			...result,
+			notes: result.reruns.map(
+				({ task, passed }) =>
+					`    ↻ ${task} timed out under load; ${passed ? "passed" : "failed again"} when rerun alone`,
+			),
+		};
 	};
-
-	const conditional = (enabled, skip, step) => async () =>
-		enabled() ? step() : { skip: `${skip}: not affected` };
-
+	/** @type {[string, () => Promise<{ ok: boolean, logs: string[], notes?: string[] }>][]} */
 	const steps = [
-		workflowsChanged && ["actionlint", command("actionlint", ["actionlint"])],
 		[
 			"pnpm install",
 			command("pnpm-install", ["pnpm", "install", "--frozen-lockfile", "--prefer-offline"]),
 		],
-		["affected scope", resolveScope],
 		["TypeScript reference sync", command("sync", ["pnpm", "nx", "sync:check"])],
-		["lint, format, and custom-rule checks", command("check", ["pnpm", "run", "check"])],
-		// `pnpm run check` already built every package, including the scenarios CLI.
-		[
-			"scenario CLI smoke under plain Node",
-			command(
-				"scenario-cli",
-				["node", "packages/diagram/scenarios/dist/cli.js", "--list"],
-				[
-					"node",
-					"packages/diagram/scenarios/dist/cli.js",
-					"--scenario",
-					"sketchi-onboarding-decision-flow",
-					"--fixture",
-				],
-			),
-		],
-		[
-			"deployment and process behavior",
-			command("deploy-scripts", ["pnpm", "run", "test:deploy-scripts"]),
-		],
-		[
-			"domain integration and font packaging",
-			command(
-				"tools",
-				["pnpm", "exec", "effect-tsgo", "tsc@7.0.2", "-p", "tools/tsconfig.json", "--noEmit"],
-				["pnpm", "exec", "vitest", "run", "--config", "tools/vitest.config.mts"],
-			),
-		],
-		[
-			"typecheck and build",
-			command("typecheck-build", [
+		["native Nx checks", checks],
+	];
+	if (full || all) {
+		steps.push([
+			"sampled routing",
+			command("routing-sample", [
 				"pnpm",
 				"nx",
-				...nxScope,
-				"-t",
-				"typecheck,build",
+				"run",
+				"diagrams:routing-sample",
 				"--outputStyle=static",
 			]),
-		],
-		["tests", tests],
-		[
-			"sampled routing",
-			conditional(
-				() => scope.routing,
-				"sampled routing",
-				command("routing-sample", [
-					"pnpm",
-					"nx",
-					"run",
-					"drawing:routing-sample",
-					"--outputStyle=static",
-				]),
-			),
-		],
-		[
-			"root TypeScript project references",
-			conditional(
-				() => scope.code,
-				"root project references",
-				command("graph", ["pnpm", "exec", "effect-tsgo", "tsc@7.0.2", "-b", "--pretty", "false"]),
-			),
-		],
-		[
-			"diagram UI Storybook build",
-			conditional(
-				() => scope.storybook,
-				"diagram UI Storybook",
-				command("storybook", ["pnpm", "nx", "build-storybook", "editor"]),
-			),
-		],
-	].filter(Boolean);
+		]);
+	}
 
 	for (const [label, step] of steps) {
 		console.log(`→ ${label}`);
 		const stepStarted = Date.now();
 		const result = await step();
-		if (result.skip) {
-			report.push(`- ${result.skip}`);
-			continue;
-		}
-		const line = [result.label ?? label, ...(result.notes ?? [])].join("\n");
+		const line = [label, ...(result.notes ?? [])].join("\n");
 		if (!result.ok) fail(line, result.logs);
 		report.push(
-			`✓ ${result.label ?? label} in ${formatDuration(Date.now() - stepStarted)}`,
+			`✓ ${label} in ${formatDuration(Date.now() - stepStarted)}`,
 			...(result.notes ?? []),
 		);
 	}

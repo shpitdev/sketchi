@@ -55,6 +55,11 @@
 				],
 				"parallel": false
 			}
+		},
+		"check-storybook": {
+			"executor": "nx:noop",
+			"inputs": ["default", "^default", "{workspaceRoot}/scripts/lib/excalidraw-fonts.mjs"],
+			"dependsOn": ["build-storybook"]
 		}
 	}
 }

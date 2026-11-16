@@ -1,12 +1,12 @@
 import { defineConfig } from "vitest/config";
 
-import drawing from "./vitest.config.ts";
+import diagrams from "./vitest.config.js";
 
 export default defineConfig({
-	...drawing,
+	...diagrams,
 	test: {
-		...drawing.test,
-		name: "drawing-routing",
+		...diagrams.test,
+		name: "diagrams-routing",
 		include: [
 			"packages/diagrams/src/graph/tests/routing*-fuzz.test.ts",
 			"packages/diagrams/src/graph/tests/text-fit-fuzz.test.ts",

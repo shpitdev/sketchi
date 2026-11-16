@@ -124,7 +124,8 @@
 			"{workspaceRoot}/packages/diagrams/src/*.ts",
 			"{workspaceRoot}/packages/diagrams/src/build/**/*",
 			"{workspaceRoot}/packages/diagrams/src/generate/**/*"
-		]
+		],
+		"workspaceFiles": ["{workspaceRoot}/**/*", "sharedGlobals"]
 	},
 	"targetDefaults": {
 		"build": {

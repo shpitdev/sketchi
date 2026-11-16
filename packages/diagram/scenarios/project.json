@@ -35,6 +35,20 @@
 				],
 				"parallel": false
 			}
+		},
+		"check-scenario": {
+			"executor": "nx:run-commands",
+			"cache": true,
+			"inputs": ["production", "^production"],
+			"outputs": [],
+			"dependsOn": ["build"],
+			"options": {
+				"commands": [
+					"node packages/diagram/scenarios/dist/cli.js --list",
+					"node packages/diagram/scenarios/dist/cli.js --scenario sketchi-onboarding-decision-flow --fixture"
+				],
+				"parallel": false
+			}
 		}
 	}
 }
