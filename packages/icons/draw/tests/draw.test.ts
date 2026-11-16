@@ -296,6 +296,7 @@ describe("drawIcon", () => {
 				// Every image in the lineup goes at low detail, the judge's main spend.
 				const images = JSON.stringify(judged.judgeQueries[0]).match(/"detail":"[a-z]+"/g);
 				expect(images).toEqual(Array.from({ length: 6 }, () => '"detail":"low"'));
+				expect(judged.judgeQueries[0]).toMatchObject({ text: { format: { type: "json_schema" } } });
 
 				const unreadable = drawThenAccept("a logo");
 				const blank = yield* settle(draw(unreadable.layer));
@@ -303,6 +304,9 @@ describe("drawIcon", () => {
 				expect(blank.success.judge).toMatchObject({ recognizable: false, attempts: 1 });
 				expect(blank.success.judge.error).toBeUndefined();
 				expect(unreadable.dispatches["icon-judge"]).toBe(1);
+				// The unreadable reply was still billed: its usage counts.
+				const billed = blank.success.usage.byCall.find((call) => call.role === "judge");
+				expect(billed?.usage).toMatchObject({ outputTokens: 40 });
 			}),
 	);
 });
