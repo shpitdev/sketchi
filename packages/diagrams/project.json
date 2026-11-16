@@ -54,7 +54,7 @@
 		"gantt-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "GANTT_FUZZ_SEEDS=300 vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/gantt/render.test.ts -t \"seeded fuzz\""
+				"command": "GANTT_FUZZ_SEEDS=300 vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/gantt/tests/gantt-fuzz.test.ts -t \"seeded fuzz\""
 			},
 			"inputs": [
 				"diagramTestShared",
@@ -71,7 +71,7 @@
 		"chart-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "CHART_FUZZ_SEEDS=300 vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/chart/render.test.ts -t \"seeded fuzz\""
+				"command": "CHART_FUZZ_SEEDS=300 vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/chart/tests/chart-fuzz.test.ts -t \"seeded fuzz\""
 			},
 			"inputs": [
 				"diagramTestShared",
@@ -415,7 +415,7 @@
 		"class-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "CLASS_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/class/class-fuzz.test.ts"
+				"command": "CLASS_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/class/tests/class-fuzz.test.ts"
 			},
 			"inputs": ["default", "^production", "testEnvironment"],
 			"dependsOn": ["^build"],

@@ -31,6 +31,7 @@ Keep:
 5. Spend bounds: retry, timeout and attempt caps on model calls.
 6. A regression test for a real past bug, only when the fuzz or boundary test would not catch it.
 7. One table per family validator: each issue code raised once by a minimal bad input, asserting the code only. Fuzz generates valid input, so nothing else notices a rule going missing.
+8. One table per fuzz oracle: the layout-issue readout or file validator a fuzz test uses to pass or fail detects each issue kind once on a deliberately broken scene. Without it the fuzz cannot fail.
 
 Do not add:
 
