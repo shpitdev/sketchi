@@ -1,10 +1,10 @@
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai";
-import { type CloudflareAiGateway } from "@sketchi/cloudflare/ai-gateway";
+import { type CloudflareAiGateway, makeGatewayHttpClient } from "@sketchi/cloudflare/ai-gateway";
 
 import { TelemetryCorrelation } from "@sketchi/observability";
-import { Array, Clock, Effect, Option, Schema, String, type Schedule } from "effect";
+import { Array, Clock, Effect, Option, String, type Schedule } from "effect";
 import { type AiError, Prompt } from "effect/ai";
-import { HttpClient, HttpClientError, HttpClientResponse } from "effect/http";
+import { HttpClient } from "effect/http";
 
 import { IconModelError } from "./errors.js";
 import { JUDGE_PROMPT } from "./judge.js";
@@ -22,15 +22,6 @@ const JUDGE_REPLY_FORMAT = {
 		additionalProperties: false,
 	},
 } as const;
-
-const decodeBody = Schema.decodeUnknownEffect(
-	Schema.fromJsonString(
-		Schema.StructWithRest(
-			Schema.Struct({ text: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)) }),
-			[Schema.Record(Schema.String, Schema.Unknown)],
-		),
-	),
-);
 
 /** The bare model id for an OpenAI route, without its gateway routing prefix. */
 export function stripOpenAiModelPrefix(model: string): string {
@@ -79,72 +70,24 @@ export const makeJudgeCall = (options: {
 			// Per attempt/call, so concurrent draws cannot exchange response metadata.
 			let status: number | undefined;
 			let logId: string | undefined;
-			const client = HttpClient.make(
-				Effect.fn("iconDraw.models.judge.gateway")(function* (httpRequest, url, signal) {
-					if (signal.aborted) return yield* Effect.interrupt;
-					if (httpRequest.body._tag !== "Uint8Array") {
-						return yield* Effect.fail(
-							new HttpClientError.HttpClientError({
-								reason: new HttpClientError.EncodeError({
-									request: httpRequest,
-									description: "Expected an OpenAI JSON request.",
-								}),
-							}),
-						);
-					}
-					const payload = yield* decodeBody(
-						httpRequest.body.text ?? new TextDecoder().decode(httpRequest.body.body),
-					).pipe(
-						Effect.mapError(
-							(cause) =>
-								new HttpClientError.HttpClientError({
-									reason: new HttpClientError.EncodeError({ request: httpRequest, cause }),
-								}),
-						),
-					);
-					const transportError = (cause: unknown) =>
-						new HttpClientError.HttpClientError({
-							reason: new HttpClientError.TransportError({ request: httpRequest, cause }),
-						});
-					const response = yield* Effect.tryPromise({
-						try: () =>
-							options.gateway.run(
-								{
-									endpoint: String.replace(/^\//, "")(url.pathname),
-									provider: "openai",
-									headers: { "Content-Type": "application/json" },
-									// generateText keeps the reply's text and usage when the pick is unreadable;
-									// generateObject would drop both. Its public config has no text.format.
-									query: { ...payload, text: { ...payload.text, format: JUDGE_REPLY_FORMAT } },
-								},
-								{
-									gateway: {
-										collectLog: options.config.collectLog,
-										skipCache: true,
-										metadata: {
-											sketchiSurface: options.config.surface,
-											sketchiOperation: "icon-judge",
-											...(trace ? { sketchiTraceId: trace } : {}),
-										},
-									},
-									signal,
-								},
-							),
-						catch: transportError,
-					});
+			const client = makeGatewayHttpClient({
+				gateway: options.gateway,
+				provider: "openai",
+				collectLog: options.config.collectLog,
+				metadata: {
+					sketchiSurface: options.config.surface,
+					sketchiOperation: "icon-judge",
+					...(trace ? { sketchiTraceId: trace } : {}),
+				},
+				// generateText keeps the reply's text and usage when the pick is unreadable;
+				// generateObject would drop both. Its public config has no text.format.
+				bodyFields: { text: { format: JUDGE_REPLY_FORMAT } },
+				responseBody: "buffer",
+				onResponse: (response) => {
 					status = response.status;
 					logId = response.headers.get("cf-aig-log-id") ?? undefined;
-					// A broken body remains a retryable transport error, within the same abortable attempt.
-					const body = yield* Effect.tryPromise({
-						try: () => response.text(),
-						catch: transportError,
-					});
-					return HttpClientResponse.fromWeb(
-						httpRequest,
-						new Response(body, { status: response.status, headers: response.headers }),
-					);
-				}),
-			);
+				},
+			});
 			const run = Effect.gen(function* () {
 				const api = yield* OpenAiClient.make({ apiUrl: "https://gateway.invalid" }).pipe(
 					Effect.provideService(HttpClient.HttpClient, client),

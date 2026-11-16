@@ -1,28 +1,18 @@
 import { AnthropicClient, AnthropicLanguageModel } from "@effect/ai-anthropic";
 import {
 	type CloudflareAiGateway,
+	makeGatewayHttpClient,
 	stripAnthropicModelPrefix,
 } from "@sketchi/cloudflare/ai-gateway";
 
 import { TelemetryCorrelation } from "@sketchi/observability";
-import { Array, Clock, Effect, Option, Schema, String, type Schedule } from "effect";
+import { Array, Clock, Effect, Option, String, type Schedule } from "effect";
 import { type AiError, Prompt } from "effect/ai";
-import { HttpClient, HttpClientError, HttpClientResponse } from "effect/http";
+import { HttpClient } from "effect/http";
 
 import { AUTHOR_REPLY_SCHEMA, AUTHOR_SYSTEM_PROMPT } from "./author.js";
 import { IconModelError } from "./errors.js";
 import type { AuthorCallReply, IconAuthorModel, IconDrawGatewayConfigValue } from "./models.js";
-
-const decodeBody = Schema.decodeUnknownEffect(
-	Schema.fromJsonString(
-		Schema.StructWithRest(
-			Schema.Struct({
-				output_config: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
-			}),
-			[Schema.Record(Schema.String, Schema.Unknown)],
-		),
-	),
-);
 
 /** The domain keeps tolerant reply repair; generateObject would decode before that repair. */
 export const makeAuthorCall = (options: {
@@ -45,77 +35,29 @@ export const makeAuthorCall = (options: {
 		const response = yield* Effect.suspend(() => {
 			// Per attempt/call, so concurrent draws cannot exchange response metadata.
 			let status: number | undefined;
-			const client = HttpClient.make(
-				Effect.fn("iconDraw.models.author.gateway")(function* (httpRequest, _url, signal) {
-					if (httpRequest.body._tag !== "Uint8Array") {
-						return yield* Effect.fail(
-							new HttpClientError.HttpClientError({
-								reason: new HttpClientError.EncodeError({
-									request: httpRequest,
-									description: "Expected an Anthropic JSON request.",
-								}),
-							}),
-						);
-					}
-					const payload = yield* decodeBody(
-						httpRequest.body.text ?? new TextDecoder().decode(httpRequest.body.body),
-					).pipe(
-						Effect.mapError(
-							(cause) =>
-								new HttpClientError.HttpClientError({
-									reason: new HttpClientError.EncodeError({ request: httpRequest, cause }),
-								}),
-						),
-					);
-					const transportError = (cause: unknown) =>
-						new HttpClientError.HttpClientError({
-							reason: new HttpClientError.TransportError({ request: httpRequest, cause }),
-						});
-					const reply = yield* Effect.tryPromise({
-						try: () =>
-							options.gateway.run(
-								{
-									endpoint: "v1/messages",
-									provider: "anthropic",
-									headers: {
-										"Content-Type": "application/json",
-										"anthropic-version": "2023-06-01",
-										"anthropic-beta": "server-side-fallback-2026-07-01",
-									},
-									// Public generateText config exposes effort, but not output_config.format.
-									// Keep the existing domain schema without pre-empting its invalid-reply repair.
-									query: {
-										...payload,
-										output_config: {
-											...payload.output_config,
-											format: { type: "json_schema", schema: AUTHOR_REPLY_SCHEMA },
-										},
-									},
-								},
-								{
-									gateway: {
-										collectLog: options.config.collectLog,
-										metadata: {
-											sketchiSurface: options.config.surface,
-											sketchiOperation: "icon-author",
-											...(trace ? { sketchiTraceId: trace } : {}),
-										},
-										skipCache: true,
-									},
-									signal,
-								},
-							),
-						catch: transportError,
-					});
-					status = reply.status;
-					// A broken body remains a retryable transport error, within the same abortable attempt.
-					const body = yield* Effect.tryPromise({ try: () => reply.text(), catch: transportError });
-					return HttpClientResponse.fromWeb(
-						httpRequest,
-						new Response(body, { status: reply.status, headers: reply.headers }),
-					);
-				}),
-			);
+			const client = makeGatewayHttpClient({
+				gateway: options.gateway,
+				provider: "anthropic",
+				headers: {
+					"anthropic-version": "2023-06-01",
+					"anthropic-beta": "server-side-fallback-2026-07-01",
+				},
+				collectLog: options.config.collectLog,
+				metadata: {
+					sketchiSurface: options.config.surface,
+					sketchiOperation: "icon-author",
+					...(trace ? { sketchiTraceId: trace } : {}),
+				},
+				// Public generateText config exposes effort, but not output_config.format.
+				// Keep the existing domain schema without pre-empting its invalid-reply repair.
+				bodyFields: {
+					output_config: { format: { type: "json_schema", schema: AUTHOR_REPLY_SCHEMA } },
+				},
+				responseBody: "buffer",
+				onResponse: (response) => {
+					status = response.status;
+				},
+			});
 			const run = Effect.gen(function* () {
 				const api = yield* AnthropicClient.make({}).pipe(
 					Effect.provideService(HttpClient.HttpClient, client),
