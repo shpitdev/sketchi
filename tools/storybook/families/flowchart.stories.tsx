@@ -1,20 +1,20 @@
 import { familyForType } from "@sketchi/diagrams/family";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { crossingFixtures } from "@sketchi/diagrams/families/flowchart/crossing-fixtures";
+import { crossingFixtures } from "@sketchi/diagrams/families/flowchart/fixtures/crossing-fixtures";
 import { pharmaBatchDispositionFlowchart } from "@sketchi/diagrams/families/flowchart/fixtures";
-import { groupFixtures } from "@sketchi/diagrams/families/flowchart/group-fixtures";
-import { laneFixtures } from "@sketchi/diagrams/families/flowchart/lane-fixtures";
+import { groupFixtures } from "@sketchi/diagrams/families/flowchart/fixtures/group-fixtures";
+import { laneFixtures } from "@sketchi/diagrams/families/flowchart/fixtures/lane-fixtures";
 import {
 	leftToRightIncidentFlowchart,
 	routingFixtures,
-} from "@sketchi/diagrams/families/flowchart/routing-fixtures";
+} from "@sketchi/diagrams/families/flowchart/fixtures/routing-fixtures";
 import {
 	describedArchitectureFlowchart,
 	leftToRightHybridFlowchart,
 	requestPathFlowcharts,
 	zoneFixtures,
-} from "@sketchi/diagrams/families/flowchart/zone-fixtures";
+} from "@sketchi/diagrams/families/flowchart/fixtures/zone-fixtures";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
 
