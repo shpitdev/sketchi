@@ -162,7 +162,6 @@
               "apps/studio/src/features/mcp/toolkit.server.ts",
               "apps/studio/src/features/mcp/execute.server.ts",
               "apps/studio/src/features/mcp/sandbox.server.ts",
-              "apps/studio/src/features/mcp/session.server.ts",
               "apps/studio/src/features/mcp/mcp-docs.server.ts",
               "apps/studio/src/features/build/http.server.ts",
               "apps/studio/src/features/build/capabilities.server.ts",
@@ -170,10 +169,9 @@
               "apps/studio/src/features/chat/studio-family-tools.server.ts",
               "apps/studio/src/features/generate/api.server.ts",
               "apps/icons/src/features/mcp/mcp.server.ts",
-              "apps/icons/src/features/mcp/session.server.ts",
               "apps/icons/src/features/mcp/toolkit.server.ts",
               "packages/cloudflare/src/mcp-content.ts",
-              "packages/cloudflare/src/mcp-session.ts"
+              "packages/cloudflare/src/mcp-http.ts"
             ],
             "options": {
               "diagnosticSeverity": {
