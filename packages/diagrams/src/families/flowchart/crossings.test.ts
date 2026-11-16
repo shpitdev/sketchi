@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { crossingFixtures } from "./crossing-fixtures.js";
-import { routingFixtures } from "./routing-fixtures.js";
+import { crossingFixtures } from "./fixtures/crossing-fixtures.js";
+import { routingFixtures } from "./fixtures/routing-fixtures.js";
 import { renderFlowchartDiagram } from "./render.js";
 import {
 	crossings,

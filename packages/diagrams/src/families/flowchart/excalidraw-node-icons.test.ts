@@ -9,7 +9,7 @@ import {
 	embedCanvasIcons,
 	type CanvasShapeElement,
 } from "@sketchi/drawing";
-import { deployPipelineLogoFlowchart } from "./fixtures";
+import { deployPipelineLogoFlowchart } from "./fixtures/index";
 
 import { renderFlowchartDiagram } from "./render";
 import { renderSequenceDiagram } from "../sequence/render";

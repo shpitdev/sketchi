@@ -1,12 +1,12 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Result, Schema } from "effect";
-import { FlowchartDiagram, parseFlowchartDiagram } from "./document.js";
-import hiring from "./fixtures/lanes/hiring.js";
-import incidentResponse from "./fixtures/lanes/incident-response.js";
-import incidentResponseShortLabels from "./fixtures/lanes/incident-response-short-labels.js";
-import orderFulfilment from "./fixtures/lanes/order-fulfilment.js";
-import singleLane from "./fixtures/lanes/single-lane.js";
-import skipLanes from "./fixtures/lanes/skip-lanes.js";
+import { FlowchartDiagram, parseFlowchartDiagram } from "../document.js";
+import hiring from "./lanes/hiring.js";
+import incidentResponse from "./lanes/incident-response.js";
+import incidentResponseShortLabels from "./lanes/incident-response-short-labels.js";
+import orderFulfilment from "./lanes/order-fulfilment.js";
+import singleLane from "./lanes/single-lane.js";
+import skipLanes from "./lanes/skip-lanes.js";
 
 function flowchart(fixture: object, direction: "LR" | "TB" = "LR") {
 	return parseFlowchartDiagram({

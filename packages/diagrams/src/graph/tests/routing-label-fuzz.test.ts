@@ -1,5 +1,5 @@
 import { parseFlowchartDiagram } from "../../families/flowchart/document";
-import { labelFixtures } from "../../families/flowchart/label-fixtures";
+import { labelFixtures } from "../../families/flowchart/fixtures/label-fixtures";
 import { renderFlowchartDiagram } from "../../families/flowchart/render";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";

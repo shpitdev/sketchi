@@ -1,6 +1,6 @@
 import type { CanvasSpec } from "@sketchi/drawing";
 import { parseFlowchartDiagram } from "../../families/flowchart/document";
-import { groupFixtures } from "../../families/flowchart/group-fixtures";
+import { groupFixtures } from "../../families/flowchart/fixtures/group-fixtures";
 import { renderFlowchartDiagram } from "../../families/flowchart/render";
 import { getCanvasValidationIssues, groupRegionIssues } from "@sketchi/drawing";
 import { Result } from "effect";

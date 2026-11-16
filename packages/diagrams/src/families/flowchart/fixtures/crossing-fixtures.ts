@@ -1,28 +1,28 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Result } from "effect";
-import { parseFlowchartDiagram } from "./document.js";
-import contentModeration from "./fixtures/crossings/content-moderation.js";
-import expenseOutOfPolicy from "./fixtures/crossings/expense-out-of-policy.js";
-import groupedExpenseApproval from "./fixtures/crossings/grouped-expense-approval.js";
-import incidentEscalation from "./fixtures/crossings/incident-escalation.js";
-import incidentEscalationBridge from "./fixtures/crossings/incident-escalation-bridge.js";
-import incidentEscalationEarlyBridge from "./fixtures/crossings/incident-escalation-early-bridge.js";
-import incidentEscalationMonitoringMerge from "./fixtures/crossings/incident-escalation-monitoring-merge.js";
-import incidentEscalationQueue from "./fixtures/crossings/incident-escalation-queue.js";
-import incidentEscalationSharedResolve from "./fixtures/crossings/incident-escalation-shared-resolve.js";
-import incidentEscalationStraightEscalation from "./fixtures/crossings/incident-escalation-straight-escalation.js";
-import incidentResponseProviderLoop from "./fixtures/crossings/incident-response-provider-loop.js";
-import patientIntakeMergeCrossing from "./fixtures/crossings/patient-intake-merge-crossing.js";
-import patientIntakeMergeDetour from "./fixtures/crossings/patient-intake-merge-detour.js";
-import patientIntakeMergeLong from "./fixtures/crossings/patient-intake-merge-long.js";
-import patientIntakeScheduling from "./fixtures/crossings/patient-intake-scheduling.js";
-import procurementVendorApproval from "./fixtures/crossings/procurement-vendor-approval.js";
-import procurementVendorApprovalLegal from "./fixtures/crossings/procurement-vendor-approval-legal.js";
-import restaurantWaitlist from "./fixtures/crossings/restaurant-waitlist.js";
-import restaurantWaitlistRecheck from "./fixtures/crossings/restaurant-waitlist-recheck.js";
-import restaurantWaitlistTableReady from "./fixtures/crossings/restaurant-waitlist-table-ready.js";
-import subscriptionRenewalDunning from "./fixtures/crossings/subscription-renewal-dunning.js";
-import subscriptionRenewalGrace from "./fixtures/crossings/subscription-renewal-grace.js";
+import { parseFlowchartDiagram } from "../document.js";
+import contentModeration from "./crossings/content-moderation.js";
+import expenseOutOfPolicy from "./crossings/expense-out-of-policy.js";
+import groupedExpenseApproval from "./crossings/grouped-expense-approval.js";
+import incidentEscalation from "./crossings/incident-escalation.js";
+import incidentEscalationBridge from "./crossings/incident-escalation-bridge.js";
+import incidentEscalationEarlyBridge from "./crossings/incident-escalation-early-bridge.js";
+import incidentEscalationMonitoringMerge from "./crossings/incident-escalation-monitoring-merge.js";
+import incidentEscalationQueue from "./crossings/incident-escalation-queue.js";
+import incidentEscalationSharedResolve from "./crossings/incident-escalation-shared-resolve.js";
+import incidentEscalationStraightEscalation from "./crossings/incident-escalation-straight-escalation.js";
+import incidentResponseProviderLoop from "./crossings/incident-response-provider-loop.js";
+import patientIntakeMergeCrossing from "./crossings/patient-intake-merge-crossing.js";
+import patientIntakeMergeDetour from "./crossings/patient-intake-merge-detour.js";
+import patientIntakeMergeLong from "./crossings/patient-intake-merge-long.js";
+import patientIntakeScheduling from "./crossings/patient-intake-scheduling.js";
+import procurementVendorApproval from "./crossings/procurement-vendor-approval.js";
+import procurementVendorApprovalLegal from "./crossings/procurement-vendor-approval-legal.js";
+import restaurantWaitlist from "./crossings/restaurant-waitlist.js";
+import restaurantWaitlistRecheck from "./crossings/restaurant-waitlist-recheck.js";
+import restaurantWaitlistTableReady from "./crossings/restaurant-waitlist-table-ready.js";
+import subscriptionRenewalDunning from "./crossings/subscription-renewal-dunning.js";
+import subscriptionRenewalGrace from "./crossings/subscription-renewal-grace.js";
 
 function flowchart(fixture: object) {
 	return parseFlowchartDiagram({

@@ -11,8 +11,8 @@ import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasSpec,
 } from "@sketchi/drawing";
-import { flowchartFixture } from "./fixtures.js";
-import { groupFixtures } from "./group-fixtures.js";
+import { flowchartFixture } from "./fixtures/index.js";
+import { groupFixtures } from "./fixtures/group-fixtures.js";
 import { arrowCrossings } from "../../graph/readability";
 import { renderFlowchartDiagram } from "./render";
 

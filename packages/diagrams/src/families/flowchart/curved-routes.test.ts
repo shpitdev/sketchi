@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { groupFixtures } from "./group-fixtures.js";
-import { zoneFixtures, zoneStressFixtures } from "./zone-fixtures.js";
+import { groupFixtures } from "./fixtures/group-fixtures.js";
+import { zoneFixtures, zoneStressFixtures } from "./fixtures/zone-fixtures.js";
 import { renderFlowchartDiagram } from "./render.js";
 import { strays } from "../../../test/readability-helpers.js";
 

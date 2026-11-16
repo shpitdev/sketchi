@@ -2,8 +2,8 @@ import { FlowchartDiagram } from "./document.js";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
-import { flowchartFixture } from "./fixtures.js";
-import { laneFixtures, laneStressFixtures } from "./lane-fixtures.js";
+import { flowchartFixture } from "./fixtures/index.js";
+import { laneFixtures, laneStressFixtures } from "./fixtures/lane-fixtures.js";
 import {
 	getCanvasValidationIssues,
 	laneRegionIssues,

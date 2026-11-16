@@ -1,25 +1,25 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Result, Schema } from "effect";
-import { FlowchartDiagram, parseFlowchartDiagram } from "./document.js";
-import awsThreeTier from "./fixtures/zones/aws-three-tier.js";
-import awsThreeTierDescribed from "./fixtures/zones/aws-three-tier-described.js";
-import awsThreeTierQueries from "./fixtures/zones/aws-three-tier-queries.js";
-import awsThreeTierRequests from "./fixtures/zones/aws-three-tier-requests.js";
-import hybridCloud from "./fixtures/zones/hybrid-cloud.js";
-import hybridCloudArchiveCorridor from "./fixtures/zones/hybrid-cloud-archive-corridor.js";
-import hybridCloudBypass from "./fixtures/zones/hybrid-cloud-bypass.js";
-import hybridCloudBypassArchive from "./fixtures/zones/hybrid-cloud-bypass-archive.js";
-import hybridCloudCorporate from "./fixtures/zones/hybrid-cloud-corporate.js";
-import hybridCloudDescribed from "./fixtures/zones/hybrid-cloud-described.js";
-import hybridCloudLabeled from "./fixtures/zones/hybrid-cloud-labeled.js";
-import hybridCloudLeftToRight from "./fixtures/zones/hybrid-cloud-left-to-right.js";
-import hybridCloudStacked from "./fixtures/zones/hybrid-cloud-stacked.js";
-import hybridCloudSync from "./fixtures/zones/hybrid-cloud-sync.js";
-import kindedFlat from "./fixtures/zones/kinded-flat.js";
-import kubernetesCluster from "./fixtures/zones/kubernetes-cluster.js";
-import threeZoneRequestPath from "./fixtures/zones/three-zone-request-path.js";
-import threeZoneRequestPathCached from "./fixtures/zones/three-zone-request-path-cached.js";
-import threeZoneRequestPathHit from "./fixtures/zones/three-zone-request-path-hit.js";
+import { FlowchartDiagram, parseFlowchartDiagram } from "../document.js";
+import awsThreeTier from "./zones/aws-three-tier.js";
+import awsThreeTierDescribed from "./zones/aws-three-tier-described.js";
+import awsThreeTierQueries from "./zones/aws-three-tier-queries.js";
+import awsThreeTierRequests from "./zones/aws-three-tier-requests.js";
+import hybridCloud from "./zones/hybrid-cloud.js";
+import hybridCloudArchiveCorridor from "./zones/hybrid-cloud-archive-corridor.js";
+import hybridCloudBypass from "./zones/hybrid-cloud-bypass.js";
+import hybridCloudBypassArchive from "./zones/hybrid-cloud-bypass-archive.js";
+import hybridCloudCorporate from "./zones/hybrid-cloud-corporate.js";
+import hybridCloudDescribed from "./zones/hybrid-cloud-described.js";
+import hybridCloudLabeled from "./zones/hybrid-cloud-labeled.js";
+import hybridCloudLeftToRight from "./zones/hybrid-cloud-left-to-right.js";
+import hybridCloudStacked from "./zones/hybrid-cloud-stacked.js";
+import hybridCloudSync from "./zones/hybrid-cloud-sync.js";
+import kindedFlat from "./zones/kinded-flat.js";
+import kubernetesCluster from "./zones/kubernetes-cluster.js";
+import threeZoneRequestPath from "./zones/three-zone-request-path.js";
+import threeZoneRequestPathCached from "./zones/three-zone-request-path-cached.js";
+import threeZoneRequestPathHit from "./zones/three-zone-request-path-hit.js";
 
 function flowchart(fixture: object, direction: "LR" | "TB" = "LR") {
 	return parseFlowchartDiagram({

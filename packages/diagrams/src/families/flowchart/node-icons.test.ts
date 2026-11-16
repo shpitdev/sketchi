@@ -20,7 +20,7 @@ import {
 	deployPipelineLogoFlowchart,
 	flowchartFixture,
 	pharmaBatchDispositionFlowchart,
-} from "./fixtures.js";
+} from "./fixtures/index.js";
 import { type GraphInput } from "../../graph/input.js";
 
 import { renderFlowchartDiagram } from "./render";

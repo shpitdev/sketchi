@@ -15,7 +15,7 @@ import {
 	getFlowchartValidationIssues,
 	parseFlowchartDiagram,
 } from "./document";
-import { flowchartFixture } from "./fixtures";
+import { flowchartFixture } from "./fixtures/index";
 
 function validationIssues(input: unknown) {
 	return getFlowchartValidationIssues(

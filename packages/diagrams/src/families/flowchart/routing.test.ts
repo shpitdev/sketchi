@@ -2,8 +2,8 @@ import { FlowchartDiagram, parseFlowchartDiagram } from "./document.js";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
-import { flowchartFixture, pharmaBatchDispositionFlowchart } from "./fixtures.js";
-import { rankGapFlowchart, routingFixtures } from "./routing-fixtures.js";
+import { flowchartFixture, pharmaBatchDispositionFlowchart } from "./fixtures/index.js";
+import { rankGapFlowchart, routingFixtures } from "./fixtures/routing-fixtures.js";
 import {
 	segmentsFromPoints,
 	segmentCrossesBoundsInterior,

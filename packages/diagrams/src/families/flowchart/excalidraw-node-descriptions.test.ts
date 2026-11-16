@@ -2,7 +2,7 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { describedArchitectureFlowchart } from "./zone-fixtures";
+import { describedArchitectureFlowchart } from "./fixtures/zone-fixtures";
 import { parseFlowchartDiagram } from "./document";
 import { embedCanvasIcons } from "@sketchi/drawing";
 import { renderFlowchartDiagram } from "./render";
