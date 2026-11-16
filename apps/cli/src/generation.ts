@@ -1,6 +1,6 @@
 import { CanvasSpec } from "@sketchi/drawing";
 import { PublishedCoverageIssue } from "@sketchi/diagrams/families/flowchart/issues";
-import { ApplyDiagramPatchRequest } from "@sketchi/diagrams/build/code-mode/contract";
+import { ApplyDiagramPatchRequest } from "@sketchi/diagrams/canvas/patch-contract";
 import { type CanonicalDiagramDocument, type DIAGRAM_TYPES } from "@sketchi/diagrams/family";
 
 import { PublishedBuildIssue } from "@sketchi/diagrams/build/result";

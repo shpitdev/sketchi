@@ -1,4 +1,4 @@
-import { CreateCanvasRequest } from "@sketchi/diagrams/build/code-mode/contract";
+import { CreateCanvasRequest } from "@sketchi/diagrams/canvas/create-contract";
 import { afterEach, assert, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Schema } from "effect";
 import { TestClock } from "effect/testing";

@@ -124,6 +124,7 @@
 			"{workspaceRoot}/packages/diagrams/test/**/*",
 			"{workspaceRoot}/packages/diagrams/src/*.ts",
 			"{workspaceRoot}/packages/diagrams/src/build/**/*",
+			"{workspaceRoot}/packages/diagrams/src/canvas/**/*",
 			"{workspaceRoot}/packages/diagrams/src/generate/**/*"
 		],
 		"workspaceFiles": ["{workspaceRoot}/**/*", "sharedGlobals"]
