@@ -46,11 +46,13 @@ with `generateText`, so the author's existing tolerant repair still owns invalid
 replies.
 
 The icon judge uses `@effect/ai-openai` on the Responses API with
-`generateObject`, low image detail, low reasoning effort and an output-token cap.
+`generateText`, low image detail, low reasoning effort and an output-token cap.
 Like the author, each attempt has its own gateway transport that forwards the
-Effect HTTP abort signal and reads the whole body inside that attempt. A reply
-that is not a logo number on a successful response is a no-pick, not a failed
-call; HTTP failures keep the author's retry classification.
+Effect HTTP abort signal and reads the whole body inside that attempt, and a
+request-field transform adds the reply's JSON schema, which the public config
+does not expose. `generateObject` would discard a billed reply's usage when its
+pick is unreadable; the domain's tolerant decoder turns such a reply into a
+no-pick instead. HTTP failures keep the author's retry classification.
 
 ## Contracts, failures and tests
 

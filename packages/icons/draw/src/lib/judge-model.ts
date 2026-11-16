@@ -10,8 +10,27 @@ import { IconModelError } from "./errors.js";
 import { JUDGE_PROMPT } from "./judge.js";
 import type { IconDrawGatewayConfigValue, JudgeCallReply } from "./models.js";
 
-const JudgeReply = Schema.Struct({ logo: Schema.Int });
-const decodeQuery = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
+/** The reply's shape, constrained by the provider; `decodeJudgeReply` still reads it tolerantly. */
+const JUDGE_REPLY_FORMAT = {
+	type: "json_schema",
+	name: "judge_reply",
+	strict: true,
+	schema: {
+		type: "object",
+		properties: { logo: { type: "integer" } },
+		required: ["logo"],
+		additionalProperties: false,
+	},
+} as const;
+
+const decodeBody = Schema.decodeUnknownEffect(
+	Schema.fromJsonString(
+		Schema.StructWithRest(
+			Schema.Struct({ text: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)) }),
+			[Schema.Record(Schema.String, Schema.Unknown)],
+		),
+	),
+);
 
 /** The bare model id for an OpenAI route, without its gateway routing prefix. */
 export function stripOpenAiModelPrefix(model: string): string {
@@ -73,7 +92,7 @@ export const makeJudgeCall = (options: {
 							}),
 						);
 					}
-					const query = yield* decodeQuery(
+					const payload = yield* decodeBody(
 						httpRequest.body.text ?? new TextDecoder().decode(httpRequest.body.body),
 					).pipe(
 						Effect.mapError(
@@ -94,7 +113,9 @@ export const makeJudgeCall = (options: {
 									endpoint: String.replace(/^\//, "")(url.pathname),
 									provider: "openai",
 									headers: { "Content-Type": "application/json" },
-									query,
+									// generateText keeps the reply's text and usage when the pick is unreadable;
+									// generateObject would drop both. Its public config has no text.format.
+									query: { ...payload, text: { ...payload.text, format: JUDGE_REPLY_FORMAT } },
 								},
 								{
 									gateway: {
@@ -136,19 +157,15 @@ export const makeJudgeCall = (options: {
 						max_output_tokens: options.maxOutputTokens,
 					},
 				}).pipe(Effect.provideService(OpenAiClient.OpenAiClient, api));
-				return yield* languageModel.generateObject({
-					prompt,
-					schema: JudgeReply,
-					objectName: "judge_reply",
-				});
+				return yield* languageModel.generateText({ prompt });
 			});
 			return run.pipe(
 				Effect.map((response) => ({ response, logId })),
 				Effect.catchIf(
-					// An answer that is not a logo number is no verdict, not a failed call.
+					// A successful status whose body is not a Responses reply is no verdict, not a failed call.
 					(cause: AiError.AiError) =>
-						(cause.reason._tag === "StructuredOutputError" ||
-							cause.reason._tag === "InvalidOutputError") &&
+						(cause.reason._tag === "InvalidOutputError" ||
+							cause.reason._tag === "InvalidResponseError") &&
 						status !== undefined &&
 						status >= 200 &&
 						status < 300,
