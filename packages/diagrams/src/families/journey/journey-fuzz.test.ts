@@ -8,13 +8,9 @@ import {
 	JOURNEY_MAX_STEPS,
 	type JourneyDiagram,
 	parseJourneyDiagram,
-} from "@sketchi/diagrams/families/journey/document";
-import {
-	JOURNEY_MAX_ASPECT,
-	JOURNEY_MAX_ELEMENTS,
-	renderJourneyDiagram,
-} from "@sketchi/diagrams/families/journey/render";
-import { journeyLayoutIssues } from "@sketchi/diagrams/families/journey/readout";
+} from "./document";
+import { JOURNEY_MAX_ASPECT, JOURNEY_MAX_ELEMENTS, renderJourneyDiagram } from "./render";
+import { journeyLayoutIssues } from "./readout";
 
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 

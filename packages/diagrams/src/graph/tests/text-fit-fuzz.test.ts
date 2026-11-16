@@ -1,5 +1,5 @@
-import { mindmapTopics } from "@sketchi/diagrams/families/mindmap/index";
-import { parseCanonicalDiagram, renderDiagram } from "@sketchi/diagrams/family";
+import { mindmapTopics } from "../../families/mindmap/index";
+import { parseCanonicalDiagram, renderDiagram } from "../../family";
 import {
 	canvasBoundTextBox,
 	canvasBoundTextInset,

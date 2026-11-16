@@ -1,11 +1,8 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import {
-	parseQuadrantDiagram,
-	quadrantFixture,
-} from "@sketchi/diagrams/families/quadrant/document";
-import { renderQuadrantDiagram } from "@sketchi/diagrams/families/quadrant/render";
+import { parseQuadrantDiagram, quadrantFixture } from "./document";
+import { renderQuadrantDiagram } from "./render";
 
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 

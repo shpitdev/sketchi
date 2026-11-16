@@ -8,8 +8,8 @@ export default defineConfig({
 		...drawing.test,
 		name: "drawing-routing",
 		include: [
-			"tools/drawing-tests/routing*-fuzz.test.ts",
-			"tools/drawing-tests/text-fit-fuzz.test.ts",
+			"packages/diagrams/src/graph/tests/routing*-fuzz.test.ts",
+			"packages/diagrams/src/graph/tests/text-fit-fuzz.test.ts",
 		],
 		exclude: [],
 	},

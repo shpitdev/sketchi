@@ -1,6 +1,6 @@
 import type { CanvasSpec } from "@sketchi/drawing";
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
-import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
+import { parseFlowchartDiagram } from "../../families/flowchart/document";
+import { renderFlowchartDiagram } from "../../families/flowchart/render";
 import { groupRegionIssues } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";

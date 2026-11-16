@@ -4,18 +4,12 @@ import { describe, expect, it } from "vitest";
 
 import { generateKeyBetween } from "fractional-indexing";
 
-import {
-	FlowchartDiagram,
-	parseFlowchartDiagram,
-} from "@sketchi/diagrams/families/flowchart/document";
-import {
-	flowchartFixture,
-	pharmaBatchDispositionFlowchart,
-} from "@sketchi/diagrams/families/flowchart/fixtures";
-import { groupFixtures } from "@sketchi/diagrams/families/flowchart/group-fixtures";
-import { zoneFixtures } from "@sketchi/diagrams/families/flowchart/zone-fixtures";
+import { FlowchartDiagram, parseFlowchartDiagram } from "./document";
+import { flowchartFixture, pharmaBatchDispositionFlowchart } from "./fixtures";
+import { groupFixtures } from "./group-fixtures";
+import { zoneFixtures } from "./zone-fixtures";
 import { type CanvasSpec, getCanvasValidationIssues } from "@sketchi/drawing";
-import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
+import { renderFlowchartDiagram } from "./render";
 
 import {
 	convertSceneToExcalidraw,

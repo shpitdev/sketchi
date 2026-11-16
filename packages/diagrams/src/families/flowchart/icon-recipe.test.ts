@@ -9,18 +9,16 @@ import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasElement as SceneElement,
 } from "@sketchi/drawing";
-import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/fixtures";
-import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
+import { deployPipelineLogoFlowchart } from "./fixtures";
+import { renderFlowchartDiagram } from "./render";
 
 import {
 	convertSceneToExcalidraw,
 	validateExcalidrawScene,
 	type ExcalidrawElement,
-} from "@sketchi/drawing/excalidraw";
-import {
 	iconRecipeElements,
 	legibleIconInk,
-} from "../../packages/drawing/src/excalidraw/icon-recipe.js";
+} from "@sketchi/drawing/excalidraw";
 
 const RECIPE: IconRecipe = {
 	parts: [

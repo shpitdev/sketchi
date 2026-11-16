@@ -2,12 +2,9 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { getCanvasValidationIssues, groupRegionIssues, type CanvasSpec } from "@sketchi/drawing";
-import {
-	type OrgChartDiagram,
-	parseOrgChartDiagram,
-} from "@sketchi/diagrams/families/org-chart/document";
-import { orgChartLayoutIssues } from "@sketchi/diagrams/families/org-chart/readout";
-import { renderOrgChartDiagram } from "@sketchi/diagrams/families/org-chart/render";
+import { type OrgChartDiagram, parseOrgChartDiagram } from "./document";
+import { orgChartLayoutIssues } from "./readout";
+import { renderOrgChartDiagram } from "./render";
 
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 

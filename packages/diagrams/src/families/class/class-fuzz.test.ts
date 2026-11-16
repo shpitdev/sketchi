@@ -4,8 +4,8 @@ import {
 	type ClassRelationshipKind,
 	parseClassDiagram,
 	resolveClassShorthand,
-} from "@sketchi/diagrams/families/class/document";
-import { renderDiagram } from "@sketchi/diagrams/family";
+} from "./document";
+import { renderDiagram } from "../../family";
 import {
 	type AxisAlignedSegment,
 	candidateRouteQuality,

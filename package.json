@@ -34,7 +34,7 @@
 		"storybook:excalidraw": "nx storybook excalidraw",
 		"storybook:icons": "nx storybook icons",
 		"storybook:web": "nx storybook web",
-		"test": "nx run-many -t test",
+		"test": "nx run-many -t test,test-chart,test-class,test-er,test-flowchart,test-gantt,test-journey,test-mindmap,test-org-chart,test-quadrant,test-sankey,test-sequence,test-state-machine,test-timeline,test-venn,test-wireframe,test-graph",
 		"test:deploy-scripts": "node --test scripts/lib/*.test.mjs scripts/lib/deploy/*.test.mjs scripts/telemetry/*.test.mjs",
 		"test:wrangler-dry-runs": "node scripts/06-dry-run-worker-apps.mjs",
 		"toolchain:verify": "node scripts/verify-toolchain.mjs",

@@ -114,6 +114,15 @@
 			{
 				"env": "COLORFGBG"
 			}
+		],
+		"diagramTestShared": [
+			"sharedGlobals",
+			"{workspaceRoot}/packages/diagrams/vitest*.ts",
+			"{workspaceRoot}/packages/diagrams/tsconfig*.json",
+			"{workspaceRoot}/packages/diagrams/project.json",
+			"{workspaceRoot}/packages/diagrams/src/*.ts",
+			"{workspaceRoot}/packages/diagrams/src/build/**/*",
+			"{workspaceRoot}/packages/diagrams/src/generate/**/*"
 		]
 	},
 	"targetDefaults": {
@@ -158,7 +167,7 @@
 	},
 	"analytics": false,
 	"affected": {
-		"legacy": true
+		"legacy": false
 	},
 	"plugins": [
 		{
