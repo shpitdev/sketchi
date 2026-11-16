@@ -5,7 +5,7 @@ and neither uses the MCP SDK:
 
 - Studio (`apps/studio/src/features/mcp/mcp.server.ts`) registers `docs`,
   `search` and `execute` on Effect's `McpServer` from `effect/ai`.
-- Icons (`apps/icons/src/lib/mcp.server.ts`) registers its read-only icon
+- Icons (`apps/icons/src/features/mcp/mcp.server.ts`) registers its read-only icon
   tools the same way.
 - Both route each session to a Durable Object (`StudioMcpSession`,
   `IconsMcpSession`) through `routeMcpSession` in
