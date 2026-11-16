@@ -27,9 +27,9 @@ export function applyChatEvent(state:StudioChatState,event:AgUiSchema.Event,runI
    case "TEXT_MESSAGE_START": return update(event.messageId,(message) => ({...message,content:""}));
    case "TEXT_MESSAGE_CONTENT": return update(event.messageId,(message) => ({...message,content:(message.content ?? "")+event.delta}));
    case "TOOL_CALL_START": return update(event.parentMessageId ?? `tools-${runId}`,(message) => ({...message,toolCalls:[...(message.toolCalls ?? []),{id:event.toolCallId,type:"function",function:{name:event.toolCallName,arguments:""}}]}));
-   case "TOOL_CALL_ARGS": return {...state,messages:state.messages.map((message) => message.role === "assistant" ? {...message,toolCalls:message.toolCalls?.map((call) => call.id === event.toolCallId ? {...call,function:{...call.function,arguments:call.function.arguments+event.delta}} : call)} : message)};
+   case "TOOL_CALL_ARGS": return {...state,messages:state.messages.map((message) => message.role === "assistant" && message.toolCalls ? {...message,toolCalls:message.toolCalls.map((call) => call.id === event.toolCallId ? {...call,function:{...call.function,arguments:call.function.arguments+event.delta}} : call)} : message)};
    case "TOOL_CALL_END": return {...state,completed:new Set([...state.completed,event.toolCallId])};
-   case "TOOL_CALL_RESULT": return {...state,messages:[...state.messages,{id:event.messageId,role:"tool",toolCallId:event.toolCallId,content:event.content,metadata:event.metadata}]};
+   case "TOOL_CALL_RESULT": return {...state,messages:[...state.messages,{id:event.messageId,role:"tool",toolCallId:event.toolCallId,content:event.content,...(event.metadata ? {metadata:event.metadata} : {})}]};
    case "RUN_ERROR": return {...state,status:"error",error:event.message};
    case "RUN_FINISHED": return {...state,status:"ready"};
    default: return state;

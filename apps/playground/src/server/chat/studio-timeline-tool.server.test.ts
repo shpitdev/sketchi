@@ -8,7 +8,7 @@ import {
 } from "@sketchi/diagrams/build/code-mode/runtime";
 import { buildResponse } from "@sketchi/diagrams/build/operation";
 import { familyForType } from "@sketchi/diagrams/family";
-import type { UIMessage } from "ai";
+import type { ChatMessage } from "../../features/playground/chat-message";
 import { Effect } from "effect";
 import { expect, it } from "vitest";
 import { deriveBuildState } from "../../features/playground/build-result";
@@ -42,7 +42,7 @@ it("repairs a timeline through the Studio host and displays its real accepted sc
 			{ id: "ship", label: "Ship", date: "2026-10-01" },
 		],
 	};
-	const drawing: UIMessage = {
+	const drawing: ChatMessage = {
 		id: "drawing",
 		role: "assistant",
 		parts: [
@@ -57,7 +57,7 @@ it("repairs a timeline through the Studio host and displays its real accepted sc
 	expect(deriveBuildState([drawing], true).ghostLabels).toEqual(["Public beta", "Ship"]);
 	const accepted = await Effect.runPromise(executor.execute({ spec }));
 	expect(accepted.ok).toBe(true);
-	const message: UIMessage = {
+	const message: ChatMessage = {
 		...drawing,
 		parts: [
 			{
