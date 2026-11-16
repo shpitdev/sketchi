@@ -14,7 +14,7 @@
 	"sortImports": false,
 	"sortPackageJson": false,
 	// Every exclusion is generated output, a byte-exact fixture, vendored
-	// upstream code, a raw artifact, or prose. README.md documents the list.
+	// upstream code, a raw artifact, or prose. The comments below are the inventory.
 	"ignorePatterns": [
 		// Generated
 		"**/routeTree.gen.ts",
@@ -22,6 +22,10 @@
 		"**/CHANGELOG.md",
 		"pnpm-lock.yaml",
 		"packages/icons/catalog/src/generated/**",
+		// @nx/js:tsc writes tmp/<project>/<target>/tsconfig.generated.<uuid>.json for the
+		// length of a build (today tmp/tools/sketchi-generators/build/...); check-format
+		// can run in the same Nx invocation and must not scan it.
+		"tmp/**/tsconfig.generated.*.json",
 		// Byte-exact fixtures and frozen compatibility corpora
 		"apps/studio/src/features/build/tests/fixtures/**",
 		// Vendored shadcn and AI Elements registry components
