@@ -22,7 +22,7 @@ import {
 	deployPipelineLogoFlowchart,
 	flowchartFixture,
 } from "@sketchi/diagrams/families/flowchart/fixtures";
-import { zoneStressFixtures } from "@sketchi/diagrams/families/flowchart/zone-fixtures";
+import { zoneStressFixtures } from "@sketchi/diagrams/families/flowchart/fixtures/zone-fixtures";
 import { renderDiagram } from "@sketchi/diagrams/family";
 import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { type CanvasSpec, embedCanvasIcons } from "@sketchi/drawing";
