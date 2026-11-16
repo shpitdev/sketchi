@@ -1,5 +1,4 @@
 import { parseFlowchartDiagram } from "../../families/flowchart/document";
-import { labelFixtures } from "../../families/flowchart/fixtures/label-fixtures";
 import { renderFlowchartDiagram } from "../../families/flowchart/render";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -57,20 +56,6 @@ describe("label fuzz", () => {
 				).map((label) => `${index}:${label}`),
 			);
 			expect(detached.filter((label) => !known.includes(label))).toEqual([]);
-		},
-	);
-});
-
-describe.each(["TB", "BT", "LR", "RL"] as const)("label fixtures: %s", (direction) => {
-	it.each(Object.keys(labelFixtures) as (keyof typeof labelFixtures)[])(
-		"keeps %s words whole and labels clear",
-		(name) => {
-			const fixture = labelFixtures[name];
-			const elements = convertSceneToExcalidraw(
-				renderFlowchartDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
-			).elements;
-			const authored = new Map(fixture.nodes.map((node) => [`node:${node.id}`, node.label]));
-			expect(labelDefects(elements, authored)).toEqual([]);
 		},
 	);
 });

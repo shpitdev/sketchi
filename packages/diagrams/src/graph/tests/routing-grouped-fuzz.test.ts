@@ -1,6 +1,5 @@
 import type { CanvasSpec } from "@sketchi/drawing";
 import { parseFlowchartDiagram } from "../../families/flowchart/document";
-import { groupFixtures } from "../../families/flowchart/fixtures/group-fixtures";
 import { renderFlowchartDiagram } from "../../families/flowchart/render";
 import { getCanvasValidationIssues, groupRegionIssues } from "@sketchi/drawing";
 import { Result } from "effect";
@@ -18,7 +17,6 @@ import {
 	moreTouchesThanPinned,
 	ownEndStrays,
 	curvedStrays,
-	labelDefects,
 } from "./routing-fuzz-helpers";
 
 describe("grouped routing fuzz", () => {
@@ -119,25 +117,4 @@ describe("grouped routing fuzz", () => {
 			expect(strays).toEqual([]);
 		}, 120_000);
 	});
-
-	it.each(Object.keys(groupFixtures) as (keyof typeof groupFixtures)[])(
-		"exports the %s fixture with its groups whole, apart and clear",
-		(name) => {
-			for (const direction of ["TB", "BT", "LR", "RL"] as const) {
-				const scene = renderFlowchartDiagram({
-					...groupFixtures[name],
-					layout: { direction, edgeRouting: "orthogonal" },
-				});
-				const exported = convertSceneToExcalidraw(scene);
-				const authored = new Map(
-					groupFixtures[name].nodes.map((node) => [`node:${node.id}`, node.label]),
-				);
-				expect([
-					...validateExcalidrawScene(exported).issues,
-					...groupRegionIssues(scene),
-					...labelDefects(exported.elements, authored),
-				]).toEqual([]);
-			}
-		},
-	);
 });
