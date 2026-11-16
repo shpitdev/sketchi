@@ -7,7 +7,7 @@ import { openD1 } from "./support/d1";
 import { makeTelemetryTestSink } from "@sketchi/observability";
 import { afterEach, expect, it } from "vitest";
 
-import { makeIconsHttpHandler } from "../src/lib/http.server";
+import { makeIconsHttpHandler } from "../src/http.server";
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {

@@ -1,5 +1,11 @@
-import { ICONS_SITE_URL } from "./home-url";
-import { ALL_ICONS_PACK_ID, findPack, packCardPath, SITE_CARD_PATH } from "./packs";
+export const SKETCHI_WEB_HOME_URL = "https://sketchi.app";
+/** The icons site's production origin, for absolute URLs crawlers follow. */
+export const ICONS_SITE_URL = "https://icons.sketchi.app";
+export const PLAYGROUND_URL = "https://playground.sketchi.app";
+export const REPO_URL = "https://github.com/shpitdev/sketchi";
+
+/** The site's link-preview card. */
+export const SITE_CARD_PATH = "/card.png";
 
 export const SITE_TITLE = "Sketchi Icons: hand-drawn icons for Excalidraw";
 
@@ -11,25 +17,6 @@ export const COMMUNITY_DESCRIPTION =
 
 export const SITE_CARD_ALT =
 	"The Sketchi Icons wordmark beside a grid of hand-drawn product icons for Excalidraw.";
-
-export function packCardAlt({ id, name }: { id: string; name: string }): string {
-	return id === ALL_ICONS_PACK_ID
-		? "Every hand-drawn icon on Sketchi Icons as one pack, with a strip of them."
-		: `The ${name} pack on Sketchi Icons, with a strip of its hand-drawn icons.`;
-}
-
-/**
- * A pack's description: its count from the build, then the sentence its
- * Excalidraw listing uses, e.g. "93 hand-drawn icons for Palantir's platforms…".
- */
-export function packDescription({ id, count }: { id: string; count: number }): string {
-	const total = count.toLocaleString("en-US");
-	const listing = findPack(id)?.excalidrawListing?.description;
-	if (id === ALL_ICONS_PACK_ID || !listing) {
-		return `All ${total} hand-drawn icons and logos on Sketchi Icons, as one Excalidraw library to download.`;
-	}
-	return `${total} ${listing.charAt(0).toLowerCase()}${listing.slice(1)}`;
-}
 
 type MetaTag =
 	| { title: string }
@@ -77,7 +64,3 @@ export function pageMeta({
 }
 
 export const SITE_IMAGE = { path: SITE_CARD_PATH, alt: SITE_CARD_ALT };
-
-export function packImage(pack: { id: string; name: string }) {
-	return { path: packCardPath(pack.id), alt: packCardAlt(pack) };
-}

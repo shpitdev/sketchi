@@ -3,9 +3,9 @@ import { TooltipProvider } from "@sketchi/ui/components/tooltip";
 import { useCallback, useState } from "react";
 
 import { copyText } from "../export/actions";
-import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url";
+import { SKETCHI_WEB_HOME_URL } from "../../shared/site";
 import type { PackExcalidrawState } from "./publication";
-import { iconCount, type PackIcon, type PackSummary } from "../../lib/packs";
+import { iconCount, type PackIcon, type PackSummary } from "./packs";
 import { useAtom, useAtomSet } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
 import { useExportFeedback } from "../browser/feedback";

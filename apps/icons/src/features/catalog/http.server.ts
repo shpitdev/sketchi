@@ -9,7 +9,7 @@ import {
 	parseIconLimit,
 	searchIconResults,
 	type IconSourceError,
-} from "./api.server";
+} from "./catalog.server";
 
 const sourceFailure = (error: IconSourceError) =>
 	Effect.logError("Icon source failed", { cause: error.cause }).pipe(

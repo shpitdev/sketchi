@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { useRef } from "react";
 import { Dialog as Modal } from "radix-ui";
 
-import type { CommunityIconEntry } from "../../lib/community-client";
+import type { CommunityIconEntry } from "./entry";
 import { DrawnIcon } from "../../components/drawn-icon/drawn-icon";
 import { NamesToggle } from "../../components/names-toggle/names-toggle";
 import { PreviewToggle, type PreviewMode } from "../../components/preview-toggle/preview-toggle";

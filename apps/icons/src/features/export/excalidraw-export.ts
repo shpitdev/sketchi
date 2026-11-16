@@ -3,8 +3,7 @@ import { estimateTextWidth, fnv1a32, wrapTextToWidth, type IconRecipe } from "@s
 
 import { type ExcalidrawElement, iconRecipeElements } from "@sketchi/drawing/excalidraw";
 
-import { RECIPE_PREVIEW_SIZE } from "../../lib/recipe-drawing";
-import { DRAWN_NAME_FONT_SIZE, DRAWN_NAME_GAP, DRAWN_NAME_MAX_WIDTH } from "../../lib/drawn-name";
+import { RECIPE_PREVIEW_SIZE } from "../../shared/recipe-drawing";
 
 // The pages load this when someone copies or downloads a drawing: the
 // Excalidraw conversion is most of its code and none of their first paint.
@@ -25,6 +24,14 @@ export interface ExportOptions {
 
 // @effect-diagnostics-next-line schemaSync:off -- Clipboard and asset build callers require synchronous serialization of constructed Excalidraw data.
 const encodeExport = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+
+// A named drawing writes the icon's name under it, in proportion to the 96px
+// drawing: Excalidraw's default text size, a small gap, and a wrap at twice
+// the drawing's width. The width estimate runs about a fifth wider than
+// Excalifont paints, so a wrapped line reads no wider than ~1.7 drawings.
+const DRAWN_NAME_FONT_SIZE = 20;
+const DRAWN_NAME_GAP = 8;
+const DRAWN_NAME_MAX_WIDTH = 192;
 
 const INK = "#1e1e1e";
 const PAPER = "#ffffff";

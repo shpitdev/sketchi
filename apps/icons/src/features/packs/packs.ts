@@ -1,7 +1,11 @@
 import { type IconRecipe } from "@sketchi/drawing";
 import { type SketchiIcon } from "@sketchi/icon-catalog";
 
-import { DRAWINGS_LIBRARY_PATH, DRAWINGS_NAMED_LIBRARY_PATH, type IconDrawings } from "./drawings";
+import {
+	DRAWINGS_LIBRARY_PATH,
+	DRAWINGS_NAMED_LIBRARY_PATH,
+	type IconDrawings,
+} from "../catalog/drawings";
 
 /**
  * A pack is a ready-made Excalidraw library: the drawn marks of some catalog
@@ -325,9 +329,6 @@ export function decodePackIcons(payload: unknown): PackIcon[] {
 	if (!Array.isArray(payload)) throw new Error("Pack icons are not a list.");
 	return payload.filter(isPackIcon);
 }
-
-/** The site's link-preview card. */
-export const SITE_CARD_PATH = "/card.png";
 
 /** The pack's link-preview card: its name, its count and a strip of its marks. */
 export function packCardPath(id: string): string {

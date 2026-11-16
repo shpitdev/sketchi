@@ -9,7 +9,7 @@ import { useState, type ClipboardEvent, type FormEvent } from "react";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { Effect } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
-import { queryError, queryRuntime } from "../../lib/query-atoms";
+import { queryError, queryRuntime } from "../browser/query";
 
 import {
 	AUTHOR_NAME_MAX_LENGTH,
@@ -17,7 +17,7 @@ import {
 	type PublishResult,
 	WEBSITE_MAX_LENGTH,
 } from "./publication";
-import { findPack, iconCount, packPreviewImagePath, type PackSummary } from "../../lib/packs";
+import { findPack, iconCount, packPreviewImagePath, type PackSummary } from "./packs";
 import { AddToExcalidrawLink, PullRequestLink } from "./pack-actions";
 
 /** Shows a pasted or typed profile link as the handle it names. */

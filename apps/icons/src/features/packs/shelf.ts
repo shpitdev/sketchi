@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import type { PackExcalidrawState } from "../features/packs/publication";
+import type { PackExcalidrawState } from "./publication";
 import type { PackSummary } from "./packs";
 
 export interface PackShelfData {
@@ -14,7 +14,7 @@ export const getPackShelf = createServerFn({ method: "GET" }).handler(
 	async (): Promise<PackShelfData> => {
 		const [{ getRequestUrl }, { loadPackShelf }] = await Promise.all([
 			import("@tanstack/react-start/server"),
-			import("../features/packs/shelf.server"),
+			import("./shelf.server"),
 		]);
 		return loadPackShelf(getRequestUrl().origin);
 	},

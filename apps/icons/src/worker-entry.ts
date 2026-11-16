@@ -2,18 +2,18 @@ import { String } from "effect";
 
 import handler from "@tanstack/react-start/server-entry";
 
-import { makeIconsHttpHandler } from "./lib/http.server";
+import { type IconsHttpEnv, makeIconsHttpHandler } from "./http.server";
 
-import { handleIconMcpRequest, type IconsMcpEnv } from "./lib/mcp.server";
-export { IconsMcpSession } from "./lib/mcp-session.server";
+import { handleIconMcpRequest, type IconsMcpEnv } from "./features/mcp/mcp.server";
+export { IconsMcpSession } from "./features/mcp/session.server";
 
-export { ClientRateLimit } from "./lib/client-rate-limit.server";
+export { ClientRateLimit } from "./features/community/client-rate-limit.server";
 
 const api = makeIconsHttpHandler();
 export default {
 	fetch(
 		request: Request,
-		env: IconsMcpEnv,
+		env: IconsHttpEnv & IconsMcpEnv,
 		execution: { readonly waitUntil: (promise: Promise<unknown>) => void },
 	) {
 		const path = new URL(request.url).pathname;

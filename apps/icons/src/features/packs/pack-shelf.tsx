@@ -10,7 +10,7 @@ import {
 	packPagePath,
 	SHELF_FIRST_PACK_IDS,
 	type PackSummary,
-} from "../../lib/packs";
+} from "./packs";
 import type { PreviewMode } from "../../components/preview-toggle/preview-toggle";
 import { RecipePreview } from "../../components/recipe-preview/recipe-preview";
 import { PackActions } from "./pack-actions";

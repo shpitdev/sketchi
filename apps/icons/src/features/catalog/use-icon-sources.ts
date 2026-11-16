@@ -6,8 +6,8 @@ import { HttpClient } from "effect/http";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { useCallback, useContext, useState } from "react";
 
-import { queryRuntime, IconQueryError } from "../../lib/query-atoms";
-import { permanentSvgUrl } from "../../lib/permanent-svg-url";
+import { queryRuntime, IconQueryError } from "../browser/query";
+import { permanentSvgUrl } from "./permanent-svg-url";
 import { useExportFeedback } from "../browser/feedback";
 import {
 	copyText,

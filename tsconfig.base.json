@@ -142,9 +142,9 @@
               "apps/studio/src/server/runtime/runtime.server.ts",
               "apps/studio/src/features/chat/studio-family-tools.server.ts",
               "apps/studio/src/server/generation/api.server.ts",
-              "apps/icons/src/lib/mcp.server.ts",
-              "apps/icons/src/lib/mcp-session.server.ts",
-              "apps/icons/src/lib/toolkit.server.ts",
+              "apps/icons/src/features/mcp/mcp.server.ts",
+              "apps/icons/src/features/mcp/session.server.ts",
+              "apps/icons/src/features/mcp/toolkit.server.ts",
               "packages/cloudflare/src/mcp-content.ts",
               "packages/cloudflare/src/mcp-session.ts"
             ],
@@ -323,14 +323,13 @@
             "include": [
               "packages/icons/community/src/http.ts",
               "packages/icons/community/src/http-api.ts",
-              "apps/icons/src/lib/http.server.ts",
-              "apps/icons/src/lib/community-client.ts",
+              "apps/icons/src/http.server.ts",
+              "apps/icons/src/features/community/entry.ts",
               "apps/icons/src/worker-entry.ts",
               "apps/cli/src/community-client.ts",
               "packages/icons/catalog/src/http-api.ts",
-              "apps/icons/src/lib/api.server.ts",
-              "apps/icons/src/lib/catalog-http.server.ts",
-              "apps/icons/src/lib/catalog.server.ts",
+              "apps/icons/src/features/catalog/catalog.server.ts",
+              "apps/icons/src/features/catalog/http.server.ts",
               "packages/icons/community/src/store.ts",
               "apps/icons/src/features/packs/publication.ts",
               "apps/icons/src/features/packs/publication.server.ts",
@@ -402,7 +401,9 @@
           },
           {
             "include": [
-              "apps/icons/src/lib/query-atoms.ts",
+              "apps/icons/src/features/browser/query.ts",
+              "apps/icons/src/features/catalog/queries.ts",
+              "apps/icons/src/features/packs/queries.ts",
               "apps/studio/src/features/artifacts/artifact-view-client.ts",
               "apps/studio/src/features/artifacts/editable-artifact-stage.tsx",
               "apps/studio/src/features/projects/bucket.server.ts",
@@ -424,11 +425,11 @@
               "apps/studio/src/routes/projects.tsx",
               "apps/studio/src/routes/projects_/$projectId.tsx",
               "apps/studio/src/server/studio/projects.server.ts",
-              "apps/icons/src/lib/community-atoms.ts",
+              "apps/icons/src/features/community/atoms.ts",
               "apps/icons/src/routes/index.tsx",
               "apps/icons/src/routes/packs/$id.tsx",
               "apps/icons/src/routes/__root.tsx",
-              "apps/icons/src/components/community-gallery/community-page.tsx"
+              "apps/icons/src/features/community/community-page.tsx"
             ],
             "options": {
               "diagnosticSeverity": {

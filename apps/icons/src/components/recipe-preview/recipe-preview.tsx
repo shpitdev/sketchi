@@ -2,7 +2,7 @@ import { Array } from "effect";
 import { type IconRecipe } from "@sketchi/drawing";
 import { useMemo } from "react";
 
-import { RECIPE_PREVIEW_SIZE, recipePreview } from "../../lib/recipe-drawing";
+import { RECIPE_PREVIEW_SIZE, recipePreview } from "../../shared/recipe-drawing";
 import { type PreviewMode } from "../preview-toggle/preview-toggle";
 
 /** Excalidraw inverts the entire light canvas, including brand colors, in dark mode. */

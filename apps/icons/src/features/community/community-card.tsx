@@ -1,7 +1,7 @@
 import { String as Str } from "effect";
 import { Info } from "lucide-react";
 
-import type { CommunityIconEntry } from "../../lib/community-client";
+import type { CommunityIconEntry } from "./entry";
 import { DrawnIcon } from "../../components/drawn-icon/drawn-icon";
 import type { PreviewMode } from "../../components/preview-toggle/preview-toggle";
 

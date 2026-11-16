@@ -44,7 +44,7 @@ import {
 	packPreviewImagePath,
 	packVersion,
 	type PackSummary,
-} from "../../lib/packs";
+} from "./packs";
 
 class PublicationReadError extends Schema.TaggedError<
 	PublicationReadError,

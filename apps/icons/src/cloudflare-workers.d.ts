@@ -1,6 +1,6 @@
 declare module "cloudflare:workers" {
   import type { McpSessionNamespace } from "@sketchi/cloudflare/mcp-session";
-  import type { IconAssetsBinding } from "./lib/catalog.server";
+  import type { IconAssetsBinding } from "./features/catalog/catalog.server";
   import type { CommunityEnv } from "@sketchi/community-icons";
   import type { TelemetryPipeline } from "@sketchi/observability";
 

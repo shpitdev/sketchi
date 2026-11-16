@@ -6,7 +6,7 @@ import { initWasm, Resvg } from "@resvg/resvg-wasm";
 import { type IconRecipe } from "@sketchi/drawing";
 import sharp from "sharp";
 
-import { PACK_PREVIEW_GRID, packPreviewSvg } from "../src/lib/pack-preview";
+import { PACK_PREVIEW_GRID, packPreviewSvg } from "../src/features/packs/preview-image";
 
 const require = createRequire(import.meta.url);
 const fontDirectory = resolve(import.meta.dirname, "../public/fonts/Excalifont");

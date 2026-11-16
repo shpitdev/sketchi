@@ -3,8 +3,9 @@ import { AsyncResult } from "effect/reactivity";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { IconLibrary } from "../features/catalog/icon-library";
-import { drawingsQuery, manifestQuery, queryError, queryStatus } from "../lib/query-atoms";
-import { getPackShelf } from "../lib/packs-rpc";
+import { queryError, queryStatus } from "../features/browser/query";
+import { drawingsQuery, manifestQuery } from "../features/catalog/queries";
+import { getPackShelf } from "../features/packs/shelf";
 
 export const Route = createFileRoute("/")({
 	// The packs render with the page; without their index the icons still work.

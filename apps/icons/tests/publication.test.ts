@@ -14,7 +14,7 @@ import {
 	PULL_REQUEST_RECHECK_MS,
 	type SubmissionRow,
 } from "../src/features/packs/publication.server";
-import { packVersion } from "../src/lib/packs";
+import { packVersion } from "../src/features/packs/packs";
 
 // Native Fetch references keep one transport identity; dispatch stays local to this suite.
 let activeFetch: typeof fetch = async () => {

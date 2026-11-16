@@ -2,7 +2,7 @@ import "@tanstack/react-start/server-only";
 import { env, waitUntil } from "cloudflare:workers";
 import { Cache, Context, Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
-import { decodePackIndex, PACK_INDEX_PATH, type PackSummary } from "../../lib/packs";
+import { decodePackIndex, PACK_INDEX_PATH, type PackSummary } from "./packs";
 import { loadPackExcalidrawStates } from "./publication.server";
 
 class PackIndexError extends Schema.TaggedError<
