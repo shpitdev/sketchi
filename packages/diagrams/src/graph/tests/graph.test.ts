@@ -2,6 +2,7 @@ import { CANVAS_SPEC_VERSION, type CanvasSpec } from "@sketchi/drawing";
 import { describe, expect, it } from "vitest";
 
 import {
+	aroundTheBands,
 	curvedStrays,
 	detachedLabels,
 	diagonalRuns,
@@ -88,6 +89,49 @@ describe("graph fuzz oracles", () => {
 		expect(routingCounts(clean).crossings).toBe(0);
 		expect(ownEndStrays(clean)).toEqual([]);
 		expect(curvedStrays(curved(clean), clean)).toEqual([]);
+	});
+
+	it("aroundTheBands finds a continuation that runs around the band ends", () => {
+		// A left to right flow wrapped into two bands: a→b, then b→c back to the next band's start.
+		const spine = [
+			{ id: "ab", source: "a", target: "b" },
+			{ id: "bc", source: "b", target: "c" },
+			{ id: "cd", source: "c", target: "d" },
+		];
+		const bands = (bc: Arrow["points"]) =>
+			scene([
+				node("a", 0, 0),
+				node("b", 200, 0),
+				node("c", 0, 150),
+				node("d", 200, 150),
+				arrow("ab", "a", "b", [
+					{ x: 100, y: 25 },
+					{ x: 200, y: 25 },
+				]),
+				arrow("bc", "b", "c", bc),
+				arrow("cd", "c", "d", [
+					{ x: 100, y: 175 },
+					{ x: 200, y: 175 },
+				]),
+			]);
+		const read = (bc: Arrow["points"]) => aroundTheBands(bands(bc), "LR", spine, new Set(["bc"]));
+		expect(
+			read([
+				{ x: 250, y: 50 },
+				{ x: 250, y: 100 },
+				{ x: 50, y: 100 },
+				{ x: 50, y: 150 },
+			]),
+		).toEqual([]);
+		expect(
+			read([
+				{ x: 300, y: 25 },
+				{ x: 350, y: 25 },
+				{ x: 350, y: 100 },
+				{ x: 50, y: 100 },
+				{ x: 50, y: 150 },
+			]),
+		).toEqual(["bc runs around the bands past its source"]);
 	});
 
 	it("diagonalRuns finds a line that runs diagonally", () => {
