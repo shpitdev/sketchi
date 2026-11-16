@@ -6,7 +6,6 @@ import { normalizeIconSlug } from "@sketchi/diagrams/build/code-mode/icons";
 import { MAX_DIAGRAM_BUILD_ATTEMPTS } from "@sketchi/diagrams/build/policy";
 import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";
 import { recordMetric } from "@sketchi/observability";
-import { type JSONValue } from "ai";
 import { Effect, Metric, Ref, Semaphore } from "effect";
 
 /** Studio renders the inline scene and offers the Excalidraw download. */
@@ -201,14 +200,6 @@ export function studioModelResult(result: unknown): StudioModelResult {
 		}),
 		...(quality ? { quality } : {}),
 	};
-}
-
-/** A Studio build tool's toModelOutput: the compact result, in this turn and in replayed history. */
-export function studioBuildModelOutput({ output }: { readonly output: unknown }): {
-	readonly type: "json";
-	readonly value: JSONValue;
-} {
-	return { type: "json", value: { ...studioModelResult(output) } };
 }
 
 export const attemptLimitIssue: CodeModeIssue = {

@@ -1,4 +1,4 @@
-import type { UIMessage } from "ai";
+import { toAgUiMessages, type ChatMessage } from "@/features/playground/chat-message";
 
 /** The most messages one Studio chat request may carry. */
 export const MAX_CHAT_MESSAGES = 64;
@@ -49,7 +49,7 @@ export function buildLogoSlugs(output: unknown): string[] {
 }
 
 /** The logo slugs the conversation's accepted builds drew, which later edits may keep. */
-export function savedLogoSlugs(messages: readonly UIMessage[]): string[] {
+export function savedLogoSlugs(messages: readonly ChatMessage[]): string[] {
 	const slugs = new Set<string>();
 	for (const message of messages) {
 		if (message.role !== "assistant") continue;
@@ -99,7 +99,7 @@ export function compactBuildOutput(output: unknown): unknown {
 	};
 }
 
-function compactMessage<Message extends UIMessage>(message: Message): Message {
+function compactMessage<Message extends ChatMessage>(message: Message): Message {
 	if (message.role !== "assistant") return message;
 	return {
 		...message,
@@ -111,23 +111,23 @@ function compactMessage<Message extends UIMessage>(message: Message): Message {
 	};
 }
 
-function isSavedBuildPart(part: UIMessage["parts"][number]): boolean {
+function isSavedBuildPart(part: ChatMessage["parts"][number]): boolean {
 	return part.type.startsWith("tool-") && "output" in part && record(part.output)?.["ok"] === true;
 }
 
-function savedBuild(message: UIMessage): boolean {
+function savedBuild(message: ChatMessage): boolean {
 	return message.role === "assistant" && message.parts.some(isSavedBuildPart);
 }
 
 /** An exchange cut to the diagram it saved: the reply's last accepted build call and its result. */
-function savedBuildOnly<Message extends UIMessage>(exchange: readonly Message[]): Message[] {
+function savedBuildOnly<Message extends ChatMessage>(exchange: readonly Message[]): Message[] {
 	const reply = exchange.findLast(savedBuild);
 	const part = reply?.parts.findLast(isSavedBuildPart);
 	return reply && part ? [{ ...reply, parts: [part] }] : [];
 }
 
-function size(messages: readonly UIMessage[]): number {
-	return JSON.stringify(messages).length;
+function size(messages: readonly ChatMessage[]): number {
+	return JSON.stringify(toAgUiMessages(messages)).length;
 }
 
 /**
@@ -139,7 +139,7 @@ function size(messages: readonly UIMessage[]): number {
  * newer exchanges, within the same limits: every edit sends its diagram's complete spec and
  * builds on that one, and the result carries the logos it drew.
  */
-export function studioChatRequestMessages<Message extends UIMessage>(
+export function studioChatRequestMessages<Message extends ChatMessage>(
 	messages: readonly Message[],
 ): Message[] {
 	const compact = messages.map(compactMessage);
@@ -153,7 +153,7 @@ export function studioChatRequestMessages<Message extends UIMessage>(
 	const pinned = latestSave >= 0 ? savedBuildOnly(exchanges[latestSave] ?? []) : [];
 	const fits = (kept: readonly Message[][]) => {
 		const flat = kept.flat();
-		return flat.length <= MAX_CHAT_MESSAGES && size(flat) <= MAX_CHAT_TOTAL_CHARACTERS;
+		return toAgUiMessages(flat).length <= MAX_CHAT_MESSAGES && size(flat) <= MAX_CHAT_TOTAL_CHARACTERS;
 	};
 	let kept: Message[][] = [];
 	let oldest = exchanges.length;

@@ -2,7 +2,7 @@ import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { mindmapTopics } from "@sketchi/diagrams/families/mindmap/index";
 import { type StudioBuildResult } from "./build-result";
 import { DrawingEditor } from "@sketchi/editor";
-import { type ChatStatus, type UIMessage } from "ai";
+import { type ChatStatus, type ChatMessage } from "@/features/playground/chat-message";
 import { type RefObject } from "react";
 
 import {
@@ -258,7 +258,7 @@ function failureCopy(status: Exclude<StudioBuildResult, { ok: true }>["status"])
 	}
 }
 
-export function assistantAsksQuestion(message: UIMessage): boolean {
+export function assistantAsksQuestion(message: ChatMessage): boolean {
 	if (message.role !== "assistant") {
 		return false;
 	}

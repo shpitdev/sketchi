@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@sketchi/ui/lib/utils";
-import type { UIMessage } from "ai";
+import type { ChatMessage } from "@/features/playground/chat-message";
 import type { ComponentProps, HTMLAttributes } from "react";
 import { memo } from "react";
 import { Streamdown } from "streamdown";
@@ -9,7 +9,7 @@ import { Streamdown } from "streamdown";
 import { studioStreamdownPlugins } from "./streamdown-plugins";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
-  from: UIMessage["role"];
+  from: ChatMessage["role"];
 };
 
 export const Message = ({ className, from, ...props }: MessageProps) => (

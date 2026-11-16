@@ -1,56 +1,34 @@
-import { Order as Ord, Array as Arr, Record as Rec, Effect, Schema } from "effect";
+import { Order as Ord, Array as Arr, Effect, Schema, Context } from "effect";
+import { Tool, Toolkit, Prompt } from "effect/ai";
 import { families, type FamilyOperation, type DiagramFamily } from "@sketchi/diagrams/family";
 import { type OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";
 import "@tanstack/react-start/server-only";
 import { buildResponse } from "@sketchi/diagrams/build/operation";
 import * as Build from "@sketchi/diagrams/build/code-mode/runtime";
-import {
-	type PlaygroundCallbackEffect,
-	type PlaygroundRequestRunner,
-} from "../runtime/runtime.server";
-import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
+import type { PlaygroundCallbackEffect } from "../runtime/runtime.server";
 import {
 	makeStudioFlowchartToolExecutor,
 	makeStudioSequenceToolExecutor,
 } from "./studio-build-policy.server";
 import {
 	makeStudioBuildToolExecutor,
-	studioBuildModelOutput,
+	studioModelResult,
 	type StudioBuildTurn,
 } from "./studio-build-tool.server";
-export function makeStudioBuildToolCallback<Input, Result, E>(
-	executor: {
-		readonly execute: (input: Input) => PlaygroundCallbackEffect<Result, E>;
-	},
-	run: PlaygroundRequestRunner,
+function buildTool<S extends Schema.Top & Schema.ConstraintDecoder<unknown>, O extends Schema.Top & Schema.ConstraintDecoder<unknown>>(
+ family: { readonly studioInput: S; readonly contracts: {readonly output: O}; readonly docs: {readonly toolDescription: string; readonly toolName: string}},
+ executor: {readonly execute: (input:S["Type"]) => PlaygroundCallbackEffect<O["Type"]>},
 ) {
-	return (input: Input) => run(executor.execute(input));
-}
-function buildTool<
-	S extends Schema.ConstraintDecoder<unknown>,
-	O extends Schema.ConstraintDecoder<unknown>,
->(
-	family: {
-		readonly studioInput: S;
-		readonly contracts: {
-			readonly output: O;
-		};
-		readonly docs: {
-			readonly toolDescription: string;
-		};
-	},
-	executor: {
-		readonly execute: (input: S["Type"]) => PlaygroundCallbackEffect<O["Type"]>;
-	},
-	run: PlaygroundRequestRunner,
-) {
-	return {
-		description: family.docs.toolDescription,
-		inputSchema: toPlaygroundStandardSchema(family.studioInput),
-		outputSchema: toPlaygroundStandardSchema(family.contracts.output),
-		toModelOutput: studioBuildModelOutput,
-		execute: makeStudioBuildToolCallback(executor, run),
-	};
+ const tool = Tool.make(family.docs.toolName, {
+   description:family.docs.toolDescription, parameters:family.studioInput, success:family.contracts.output,
+   toModelOutput:(output) => [Prompt.makePart("text",{text:Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(studioModelResult(output))})],
+ });
+ const toolkit = Toolkit.make(tool);
+ return Effect.gen(function* () {
+   const context = yield* Effect.context<Effect.Services<ReturnType<typeof executor.execute>>>();
+   const handlers = yield* toolkit.toHandlers({[tool.name]:(input:S["Type"]) => executor.execute(input).pipe(Effect.provide(context))});
+   return {toolkit,handlers};
+ });
 }
 export function makeStudioFamilyTool(
 	family: DiagramFamily,
@@ -59,7 +37,6 @@ export function makeStudioFamilyTool(
 		readonly logos: readonly OfferedLogo[];
 		readonly request: string;
 	},
-	run: PlaygroundRequestRunner,
 ) {
 	return Effect.gen(function* () {
 		if (family.type === "flowchart") {
@@ -67,14 +44,14 @@ export function makeStudioFamilyTool(
 				(input) => buildResponse(family.build(Build)(input)),
 				options,
 			);
-			return buildTool(family, executor, run);
+			return yield* buildTool(family, executor);
 		}
 		if (family.type === "sequence") {
 			const executor = yield* makeStudioSequenceToolExecutor(
 				(input) => buildResponse(family.build(Build)(input)),
 				options,
 			);
-			return buildTool(family, executor, run);
+			return yield* buildTool(family, executor);
 		}
 		const operation: FamilyOperation<PlainFamilyResult> = family;
 		const executor = yield* makeStudioFamilyExecutor(
@@ -82,10 +59,9 @@ export function makeStudioFamilyTool(
 			(input) => buildResponse(operation.build(Build)(input)),
 			options,
 		);
-		return buildTool<typeof family.studioInput, typeof family.contracts.output>(
+		return yield* buildTool<typeof family.studioInput, typeof family.contracts.output>(
 			family,
 			executor,
-			run,
 		);
 	});
 }
@@ -95,23 +71,14 @@ export const makeStudioFamilyTools = Effect.fn("playground.chat.familyTools")(fu
 		readonly logos: readonly OfferedLogo[];
 		readonly request: string;
 	},
-	run: PlaygroundRequestRunner,
 ) {
-	const entries = yield* Effect.forEach(
-		Arr.sort(
-			families,
-			Ord.make((left: DiagramFamily, right: DiagramFamily) =>
-				Ord.Number(left.docs.studioOrder, right.docs.studioOrder),
-			),
-		),
-		(family) =>
-			Effect.map(
-				makeStudioFamilyTool(family, options, run),
-				(tool) => [family.docs.toolName, tool] as const,
-			),
-	);
-	return Rec.fromEntries(entries);
+ const entries = yield* Effect.forEach(
+   Arr.sort(families, Ord.make((left:DiagramFamily,right:DiagramFamily) => Ord.Number(left.docs.studioOrder,right.docs.studioOrder))),
+   (family) => makeStudioFamilyTool(family,options),
+ );
+ return yield* Toolkit.merge(...Arr.map(entries,(entry) => entry.toolkit)).pipe(Effect.provide(Context.mergeAll(...Arr.map(entries,(entry) => entry.handlers))));
 });
+
 type PlainFamily = Exclude<
 	DiagramFamily,
 	{

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/api/chat")({
+export const Route = createFileRoute("/api/studio/chat")({
 	server: {
 		handlers: {
 			POST: async ({ request }) => {

@@ -1,10 +1,10 @@
 import { type CanvasSpec } from "@sketchi/drawing";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
-import { useChat } from "@ai-sdk/react";
+import { useStudioChat } from "@/features/playground/chat-client";
 
 import { DrawingEditor } from "@sketchi/editor";
 import { createFileRoute } from "@tanstack/react-router";
-import { DefaultChatTransport, type UIMessage } from "ai";
+import { type ChatMessage } from "@/features/playground/chat-message";
 import { MessageSquare, PanelsTopLeft, Square } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -32,7 +32,6 @@ import {
 	type StudioBuildResult,
 } from "@/features/playground/build-result";
 import { DiagramToolCard } from "@/features/playground/diagram-tool-card";
-import { studioChatRequestMessages } from "@/features/playground/studio-chat-request";
 import { cn } from "@sketchi/ui/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -40,7 +39,7 @@ export const Route = createFileRoute("/")({
 });
 
 function renderAssistantParts(
-	message: UIMessage,
+	message: ChatMessage,
 	active: boolean,
 	onCompose?: () => void,
 ): ReactNode[] {
@@ -85,7 +84,7 @@ function renderAssistantParts(
 	return nodes;
 }
 
-function userText(message: UIMessage): string {
+function userText(message: ChatMessage): string {
 	return message.parts
 		.map((part) => (part.type === "text" ? part.text : ""))
 		.join("")
@@ -212,18 +211,7 @@ function DiagramStage({
 function StudioRoute() {
 	const [mobilePanel, setMobilePanel] = useState<"chat" | "diagram">("chat");
 	const composerRef = useRef<HTMLTextAreaElement>(null);
-	const [transport] = useState(
-		() =>
-			new DefaultChatTransport({
-				api: "/api/chat",
-				prepareSendMessagesRequest: ({ body, id, messages, messageId, trigger }) => ({
-					body: { ...body, id, messages: studioChatRequestMessages(messages), messageId, trigger },
-				}),
-			}),
-	);
-	const { error, messages, sendMessage, status, stop } = useChat({
-		transport,
-	});
+	const { error, messages, sendMessage, status, stop, retry } = useStudioChat();
 	const busy = status === "submitted" || status === "streaming";
 
 	const { buildMode, displayResult, activePart, scene, artifact, ghostLabels } = useMemo(
@@ -307,8 +295,9 @@ function StudioRoute() {
 				) : null}
 
 				<p aria-atomic="true" className={error ? "studio__error" : "sr-only"} role="alert">
-					{error ? "Sketchi couldn’t finish that request. Try again." : null}
+					{error ?? null}
 				</p>
+				{error ? <button className="studio__artifact-link" onClick={retry} type="button">Try again</button> : null}
 
 				<div className="studio__body">
 					{!isEmpty ? (

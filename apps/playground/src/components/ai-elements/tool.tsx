@@ -7,7 +7,7 @@ import {
   CollapsibleTrigger,
 } from "@sketchi/ui/components/collapsible";
 import { cn } from "@sketchi/ui/lib/utils";
-import type { DynamicToolUIPart, ToolUIPart } from "ai";
+import type { ChatToolPart } from "@/features/playground/chat-message";
 import {
   CheckCircleIcon,
   ChevronDownIcon,
@@ -30,7 +30,7 @@ export const Tool = ({ className, ...props }: ToolProps) => (
   />
 );
 
-export type ToolPart = ToolUIPart | DynamicToolUIPart;
+export type ToolPart = ChatToolPart;
 
 export type ToolHeaderProps = {
   title?: string;
@@ -42,39 +42,20 @@ export type ToolHeaderProps = {
    * place, for titles that already say the state.
    */
   badge?: boolean;
-} & (
-  | { type: ToolUIPart["type"]; state: ToolUIPart["state"]; toolName?: never }
-  | {
-      type: DynamicToolUIPart["type"];
-      state: DynamicToolUIPart["state"];
-      toolName: string;
-    }
-);
+} & { type: ChatToolPart["type"]; state: ChatToolPart["state"] };
 
 const statusLabels: Record<ToolPart["state"], string> = {
-  "approval-requested": "Awaiting Approval",
-  "approval-responded": "Responded",
   "input-available": "Running",
   "input-streaming": "Pending",
   "output-available": "Completed",
-  "output-denied": "Denied",
   "output-error": "Error",
 };
 
 const statusIcons: Record<ToolPart["state"], ReactNode> = {
-  "approval-requested": (
-    <ClockIcon className="size-4" style={{ color: "var(--warn)" }} />
-  ),
-  "approval-responded": (
-    <CheckCircleIcon className="size-4" style={{ color: "var(--blueprint)" }} />
-  ),
   "input-available": <ClockIcon className="size-4 animate-pulse" />,
   "input-streaming": <CircleIcon className="size-4" />,
   "output-available": (
     <CheckCircleIcon className="size-4" style={{ color: "var(--ok)" }} />
-  ),
-  "output-denied": (
-    <XCircleIcon className="size-4" style={{ color: "var(--warn)" }} />
   ),
   "output-error": (
     <XCircleIcon className="size-4" style={{ color: "var(--danger)" }} />
@@ -95,11 +76,10 @@ export const ToolHeader = ({
   state,
   stopped,
   badge = true,
-  toolName,
   ...props
 }: ToolHeaderProps) => {
   const derivedName =
-    type === "dynamic-tool" ? toolName : type.split("-").slice(1).join("-");
+    type.slice(5);
 
   return (
     <CollapsibleTrigger

@@ -1,4 +1,4 @@
-import type { UIMessage } from "ai";
+import type { ChatMessage } from "@/features/playground/chat-message";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -38,11 +38,11 @@ function accepted(id: string) {
 	};
 }
 
-function user(id: string, text = `Request ${id}.`): UIMessage {
+function user(id: string, text = `Request ${id}.`): ChatMessage {
 	return { id: `u${id}`, role: "user", parts: [{ type: "text", text }] };
 }
 
-function builds(id: string, output: unknown = accepted(id)): UIMessage {
+function builds(id: string, output: unknown = accepted(id)): ChatMessage {
 	return {
 		id: `a${id}`,
 		role: "assistant",
@@ -59,7 +59,7 @@ function builds(id: string, output: unknown = accepted(id)): UIMessage {
 	};
 }
 
-function says(id: string, text: string): UIMessage {
+function says(id: string, text: string): ChatMessage {
 	return { id: `a${id}`, role: "assistant", parts: [{ type: "text", text }] };
 }
 
@@ -103,7 +103,7 @@ describe("Studio chat request", () => {
 
 	it("keeps the latest exchanges of a long conversation within the limits", () => {
 		const long = "z".repeat(1_500);
-		const messages: UIMessage[] = [];
+		const messages: ChatMessage[] = [];
 		for (let edit = 0; edit < 40; edit += 1) {
 			messages.push(user(String(edit), `Edit ${edit}. ${long}`), builds(String(edit)));
 		}
@@ -119,7 +119,7 @@ describe("Studio chat request", () => {
 
 	it("keeps the latest diagram's build when newer talk fills the request", () => {
 		const chatter = "w".repeat(4_000);
-		const messages: UIMessage[] = [user("0"), builds("0"), user("1"), builds("1")];
+		const messages: ChatMessage[] = [user("0"), builds("0"), user("1"), builds("1")];
 		for (let turn = 2; turn < 12; turn += 1) {
 			messages.push(user(String(turn), `Question ${turn}?`), says(String(turn), chatter));
 		}
