@@ -2,7 +2,7 @@ import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai-compat";
 import { SpanContent, TelemetryCorrelation } from "@sketchi/observability";
 import { Clock, Context, Effect, Layer, Option, Result } from "effect";
 import { type AiError, LanguageModel, Prompt, type Response as AiResponse } from "effect/ai";
-import { FetchHttpClient, HttpClient } from "effect/http";
+import { HttpClient } from "effect/http";
 
 import {
 	candidateFromText,
@@ -15,6 +15,7 @@ import {
 	type CloudflareAiGateway,
 	CloudflareAiGatewayBinding,
 	isTransientHttpStatus,
+	makeGatewayHttpClient,
 	parseJsonResponse,
 	stripAnthropicModelPrefix,
 	stripGoogleModelPrefix,
@@ -35,12 +36,13 @@ import {
 import { DiagramFamilyNarrowing } from "./family-narrowing.js";
 import { runDiagramGenerationWithPolicy } from "./policy.js";
 
-// The gateway fetch below never dials this. It only satisfies the client's URL handling.
-const GATEWAY_FETCH_API_URL = "https://sketchi-gateway.invalid";
+// The gateway client never dials this. Only its path, the gateway endpoint, is sent.
+const GATEWAY_API_URL = "https://sketchi-gateway.invalid";
 
 /** One upstream reached through `gateway.run`, using the key stored on the gateway. */
 export interface GatewayChatRoute {
-	readonly endpoint: string;
+	/** The upstream's path before `/chat/completions`. */
+	readonly apiPath: string;
 	readonly gatewayLabel: string;
 	readonly gatewayProvider: string;
 	readonly modelId: (model: string) => string;
@@ -51,7 +53,7 @@ export interface GatewayChatRoute {
 }
 
 export const googleGatewayChatRoute: GatewayChatRoute = {
-	endpoint: "v1beta/openai/chat/completions",
+	apiPath: "v1beta/openai",
 	gatewayLabel: "Google AI Studio",
 	gatewayProvider: "google-ai-studio",
 	modelId: stripGoogleModelPrefix,
@@ -64,7 +66,7 @@ export const googleGatewayChatRoute: GatewayChatRoute = {
 };
 
 export const anthropicGatewayChatRoute: GatewayChatRoute = {
-	endpoint: "v1/chat/completions",
+	apiPath: "v1",
 	gatewayLabel: "Anthropic",
 	gatewayProvider: "anthropic",
 	modelId: stripAnthropicModelPrefix,
@@ -93,65 +95,11 @@ export class CloudflareGatewayChatConfig extends Context.Service<
 	CloudflareGatewayChatConfigValue
 >()("@sketchi/diagram-generation/CloudflareGatewayChatConfig") {}
 
-// Synchronous, so an interrupted attempt cannot reach `gateway.run` after it was aborted.
-function decodeRequestBody(body: BodyInit | null | undefined): unknown {
-	if (typeof body === "string") return JSON.parse(body);
-	if (ArrayBuffer.isView(body)) return JSON.parse(new TextDecoder().decode(body));
-	throw new TypeError("The chat client sent an unexpected request body.");
-}
-
 /** What the gateway answered, as it arrived. */
 interface GatewayReply {
 	body?: string;
 	logId?: string;
 	status?: number;
-}
-
-function gatewayFetch(
-	gateway: CloudflareAiGateway,
-	config: CloudflareGatewayChatConfigValue,
-	request: DiagramGenerationRequest,
-	traceId: string | undefined,
-	reply: GatewayReply,
-): typeof globalThis.fetch {
-	return async (_input, init) => {
-		const response = await gateway.run(
-			{
-				endpoint: config.route.endpoint,
-				headers: { "Content-Type": "application/json" },
-				provider: config.route.gatewayProvider,
-				query: decodeRequestBody(init?.body),
-			},
-			{
-				gateway: {
-					collectLog: config.collectLog,
-					// AI Gateway keeps five metadata entries per request and drops the rest.
-					metadata: {
-						scenarioId: request.prompt.id,
-						sketchiProvider: config.route.provider,
-						sketchiSurface: config.surface,
-						...(traceId ? { sketchiTraceId: traceId } : {}),
-					},
-					// Someone who sends the same request again wants another diagram, and an
-					// evaluation sample has to be a real draw, so no call replays a cached answer.
-					skipCache: true,
-				},
-				...(init?.signal ? { signal: init.signal } : {}),
-			},
-		);
-		const logId = response.headers.get("cf-aig-log-id");
-		if (logId) reply.logId = logId;
-		reply.status = response.status;
-		if (!response.body) return response;
-		// Read the body here so a broken stream fails as transport and is retried. Past this
-		// point the client reports read failures and unparseable JSON as the same error.
-		const body = await response.text();
-		reply.body = body;
-		return new Response(body, {
-			headers: response.headers,
-			status: response.status,
-		});
-	};
 }
 
 /** The binding's own failure, under the NetworkError and HttpClientError wrappers. */
@@ -238,7 +186,6 @@ function usageAttributes(usage: AiResponse.Usage): Record<string, number> {
 }
 
 const runChatAttempt = Effect.fn("diagramGeneration.gatewayChat.attempt")(function* (
-	model: Context.Service.Shape<typeof LanguageModel.LanguageModel>,
 	gateway: CloudflareAiGateway,
 	config: CloudflareGatewayChatConfigValue,
 	request: DiagramGenerationRequest,
@@ -266,22 +213,45 @@ const runChatAttempt = Effect.fn("diagramGeneration.gatewayChat.attempt")(functi
 		"gen_ai.system_instructions": [{ type: "text", content: system }],
 		"sketchi.gateway.request_fields": requestFields,
 	});
+	const transport = makeGatewayHttpClient({
+		gateway,
+		provider: route.gatewayProvider,
+		collectLog: config.collectLog,
+		// AI Gateway keeps five metadata entries per request and drops the rest.
+		metadata: {
+			scenarioId: request.prompt.id,
+			sketchiProvider: route.provider,
+			sketchiSurface: config.surface,
+			...(traceId ? { sketchiTraceId: traceId } : {}),
+		},
+		// A body that breaks is a retryable transport failure, not an unreadable answer.
+		responseBody: "buffer",
+		onResponse: (response) => {
+			reply.status = response.status;
+			const logId = response.headers.get("cf-aig-log-id");
+			if (logId) reply.logId = logId;
+		},
+	}).pipe(
+		HttpClient.tap((response) =>
+			Effect.map(response.text, (body) => {
+				reply.body = body;
+			}),
+		),
+	);
+	const client = yield* OpenAiClient.make({ apiUrl: `${GATEWAY_API_URL}/${route.apiPath}` }).pipe(
+		Effect.provideService(HttpClient.HttpClient, transport),
+	);
+	const model = yield* OpenAiLanguageModel.make({
+		model: modelId,
+		config: { max_output_tokens: maxOutputTokens, ...requestFields },
+	}).pipe(Effect.provideService(OpenAiClient.OpenAiClient, client));
 	const response = yield* LanguageModel.generateText({
 		prompt: Prompt.make([
 			{ role: "system", content: system },
 			{ role: "user", content: [{ type: "text", text: user }] },
 		]),
 	}).pipe(
-		OpenAiLanguageModel.withConfigOverride({
-			max_output_tokens: maxOutputTokens,
-			model: modelId,
-			...requestFields,
-		}),
 		Effect.provideService(LanguageModel.LanguageModel, model),
-		Effect.provideService(
-			FetchHttpClient.Fetch,
-			gatewayFetch(gateway, config, request, traceId, reply),
-		),
 		// The attempt span already times this call, and its URL is not a real address.
 		Effect.provideService(HttpClient.TracerDisabledWhen, () => true),
 		Effect.ensuring(
@@ -359,12 +329,6 @@ export const CloudflareGatewayChatClientLive = Layer.effect(DiagramGenerationCli
 		// Without it, an untyped request is routed by its words alone.
 		const narrowing = Option.getOrUndefined(yield* Effect.serviceOption(DiagramFamilyNarrowing));
 		const { provider } = config.route;
-		const client = yield* OpenAiClient.make({ apiUrl: GATEWAY_FETCH_API_URL }).pipe(
-			Effect.provide(FetchHttpClient.layer),
-		);
-		const model = yield* OpenAiLanguageModel.make({ model: "set-per-request" }).pipe(
-			Effect.provideService(OpenAiClient.OpenAiClient, client),
-		);
 		const gateway = yield* Effect.result(
 			Effect.try({
 				try: () => ai.gateway(config.gatewayId),
@@ -391,7 +355,7 @@ export const CloudflareGatewayChatClientLive = Layer.effect(DiagramGenerationCli
 				return yield* runDiagramGenerationWithPolicy(
 					(attemptRequest) =>
 						Result.isSuccess(gateway)
-							? runChatAttempt(model, gateway.success, config, attemptRequest)
+							? runChatAttempt(gateway.success, config, attemptRequest)
 							: Effect.fail(gateway.failure),
 					request,
 					provider,
