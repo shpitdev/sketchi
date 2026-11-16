@@ -1,4 +1,4 @@
-import { formatContractSchemaError } from "@sketchi/diagrams/build/input";
+import { formatContractSchemaError } from "@sketchi/diagrams/build/contract";
 import { CreateCanvasRequest } from "@sketchi/diagrams/canvas/create-contract";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Schema, SchemaIssue, Result } from "effect";

@@ -3,12 +3,9 @@ import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-	CodeModeArtifactStorage,
-	makeMemoryArtifactStorage,
-} from "../../../build/code-mode/artifacts.js";
-import { buildSankey } from "../../../build/code-mode/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
+import { buildSankey } from "../../../build/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
 import { applyDiagramPatch } from "../../../canvas/patch.js";
 import { buildResponse, type BuildRejection } from "../../../build/operation.js";
 import {

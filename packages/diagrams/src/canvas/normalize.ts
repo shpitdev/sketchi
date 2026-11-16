@@ -15,10 +15,10 @@ import {
 import { type validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect } from "effect";
 
-import { jsonSizeBytes } from "../build/code-mode/artifacts.js";
-import { exportIssues } from "../build/code-mode/export.js";
-import { iconRefSlug, undrawableIconIssue } from "../build/code-mode/icons.js";
-import { issue } from "../build/code-mode/issues.js";
+import { jsonSizeBytes } from "../build/artifacts.js";
+import { exportIssues } from "../build/export.js";
+import { iconRefSlug, undrawableIconIssue } from "../build/icons.js";
+import { issue } from "../build/issues.js";
 import { type CanvasInput } from "./input.js";
 
 export function canvasExportIssues(

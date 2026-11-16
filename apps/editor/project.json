@@ -1,0 +1,84 @@
+{
+	"name": "excalidraw",
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"sourceRoot": "apps/editor/src",
+	"projectType": "application",
+	"tags": ["scope:app", "type:app"],
+	"targets": {
+		"build": {
+			"executor": "nx:run-commands",
+			"inputs": [
+				"production",
+				"^production",
+				"{workspaceRoot}/scripts/lib/excalidraw-fonts.mjs",
+				"{workspaceRoot}/scripts/lib/worker-apps.mjs",
+				"{workspaceRoot}/tools/local-dev-ports.ts"
+			],
+			"outputs": ["{workspaceRoot}/dist/apps/editor", "{projectRoot}/.wrangler/deploy/config.json"],
+			"options": {
+				"command": "vite build --config apps/editor/vite.config.ts"
+			}
+		},
+		"build-storybook": {
+			"outputs": ["{workspaceRoot}/storybook-static/excalidraw"],
+			"options": {
+				"output-dir": "../../storybook-static/excalidraw"
+			}
+		},
+		"cf-typegen": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "wrangler types --config apps/editor/wrangler.jsonc"
+			}
+		},
+		"deploy": {
+			"executor": "nx:run-commands",
+			"dependsOn": ["build"],
+			"options": {
+				"command": "wrangler deploy --config dist/apps/editor/server/wrangler.json"
+			}
+		},
+		"dev": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "PORTLESS_PORT=443 portless run --name excalidraw.sketchi vite dev --config apps/editor/vite.config.ts"
+			}
+		},
+		"preview": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vite preview --config apps/editor/vite.config.ts --host 127.0.0.1 --port 6302"
+			}
+		},
+		"static-storybook": {
+			"options": {
+				"staticFilePath": "storybook-static/excalidraw"
+			}
+		},
+		"storybook": {
+			"options": {
+				"port": 6008
+			}
+		},
+		"test": {
+			"executor": "nx:run-commands",
+			"outputs": ["{workspaceRoot}/coverage/apps/editor"],
+			"options": {
+				"command": "vitest run --config apps/editor/vitest.config.ts"
+			}
+		},
+		"test-browser": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config apps/editor/vitest.browser.config.mts"
+			}
+		},
+		"typecheck": {
+			"executor": "nx:run-commands",
+			"options": {
+				"commands": ["effect-tsgo tsc@7.0.2 -p apps/editor/tsconfig.app.json --noEmit"],
+				"parallel": false
+			}
+		}
+	}
+}

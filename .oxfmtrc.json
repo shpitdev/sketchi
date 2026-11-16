@@ -23,9 +23,9 @@
 		"pnpm-lock.yaml",
 		"packages/icons/catalog/src/generated/**",
 		// Byte-exact fixtures and frozen compatibility corpora
-		"apps/playground/src/features/build/tests/fixtures/**",
+		"apps/studio/src/features/build/tests/fixtures/**",
 		// Vendored shadcn and AI Elements registry components
-		"apps/playground/src/components/ai-elements/**",
+		"apps/studio/src/components/ai-elements/**",
 		"packages/ui/src/components/**",
 		// Raw pipeline artifacts, and state that editor and agent tools rewrite
 		"packages/icons/catalog/pipeline-output/**",

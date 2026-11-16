@@ -23,10 +23,10 @@ document builds without requiring particular source, story or test filenames.
 | Excalidraw conversion | `packages/drawing`. Any new renderer role must convert and validate. | offline-build pipeline |
 | generation prompt | `IR_INSTRUCTIONS` and `FAMILY_EXAMPLES` in `packages/diagrams/src/generate/messages.ts`. Remove the name from `UnsupportedDiagramIntentKindSchema` (`intent.ts`); the prompt's refusal list is built from it. | compile, message-builder tests; generated quality in Frontierclimb |
 | generation output parsing | The `parsers` entry and requirement targets in `candidates.ts`. Diagnostics should carry repair hints. | compile, generated-response pipeline |
-| Code Mode build | A Code Mode authoring spec and build operation in `packages/diagrams/src/build`, registered in `CANONICAL_DOCUMENT_SPECS`, `buildCanonicalDocument`, and `canonicalDocumentFromDiagram` (`documents.ts`), plus MCP docs in `apps/playground/src/features/mcp/mcp-docs/catalog.ts`. | compile, offline-build pipeline |
+| Code Mode build | A Code Mode authoring spec and build operation in `packages/diagrams/src/build`, registered in `CANONICAL_DOCUMENT_SPECS`, `buildCanonicalDocument`, and `canonicalDocumentFromDiagram` (`documents.ts`), plus MCP docs in `apps/studio/src/features/mcp/mcp-docs/catalog.ts`. | compile, offline-build pipeline |
 | CLI document dispatch | `sketchi create` and the offline builder read the agent registry. Add a changeset for `@sketchi/cli`. | offline-build pipeline |
 | CLI generate type | `generate --type` reads the registry, and the wizard choice comes from `GENERATION_TYPE_CHOICES` in `apps/cli/src/generation-types.ts`. | compile, CLI behavior tests |
-| generate API request | `POST /api/v1/generate` accepts every registered family (`apps/playground/src/server/generation/request.ts`). Unsupported kinds come from `UnsupportedDiagramIntentKindSchema`. | request schema |
+| generate API request | `POST /api/v1/generate` accepts every registered family (`apps/studio/src/server/generation/request.ts`). Unsupported kinds come from `UnsupportedDiagramIntentKindSchema`. | request schema |
 | maintained scenarios | `packages/diagram/scenarios`: scenarios with checks scored on the model's own diagram, registered in `diagramScenarios` or the reliability scenarios. | scenario regressions and Frontierclimb |
 | Storybook story | `tools/storybook/families/<name>.stories.tsx`. | Storybook build and review |
 
@@ -62,8 +62,8 @@ rest; see `docs/quadrant-charts.md`. Mindmaps radiate from their central topic; 
 `docs/mindmaps.md`.
 
 Surfaces that offer a family to people also need updating: the playground
-generate API (`apps/playground/src/server/generation/api.server.ts`), Studio
-chat build tools (`apps/playground/src/server/chat/`), and `llms.txt`. Add
+generate API (`apps/studio/src/server/generation/api.server.ts`), Studio
+chat build tools (`apps/studio/src/server/chat/`), and `llms.txt`. Add
 optional `icon` support through the shared `DiagramIconRef` when a family's
 elements represent named technologies.
 

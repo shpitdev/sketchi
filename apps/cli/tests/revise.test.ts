@@ -1,8 +1,10 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-import { CodeModeArtifactStorageMemory } from "@sketchi/diagrams/build/code-mode/artifacts";
-import { makeCodeModeRuntimeEnvironmentLayer } from "@sketchi/diagrams/build/code-mode/runtime";
+import {
+	CodeModeArtifactStorageMemory,
+	makeCodeModeRuntimeEnvironmentLayer,
+} from "@sketchi/diagrams/build";
 import { afterEach, assert, describe, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 

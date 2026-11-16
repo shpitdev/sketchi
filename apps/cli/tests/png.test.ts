@@ -1,5 +1,7 @@
-import { CodeModeArtifactStorageMemory } from "@sketchi/diagrams/build/code-mode/artifacts";
-import { makeCodeModeRuntimeEnvironmentLayer } from "@sketchi/diagrams/build/code-mode/runtime";
+import {
+	CodeModeArtifactStorageMemory,
+	makeCodeModeRuntimeEnvironmentLayer,
+} from "@sketchi/diagrams/build";
 import nativeIcons from "@sketchi/icon-catalog/native-icons";
 import { assert, layer } from "@effect/vitest";
 import { Effect, Layer } from "effect";

@@ -2,9 +2,9 @@ import { scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
 import {
 	CodeModeArtifactStorage,
 	CodeModeArtifactStorageMemory,
-} from "@sketchi/diagrams/build/code-mode/artifacts";
-import { canonicalDocumentFromDiagram } from "@sketchi/diagrams/build/code-mode/documents";
-import { makeCodeModeRuntimeEnvironmentLayer } from "@sketchi/diagrams/build/code-mode/runtime";
+	canonicalDocumentFromDiagram,
+	makeCodeModeRuntimeEnvironmentLayer,
+} from "@sketchi/diagrams/build";
 import {
 	type CanonicalDiagram,
 	type CanonicalDiagramDocument,

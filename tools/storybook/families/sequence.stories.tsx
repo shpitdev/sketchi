@@ -5,7 +5,7 @@ import {
 import { familyForType } from "@sketchi/diagrams/family";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index.js";
 
 const sequenceFixture = familyForType("sequence").fixture;
 

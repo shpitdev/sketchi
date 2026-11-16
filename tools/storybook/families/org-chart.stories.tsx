@@ -4,7 +4,7 @@ import { type Meta, type StoryObj } from "@storybook/react-vite";
 import { orgChartScenarios } from "@sketchi/diagram-scenarios";
 import { orgChartStressFixtures } from "@sketchi/diagrams/families/org-chart/fixtures";
 
-import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index.js";
 
 const orgChartFixture = familyForType("org-chart").fixture;
 

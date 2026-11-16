@@ -22,7 +22,7 @@ import {
 	requiredObject,
 	RequiredNonEmptyString,
 	stringLiteral,
-} from "../build/code-mode/schema.js";
+} from "../build/schema.js";
 import { CanvasElementInput, CanvasInput } from "./input.js";
 
 const FLOWCHART_NODE_KINDS = ["start", "process", "decision", "end"] as const;

@@ -7,7 +7,7 @@ import {
 	EditFlowchartAccepted,
 	EditFlowchartRejected,
 	EditFlowchartRequest,
-} from "./build/code-mode/edit-flowchart-contract.js";
+} from "./build/edit-flowchart-contract.js";
 import { GetArtifactAccepted, GetArtifactRejected } from "./canvas/artifact-contract.js";
 import {
 	CreateCanvasAccepted,

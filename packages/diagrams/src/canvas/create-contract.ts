@@ -11,7 +11,7 @@ import {
 	optionalContract,
 	requiredObject,
 	stringLiteral,
-} from "../build/code-mode/schema.js";
+} from "../build/schema.js";
 import { CanvasInput } from "./input.js";
 
 export const CreateCanvasRequest = Schema.Struct({

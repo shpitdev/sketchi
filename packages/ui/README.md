@@ -1,7 +1,7 @@
 # ui
 
 Shared shadcn primitives for Sketchi's Tailwind apps (`apps/web`,
-`apps/playground` and `apps/icons`), plus `cn` and the stylesheet that maps shadcn tokens onto the
+`apps/studio` and `apps/icons`), plus `cn` and the stylesheet that maps shadcn tokens onto the
 shared theme.
 
 ```tsx

@@ -78,13 +78,13 @@ prompt ─▶ model candidate ─▶ typed diagram ─▶ deterministic layout �
 | `packages/observability`      | span telemetry for every Worker request                                 |
 | `packages/ui`                 | shadcn primitives and tokens for the Tailwind apps                      |
 
-| App          | Serves                                                                 |
-| ------------ | ---------------------------------------------------------------------- |
-| `cli`        | the `sketchi` command                                                  |
-| `playground` | playground.sketchi.app: Studio, the HTTP API and the MCP server       |
-| `web`        | sketchi.app: home, docs and agent setup                                |
-| `icons`      | icons.sketchi.app                                                      |
-| `excalidraw` | an internal Excalidraw workspace for checking real scenes              |
+| App (`apps/`) | Nx project   | Serves                                                          |
+| ------------- | ------------ | --------------------------------------------------------------- |
+| `cli`         | `sketchi-cli` | the `sketchi` command                                          |
+| `studio`      | `playground` | playground.sketchi.app: Studio, the HTTP API and the MCP server |
+| `web`         | `web`        | sketchi.app: home, docs and agent setup                         |
+| `icons`       | `icons`      | icons.sketchi.app                                               |
+| `editor`      | `excalidraw` | an internal Excalidraw workspace for checking real scenes       |
 
 Every app except the CLI is a Cloudflare Worker. See the
 [architecture guide](docs/architecture.md) and, for each family,
@@ -98,7 +98,7 @@ Every app except the CLI is a Cloudflare Worker. See the
 mise trust && mise install
 pnpm install
 pnpm dev                    # every app, through Portless
-pnpm nx dev playground      # one app
+pnpm nx dev playground      # one app (apps/studio)
 ```
 
 `pnpm ci:local` is the gate: lint and format, typecheck (TypeScript 6 and the

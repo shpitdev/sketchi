@@ -4,12 +4,9 @@ import { type CanvasSpec, SKETCHI_DIAGRAM_PALETTE } from "@sketchi/drawing";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { describe, expect, it } from "vitest";
 
-import {
-	CodeModeArtifactStorage,
-	makeMemoryArtifactStorage,
-} from "../../../build/code-mode/artifacts.js";
-import { buildVennDiagram } from "../../../build/code-mode/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
+import { buildVennDiagram } from "../../../build/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
 import { buildResponse } from "../../../build/operation.js";
 import {
 	parseVennDiagram,

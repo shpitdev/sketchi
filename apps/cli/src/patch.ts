@@ -1,7 +1,6 @@
 import { type CanvasSpec } from "@sketchi/drawing";
-import { formatContractSchemaError } from "@sketchi/diagrams/build/input";
-import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
-import { CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
+import { formatContractSchemaError } from "@sketchi/diagrams/build/contract";
+import { CodeModeArtifactStorage, CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build";
 import { applyDiagramPatch } from "@sketchi/diagrams/canvas/patch";
 import { ApplyDiagramPatchRequest } from "@sketchi/diagrams/canvas/patch-contract";
 import { Context, Effect, Layer, Schema, Result } from "effect";

@@ -16,7 +16,7 @@ import {
 import { duckdbCommand } from "./db.mjs";
 
 const studioWrangler = JSON.parse(
-	readFileSync(new URL("../../apps/playground/wrangler.jsonc", import.meta.url), "utf8").replace(
+	readFileSync(new URL("../../apps/studio/wrangler.jsonc", import.meta.url), "utf8").replace(
 		/^\s*\/\/.*$/gm,
 		"",
 	),

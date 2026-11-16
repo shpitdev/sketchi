@@ -1,7 +1,7 @@
 import { PublishedBuildIssue } from "../../build/result.js";
 import { Array, Effect } from "effect";
 import { defineBuild } from "../../build/operation.js";
-import { BuildIconSource, resolveNodeIcons, embedSceneIcons } from "../../build/code-mode/icons.js";
+import { BuildIconSource, resolveNodeIcons, embedSceneIcons } from "../../build/icons.js";
 import {
 	SequenceDocument,
 	SequenceDiagram,

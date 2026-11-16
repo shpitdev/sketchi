@@ -3,57 +3,17 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		"./build/code-mode/artifacts": {
-			"types": "./dist/build/code-mode/artifacts.d.ts",
-			"default": "./dist/build/code-mode/artifacts.js"
+		"./build": {
+			"types": "./dist/build/index.d.ts",
+			"default": "./dist/build/index.js"
 		},
-		"./build/code-mode/boundary": {
-			"types": "./dist/build/code-mode/boundary.d.ts",
-			"default": "./dist/build/code-mode/boundary.js"
-		},
-		"./build/code-mode/builds": {
-			"types": "./dist/build/code-mode/builds.d.ts",
-			"default": "./dist/build/code-mode/builds.js"
-		},
-		"./build/code-mode/documents": {
-			"types": "./dist/build/code-mode/documents.d.ts",
-			"default": "./dist/build/code-mode/documents.js"
-		},
-		"./build/code-mode/edit-flowchart": {
-			"types": "./dist/build/code-mode/edit-flowchart.d.ts",
-			"default": "./dist/build/code-mode/edit-flowchart.js"
-		},
-		"./build/code-mode/edit-flowchart-contract": {
-			"types": "./dist/build/code-mode/edit-flowchart-contract.d.ts",
-			"default": "./dist/build/code-mode/edit-flowchart-contract.js"
-		},
-		"./build/code-mode/icons": {
-			"types": "./dist/build/code-mode/icons.d.ts",
-			"default": "./dist/build/code-mode/icons.js"
-		},
-		"./build/code-mode/runtime": {
-			"types": "./dist/build/code-mode/runtime.d.ts",
-			"default": "./dist/build/code-mode/runtime.js"
-		},
-		"./build/code-mode/schema": {
-			"types": "./dist/build/code-mode/schema.d.ts",
-			"default": "./dist/build/code-mode/schema.js"
-		},
-		"./build/code-mode/search-icons": {
-			"types": "./dist/build/code-mode/search-icons.d.ts",
-			"default": "./dist/build/code-mode/search-icons.js"
-		},
-		"./build/code-mode/search-icons-contract": {
-			"types": "./dist/build/code-mode/search-icons-contract.d.ts",
-			"default": "./dist/build/code-mode/search-icons-contract.js"
+		"./build/contract": {
+			"types": "./dist/build/contract.d.ts",
+			"default": "./dist/build/contract.js"
 		},
 		"./build/policy": {
 			"types": "./dist/build/policy.d.ts",
 			"default": "./dist/build/policy.js"
-		},
-		"./build/result": {
-			"types": "./dist/build/result.d.ts",
-			"default": "./dist/build/result.js"
 		},
 		"./canvas/artifact": {
 			"types": "./dist/canvas/artifact.d.ts",
@@ -411,10 +371,6 @@
 			"types": "./dist/family.d.ts",
 			"default": "./dist/family.js"
 		},
-		"./build/operation": {
-			"types": "./dist/build/operation.d.ts",
-			"default": "./dist/build/operation.js"
-		},
 		"./clean-text": {
 			"types": "./dist/clean-text.d.ts",
 			"default": "./dist/clean-text.js"
@@ -450,10 +406,6 @@
 		"./families/flowchart/build": {
 			"types": "./dist/families/flowchart/build.d.ts",
 			"default": "./dist/families/flowchart/build.js"
-		},
-		"./build/input": {
-			"types": "./dist/build/input.d.ts",
-			"default": "./dist/build/input.js"
 		}
 	},
 	"dependencies": {

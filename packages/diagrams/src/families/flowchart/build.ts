@@ -8,7 +8,7 @@ import {
 	resolveFlowchartLogos,
 	fillGroupLogos,
 	embedSceneIcons,
-} from "../../build/code-mode/icons.js";
+} from "../../build/icons.js";
 import { checkRequestCoverage, type CoverageIssueCode } from "../../generate/coverage.js";
 import { longNodeDescriptions } from "../../graph/compose.js";
 import { NODE_DESCRIPTION_MAX_LINES } from "../../graph/measure.js";

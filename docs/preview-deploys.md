@@ -5,12 +5,12 @@
 GitHub Actions builds each Nx app and runs `wrangler preview --name pr-<number>`
 against its existing Worker. It no longer creates a separate Worker per PR.
 
-| Project        | Worker               | Stable Preview hostname                                |
-| -------------- | -------------------- | ------------------------------------------------------ |
-| `web`          | `sketchi-web`        | `pr-<number>-sketchi-web.<account>.workers.dev`        |
-| `playground`   | `sketchi-studio`     | `pr-<number>-sketchi-studio.<account>.workers.dev`     |
-| `icons`        | `sketchi-icons`      | `pr-<number>-sketchi-icons.<account>.workers.dev`      |
-| `excalidraw`   | `sketchi-excalidraw` | `pr-<number>-sketchi-excalidraw.<account>.workers.dev` |
+| Project      | Source         | Worker               | Stable Preview hostname                                |
+| ------------ | -------------- | -------------------- | ------------------------------------------------------ |
+| `web`        | `apps/web`     | `sketchi-web`        | `pr-<number>-sketchi-web.<account>.workers.dev`        |
+| `playground` | `apps/studio`  | `sketchi-studio`     | `pr-<number>-sketchi-studio.<account>.workers.dev`     |
+| `icons`      | `apps/icons`   | `sketchi-icons`      | `pr-<number>-sketchi-icons.<account>.workers.dev`      |
+| `excalidraw` | `apps/editor`  | `sketchi-excalidraw` | `pr-<number>-sketchi-excalidraw.<account>.workers.dev` |
 
 Cloudflare's [Worker Previews](https://developers.cloudflare.com/workers/previews/)
 provide branch-specific bindings, variables, secrets, and observability under an
@@ -201,7 +201,7 @@ and wait about two minutes for the sink to roll. Then
 usage row, and `span_tree` on its `trace_id` returns its spans.
 
 Wrangler accepts Pipeline stream names in local dry-runs, but the deploy API
-requires stream IDs for Worker bindings. Keep `apps/playground/wrangler.jsonc` on
+requires stream IDs for Worker bindings. Keep `apps/studio/wrangler.jsonc` on
 the production stream IDs and keep `previews.pipelines`
 on the preview stream IDs. The validator rejects Previews bound to production targets.
 
