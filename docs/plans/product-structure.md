@@ -240,7 +240,7 @@ Starting state is the mindmap example; exact checkpoints and reviews are in the 
 
 | Mechanism today | Where | Disposition | Proof that closes it |
 |---|---|---|---|
-| Studio chat server and browser | `apps/playground/src/features/chat/*`, `/api/studio/chat` | Track 3 implements `Chat.streamText`, AG-UI events and atoms together; old `/api/chat` and direct AI SDK dependencies removed. One shared turn guard owns canonical preparation, attempts, accepted-artifact reuse and rejected replies. Narrow adapters remain for `parallel_tool_calls:false` on the gateway request, canonical `Tool.dynamic` schemas, preview-only partial JSON, and truncated OpenAI tool-completion events before their terminal reason. | Local gateway/model fixtures, rejection telemetry and turn-policy regressions pass. Headless local Studio streaming, Stop, Retry, active preview and editor save/reload pass; actual new local IDB/R2 formats inspected. Browserbase suites remain unrun because credentials are missing. Live provider cancellation, same-input Frontierclimb quality/cost comparison, final Fable review and user merge decision remain open; paid comparison needs approval. |
+| Studio chat server and browser | `apps/playground/src/features/chat/*`, `/api/studio/chat` | Track 3 implements `Chat.streamText`, AG-UI events and atoms together; old `/api/chat` and direct AI SDK dependencies removed. One shared turn guard owns canonical preparation, attempts, accepted-artifact reuse and rejected replies. Narrow adapters remain for `parallel_tool_calls:false` on the gateway request, canonical `Tool.dynamic` schemas, preview-only partial JSON, and truncated OpenAI tool-completion events before their terminal reason. | Local gateway/model fixtures, rejection telemetry and turn-policy regressions pass. Headless local Studio streaming, Stop, Retry, active preview and editor save/reload pass; actual new local IDB/R2 formats inspected. Browserbase suites remain unrun because credentials are missing. Stop is closed under the dated disposition and production checklist below. The same-input Frontierclimb quality/cost comparison remains unproved. |
 | MCP SDK servers, `agents/mcp`, `effect-mcp-adapter.server.ts` | `server/codemode/mcp.server.ts`, `apps/icons/src/lib/mcp.server.ts`, `vite.config.ts` | Replace with Effect `McpServer` over the shared Toolkit. Host is `layerHttpRequestScoped` only if every configured client is sessionless; otherwise `layerHttp` in a session-owned Durable Object. No per-isolate session map. | Real clients initialise, list, call and fetch artifacts across requests, isolate change, redeploy and an idle gap; `mcp-validation-issues-v2.json` replayed |
 | Code Mode sandbox loader | `execute.server.ts` | Keep as a narrow external service. Replace the Promise composition, lifetime and error translation around it. | Receipts, partial results and PNG budgets unchanged |
 | Handwritten HTTP clients and route handlers | `packages/studio/projects/src/client-api.ts`, `server/codemode/api.server.ts`, `server/generation/api.server.ts`, CLI `generation.ts`, `canvas.ts`, `icon-draw.ts` | One `HttpApi` contract in `diagrams/http-api.ts` and the projects feature; generated clients in browser and CLI. | The last released CLI completes its four network commands against a preview of both Workers; `http-status-compatibility-v1.json` replayed |
@@ -259,6 +259,16 @@ Starting state is the mindmap example; exact checkpoints and reviews are in the 
 | Operator scripts | `scripts/**/*.mjs` (2,606 lines) | Typed Effect in `tools/ops`. `ci-local.mjs` stays a minimal bootstrap. Source-string tests are deleted, not translated. | Preview deletion cannot remove another owner's resource; one real gate run |
 | Telemetry exporter | `packages/observability` | Upstream spans and exporters with a narrow Pipeline sink. Request-scoped flush through `waitUntil`; no module-scope timer. | One live request joined to its gateway log, artifact and retained span rows |
 | Remaining `async` functions (98 files), `Effect.tryPromise` wrappers (33), global `fetch` (13), timers (10) | throughout | Not a count to drive down for its own sake. Each goes with its owner above; what is left must be a host callback or a named gap under the diagnostic ratchet. | Diagnostic group at error |
+
+### Studio Stop disposition — 2026-11-16
+
+Closed as a Preview-platform symptom, not a code regression.
+
+Worker Previews do not deliver client disconnect to the Worker, so Stop/cancellation cannot be verified on a Preview.
+
+Production deployment still requires the user's decision.
+
+- [ ] After the first production deploy of Studio, press Stop once on a long prompt and read its gateway log. If the call does not end within a few seconds, roll Studio back.
 
 ## Evidence and cost gaps that cannot be inferred closed
 
