@@ -13,7 +13,7 @@ A mindmap draws a nested topic hierarchy around one central topic: a brainstorm,
 
 ## Layout
 
-`packages/diagrams/src/mindmap` owns the document, normalization, limits, quality and layout. `renderMindmap` draws a decoded document; mindmaps never go through the flowchart router.
+`packages/diagrams/src/families/mindmap` owns the document, normalization, limits, quality and layout. `renderMindmap` draws a decoded document; mindmaps never go through the flowchart router.
 
 Generation, Code Mode and CLI builds share `MindmapDocument`. The hierarchy remains a tree through measurement and layout; no flat node/edge model or separately authored depth/order metadata exists. IDs such as `topic-0-1` and `branch-0-1` are derived from child positions for exported element identity. CLI `document.json` keeps the nested spec; CanvasSpec scenes and native Excalidraw drawings keep their existing stored formats.
 
