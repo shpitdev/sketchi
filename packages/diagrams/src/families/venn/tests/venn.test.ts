@@ -8,7 +8,8 @@ import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
 } from "../../../build/code-mode/artifacts.js";
-import { buildVennDiagram, CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { buildVennDiagram } from "../../../build/code-mode/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
 import { buildResponse } from "../../../build/operation.js";
 import {
 	parseVennDiagram,

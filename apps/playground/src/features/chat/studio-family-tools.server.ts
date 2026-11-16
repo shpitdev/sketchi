@@ -4,8 +4,8 @@ import { families, type FamilyOperation, type DiagramFamily } from "@sketchi/dia
 import { type OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";
 import "@tanstack/react-start/server-only";
 import { buildResponse } from "@sketchi/diagrams/build/operation";
-import { toCodeModeJsonSchema } from "@sketchi/diagrams/build/code-mode/contract";
-import * as Build from "@sketchi/diagrams/build/code-mode/runtime";
+import { bindBuild } from "@sketchi/diagrams/build/code-mode/builds";
+import { toCodeModeJsonSchema } from "@sketchi/diagrams/build/code-mode/schema";
 import type { PlaygroundCallbackEffect } from "../../server/runtime/runtime.server";
 import {
 	makeStudioFlowchartToolExecutor,
@@ -57,14 +57,14 @@ export function makeStudioFamilyTool(
 	return Effect.gen(function* () {
 		if (family.type === "flowchart") {
 			const executor = yield* makeStudioFlowchartToolExecutor(
-				(input) => buildResponse(family.build(Build)(input)),
+				(input) => buildResponse(family.build({ bindBuild })(input)),
 				options,
 			);
 			return yield* buildTool(family, executor);
 		}
 		if (family.type === "sequence") {
 			const executor = yield* makeStudioSequenceToolExecutor(
-				(input) => buildResponse(family.build(Build)(input)),
+				(input) => buildResponse(family.build({ bindBuild })(input)),
 				options,
 			);
 			return yield* buildTool(family, executor);
@@ -72,7 +72,7 @@ export function makeStudioFamilyTool(
 		const operation: FamilyOperation<PlainFamilyResult> = family;
 		const executor = yield* makeStudioFamilyExecutor(
 			family,
-			(input) => buildResponse(operation.build(Build)(input)),
+			(input) => buildResponse(operation.build({ bindBuild })(input)),
 			options,
 		);
 		return yield* buildTool(family, executor);

@@ -9,7 +9,8 @@ import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
 } from "../../../build/code-mode/artifacts.js";
-import { buildOrgChart, CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { buildOrgChart } from "../../../build/code-mode/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
 import { buildResponse } from "../../../build/operation.js";
 import {
 	ORG_CHART_MAX_DEPTH,

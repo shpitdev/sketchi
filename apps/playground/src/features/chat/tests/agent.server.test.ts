@@ -4,11 +4,9 @@ import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
 } from "@sketchi/diagrams/build/code-mode/artifacts";
-import { toCodeModeJsonSchema } from "@sketchi/diagrams/build/code-mode/contract";
-import {
-	buildFlowchart,
-	CodeModeRuntimeEnvironment,
-} from "@sketchi/diagrams/build/code-mode/runtime";
+import { buildFlowchart } from "@sketchi/diagrams/build/code-mode/builds";
+import { CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
+import { toCodeModeJsonSchema } from "@sketchi/diagrams/build/code-mode/schema";
 import { buildResponse } from "@sketchi/diagrams/build/operation";
 import { MAX_AGENT_STEPS, MAX_DIAGRAM_BUILD_ATTEMPTS } from "@sketchi/diagrams/build/policy";
 import { families, familyForType } from "@sketchi/diagrams/family";

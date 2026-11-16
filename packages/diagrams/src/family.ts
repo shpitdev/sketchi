@@ -3,7 +3,8 @@ import { sequenceFixture } from "./families/sequence/fixtures.js";
 import { sequenceBuild } from "./families/sequence/build.js";
 import { vennBuild } from "./families/venn/build.js";
 import { Effect, Result, Schema } from "effect";
-import type * as Runtime from "./build/code-mode/runtime.js";
+import type * as Builds from "./build/code-mode/builds.js";
+import type { CodeModeRuntimeEnvironment } from "./build/code-mode/runtime.js";
 import { docs as chartFamilyDocs } from "./families/chart/docs.js";
 import * as chartFamily from "./families/chart/document.js";
 import { chartBuild } from "./families/chart/build.js";
@@ -175,8 +176,7 @@ function family<
 				),
 				Effect.map((spec) => ({ type, spec })),
 			),
-		build: (runtime: Pick<typeof Runtime, "bindBuild">) =>
-			runtime.bindBuild(definition.operation, build),
+		build: (host: Pick<typeof Builds, "bindBuild">) => host.bindBuild(definition.operation, build),
 	};
 }
 
@@ -442,14 +442,13 @@ export function renderDiagram(
 export interface FamilyOperation<A> {
 	readonly operation: FamilyBuildOperation;
 	readonly build: (
-		runtime: typeof Runtime,
+		host: Pick<typeof Builds, "bindBuild">,
 	) => (
 		input: unknown,
 	) => Effect.Effect<
 		A,
 		import("./build/operation.js").BuildRejection<A>,
-		| import("./build/code-mode/artifacts.js").CodeModeArtifactStorage
-		| Runtime.CodeModeRuntimeEnvironment
+		import("./build/code-mode/artifacts.js").CodeModeArtifactStorage | CodeModeRuntimeEnvironment
 	>;
 }
 

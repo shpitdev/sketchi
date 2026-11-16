@@ -8,7 +8,8 @@ import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
 } from "../../../build/code-mode/artifacts.js";
-import { buildClassDiagram, CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { buildClassDiagram } from "../../../build/code-mode/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
 import { buildResponse } from "../../../build/operation.js";
 import { renderDiagram } from "../../../family.js";
 import { classBuild } from "../build.js";

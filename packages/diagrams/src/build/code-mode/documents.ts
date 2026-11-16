@@ -8,7 +8,7 @@ import {
 	type DiagramTypeValue,
 	type FamilyBuildResult,
 } from "../../family.js";
-import * as Runtime from "./runtime.js";
+import { bindBuild } from "./builds.js";
 import { type CodeModeRuntimeEnvironment } from "./runtime.js";
 
 import { type BuildOptions } from "../result.js";
@@ -28,7 +28,7 @@ export function buildCanonicalDocument(
 	import("../operation.js").BuildRejection<FamilyBuildResult>,
 	CodeModeArtifactStorage | CodeModeRuntimeEnvironment
 > {
-	return familyForType(document.type).build(Runtime)({
+	return familyForType(document.type).build({ bindBuild })({
 		spec: document.spec,
 		...(options ? { options } : {}),
 	});

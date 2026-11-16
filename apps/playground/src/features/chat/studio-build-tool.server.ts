@@ -4,7 +4,7 @@ import "@tanstack/react-start/server-only";
 import { type BuildOptions, type CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { type BuildRejection } from "@sketchi/diagrams/build/operation";
 import { normalizeIconSlug } from "@sketchi/diagrams/build/code-mode/icons";
-import { observeCodeModeBoundary } from "@sketchi/diagrams/build/code-mode/runtime";
+import { observeCodeModeBoundary } from "@sketchi/diagrams/build/code-mode/boundary";
 import { MAX_DIAGRAM_BUILD_ATTEMPTS } from "@sketchi/diagrams/build/policy";
 import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";
 import { recordMetric } from "@sketchi/observability";

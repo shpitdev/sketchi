@@ -16,16 +16,20 @@ import {
 	type FamilyOperation,
 } from "@sketchi/diagrams/family";
 import "@tanstack/react-start/server-only";
-import {
-	type ApplyDiagramPatchResult,
-	type CreateCanvasResult,
-	type EditFlowchartResult,
-} from "@sketchi/diagrams/build/code-mode/contract";
+import { bindBuild } from "@sketchi/diagrams/build/code-mode/builds";
+import { editFlowchart } from "@sketchi/diagrams/build/code-mode/edit-flowchart";
+import { type EditFlowchartResult } from "@sketchi/diagrams/build/code-mode/edit-flowchart-contract";
+import { CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
+import { searchIcons } from "@sketchi/diagrams/build/code-mode/search-icons";
+import { getArtifact } from "@sketchi/diagrams/canvas/artifact";
+import { createCanvas } from "@sketchi/diagrams/canvas/create";
+import { type CreateCanvasResult } from "@sketchi/diagrams/canvas/create-contract";
+import { applyDiagramPatch } from "@sketchi/diagrams/canvas/patch";
+import { type ApplyDiagramPatchResult } from "@sketchi/diagrams/canvas/patch-contract";
 import { CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { type ArtifactBundle, type PartialArtifactBundle } from "@sketchi/drawing/artifacts";
 import { normalizeCode } from "@cloudflare/codemode";
 import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
-import * as Build from "@sketchi/diagrams/build/code-mode/runtime";
 import { buildResponse } from "@sketchi/diagrams/build/operation";
 import { CodeModeSandbox, CodeModeExecutionError, type SandboxFunctions } from "./sandbox.server";
 import { withTelemetryCorrelation } from "@sketchi/observability";
@@ -503,7 +507,7 @@ function withModelDelivery(request: unknown): unknown {
 		},
 	};
 }
-type BuildServices = CodeModeArtifactStorage | Build.CodeModeRuntimeEnvironment;
+type BuildServices = CodeModeArtifactStorage | CodeModeRuntimeEnvironment;
 const makeSketchiFunctions = Effect.fn("studio.mcp.functions")(function* (
 	receipts: Ref.Ref<readonly ExecuteBuild[]>,
 	fibers: FiberSet.FiberSet<unknown, unknown>,
@@ -523,7 +527,7 @@ const makeSketchiFunctions = Effect.fn("studio.mcp.functions")(function* (
 		// This single per-build value cannot escape its invocation or mutate a receipt.
 		let unavailable: string | undefined;
 		const result = yield* workflow.pipe(
-			Effect.updateService(Build.CodeModeRuntimeEnvironment, (capabilities) => ({
+			Effect.updateService(CodeModeRuntimeEnvironment, (capabilities) => ({
 				...capabilities,
 				fillNamedLogos: true,
 				...(defaulted
@@ -603,7 +607,7 @@ const makeSketchiFunctions = Effect.fn("studio.mcp.functions")(function* (
 						build(
 							family.operation,
 							input,
-							buildResponse(operation.build(Build)(withModelDelivery(input))),
+							buildResponse(operation.build({ bindBuild })(withModelDelivery(input))),
 						),
 					);
 				},
@@ -611,19 +615,19 @@ const makeSketchiFunctions = Effect.fn("studio.mcp.functions")(function* (
 		),
 		editFlowchart: (input) => {
 			return run(
-				build("editFlowchart", input, buildResponse(Build.editFlowchart(withModelDelivery(input)))),
+				build("editFlowchart", input, buildResponse(editFlowchart(withModelDelivery(input)))),
 			);
 		},
 		createCanvas: (input) => {
 			return run(
-				build("createCanvas", input, buildResponse(Build.createCanvas(withModelDelivery(input)))),
+				build("createCanvas", input, buildResponse(createCanvas(withModelDelivery(input)))),
 			);
 		},
-		getArtifact: (request) => run(buildResponse(Build.getArtifact(request))),
+		getArtifact: (request) => run(buildResponse(getArtifact(request))),
 		applyDiagramPatch: (input) => {
-			return run(deliver(input, buildResponse(Build.applyDiagramPatch(withModelDelivery(input)))));
+			return run(deliver(input, buildResponse(applyDiagramPatch(withModelDelivery(input)))));
 		},
-		searchIcons: (request) => run(buildResponse(Build.searchIcons(request))),
+		searchIcons: (request) => run(buildResponse(searchIcons(request))),
 		drawIcon: (request) => run(drawIconForAgent(request)),
 	} satisfies SandboxFunctions;
 });

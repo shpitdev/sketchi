@@ -11,11 +11,9 @@ import {
 } from "../document.js";
 
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import {
-	applyDiagramPatch,
-	buildGantt,
-	CodeModeRuntimeEnvironment,
-} from "../../../build/code-mode/runtime.js";
+import { buildGantt } from "../../../build/code-mode/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { applyDiagramPatch } from "../../../canvas/patch.js";
 import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,

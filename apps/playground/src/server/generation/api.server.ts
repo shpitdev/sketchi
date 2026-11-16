@@ -33,10 +33,8 @@ import { isSupportedGenerationModel } from "@sketchi/diagrams/generate/models";
 import { type DiagramStyle } from "@sketchi/diagrams/generate/styling";
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { buildResponse } from "@sketchi/diagrams/build/operation";
-import {
-	CodeModeRuntimeEnvironment,
-	applyDiagramPatch,
-} from "@sketchi/diagrams/build/code-mode/runtime";
+import { CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
+import { applyDiagramPatch } from "@sketchi/diagrams/canvas/patch";
 import {
 	codeModeUsageResponseHeaders,
 	PlaygroundCodeModeUsage,
