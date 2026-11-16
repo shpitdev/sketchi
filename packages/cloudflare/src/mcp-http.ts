@@ -37,11 +37,17 @@ const releaseAfterBody = (response: Response, release: () => void) => {
 		reader &&
 		new ReadableStream<Uint8Array>({
 			pull: (controller) =>
-				reader.read().then((chunk) => {
-					if (!chunk.done) return controller.enqueue(chunk.value);
-					controller.close();
-					release();
-				}),
+				reader.read().then(
+					(chunk) => {
+						if (!chunk.done) return controller.enqueue(chunk.value);
+						controller.close();
+						release();
+					},
+					(cause: unknown) => {
+						release();
+						throw cause;
+					},
+				),
 			cancel: (reason) => reader.cancel(reason).finally(release),
 		});
 	return new Response(body, { status: response.status, statusText: response.statusText, headers });
