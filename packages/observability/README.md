@@ -20,7 +20,11 @@ flowchart LR
 
 `withTelemetryExport` makes the current span a request's root; the request's
 spans are sent when the scope the host passes closes, so the host closes it after
-the request's late work, under `waitUntil`. `withSpanContent` and `SpanContent` name the content
+the request's late work, under `waitUntil`.
+
+Limit: a request's rows are sent once, when its scope closes. If the isolate dies
+before then, every row of that request is lost; AI Gateway logs still show its
+model calls. `withSpanContent` and `SpanContent` name the content
 a span records. The layer performs no module-scope I/O and starts no timers.
 `makeTelemetryTestSink` receives every span as it finishes, for tests.
 
