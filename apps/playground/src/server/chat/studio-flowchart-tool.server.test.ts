@@ -3,14 +3,10 @@ import { buildResponse } from "@sketchi/diagrams/build/operation";
 import { describe, expect, it, vi } from "@effect/vitest";
 import { familyForType } from "@sketchi/diagrams/family";
 import { Effect, Fiber, Schema } from "effect";
-import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
+import { Tool } from "effect/ai";
 import { studioSystemPrompt } from "./studio-system-prompt";
-const StudioBuildFlowchartInputSchema = toPlaygroundStandardSchema(
-	familyForType("flowchart").studioInput,
-);
-const StudioBuildFlowchartOutputSchema = toPlaygroundStandardSchema(
-	familyForType("flowchart").contracts.output,
-);
+const StudioBuildFlowchartInputSchema = familyForType("flowchart").studioInput;
+const StudioBuildFlowchartOutputSchema = familyForType("flowchart").contracts.output;
 
 import {
 	CodeModeArtifactStorage,
@@ -33,7 +29,7 @@ import {
 } from "./studio-build-policy.server";
 import {
 	makeStudioBuildTurn,
-	studioBuildModelOutput,
+	studioModelResult,
 	studioTurnOutcome,
 } from "./studio-build-tool.server";
 
@@ -113,21 +109,13 @@ const repairResult: BuildFlowchartResult = {
 
 describe("Studio build_flowchart host", () => {
 	it("accepts a structured repair result and rejects missing issue fields", async () => {
-		const validRepair = await StudioBuildFlowchartOutputSchema["~standard"].validate(repairResult);
-		expect(validRepair).toEqual({ value: repairResult });
-		const invalidRepair = await StudioBuildFlowchartOutputSchema["~standard"].validate({
-			ok: false,
-			status: "invalid_flowchart",
-			issues: [{}],
-		});
-		expect(invalidRepair).toHaveProperty("issues");
+        expect(Schema.is(StudioBuildFlowchartOutputSchema)(repairResult)).toBe(true);
+        expect(Schema.is(StudioBuildFlowchartOutputSchema)({ok:false,status:"invalid_flowchart",issues:[{}]})).toBe(false);
 	});
 
 	it("keeps declared lanes and groups through Studio's tool schema and builds them", async () => {
 		const properties = (
-			StudioBuildFlowchartInputSchema["~standard"].jsonSchema.input({
-				target: "draft-2020-12",
-			}) as { properties: { spec: { properties: Record<string, unknown> } } }
+			Tool.getJsonSchemaFromSchema(StudioBuildFlowchartInputSchema) as { properties: { spec: { properties: Record<string, unknown> } } }
 		).properties.spec.properties;
 		expect(Object.keys(properties)).toEqual(expect.arrayContaining(["groups", "lanes"]));
 
@@ -146,14 +134,13 @@ describe("Studio build_flowchart host", () => {
 			),
 			lanes,
 		};
-		const validated = await StudioBuildFlowchartInputSchema["~standard"].validate({ spec: laned });
-		if (!("value" in validated)) throw new Error(JSON.stringify(validated.issues));
-		expect(validated.value.spec).toMatchObject({ lanes });
+		const validated = Schema.decodeUnknownSync(StudioBuildFlowchartInputSchema)({ spec: laned });
+		expect(validated.spec).toMatchObject({ lanes });
 
 		const executor = await Effect.runPromise(
 			makeStudioFlowchartToolExecutor(deterministicRuntime(countingStore())),
 		);
-		const built = await Effect.runPromise(executor.execute(validated.value));
+		const built = await Effect.runPromise(executor.execute(validated));
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
 		expect(built.normalizedSpec.lanes).toEqual(lanes);
 		const scene = built.artifact.formats.find((format) => format.format === "scene")?.inline as {
@@ -173,14 +160,13 @@ describe("Studio build_flowchart host", () => {
 			groups,
 			nodes: { ...spec.nodes, publish: { label: "Publish release", shape: "document" as const } },
 		};
-		const validated = await StudioBuildFlowchartInputSchema["~standard"].validate({ spec: zoned });
-		if (!("value" in validated)) throw new Error(JSON.stringify(validated.issues));
-		expect(validated.value.spec).toMatchObject({ groups });
+		const validated = Schema.decodeUnknownSync(StudioBuildFlowchartInputSchema)({ spec: zoned });
+		expect(validated.spec).toMatchObject({ groups });
 
 		const executor = await Effect.runPromise(
 			makeStudioFlowchartToolExecutor(deterministicRuntime(countingStore())),
 		);
-		const built = await Effect.runPromise(executor.execute(validated.value));
+		const built = await Effect.runPromise(executor.execute(validated));
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
 		expect(built.normalizedSpec.groups).toEqual(groups);
 		const scene = built.artifact.formats.find((format) => format.format === "scene")?.inline as {
@@ -363,9 +349,7 @@ describe("Studio build_flowchart host", () => {
 	});
 
 	it("gives the model a rejection's every issue, its element and hint, and nothing else", () => {
-		expect(studioBuildModelOutput({ output: repairResult })).toEqual({
-			type: "json",
-			value: {
+		expect(studioModelResult(repairResult)).toEqual({
 				ok: false,
 				status: "invalid_flowchart",
 				issues: repairResult.issues.map(({ code, severity, stage, ref, message, hint }) => ({
@@ -376,7 +360,6 @@ describe("Studio build_flowchart host", () => {
 					message,
 					...(hint ? { hint } : {}),
 				})),
-			},
 		});
 	});
 
@@ -388,7 +371,7 @@ describe("Studio build_flowchart host", () => {
 			}),
 		);
 		expect(result.ok).toBe(false);
-		const { value } = studioBuildModelOutput({ output: result });
+		const value = studioModelResult(result);
 		expect(value).toMatchObject({
 			ok: false,
 			issues: [
@@ -409,7 +392,7 @@ describe("Studio build_flowchart host", () => {
 			}),
 		);
 		expect(result.ok).toBe(true);
-		const { value } = studioBuildModelOutput({ output: result });
+		const value = studioModelResult(result);
 		expect(value).toMatchObject({
 			ok: true,
 			artifactId: "artifact_fixed",

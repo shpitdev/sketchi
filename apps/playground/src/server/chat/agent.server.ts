@@ -43,7 +43,7 @@ const handle = Effect.fn("playground.http.chat")(function* (request:Request) {
    // Validate the serialized event before lifecycle sanitization, as AgUiServer.handler does.
    Stream.mapEffect((event) => Effect.flatMap(encodeEvent(event),decodeEvent)),
    AgUi.withRunLifecycle(body),
-   Stream.mapEffect((event) => Effect.map(encodeEvent(event),(data) => ({event:"message",data}))),
+   Stream.mapEffect((event) => Effect.map(encodeEvent(event),(data) => ({_tag:"Event" as const,event:"message",id:undefined,data}))),
    Stream.pipeThroughChannel(Sse.encode()),
    Stream.encodeText,
  );

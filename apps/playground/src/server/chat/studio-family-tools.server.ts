@@ -21,9 +21,10 @@ function buildTool<S extends Schema.Top & Schema.ConstraintDecoder<unknown>, O e
 ) {
  const tool = Tool.make(family.docs.toolName, {
    description:family.docs.toolDescription, parameters:family.studioInput, success:family.contracts.output,
+   // @effect-diagnostics-next-line schemaSync:off -- Effect Tool.toModelOutput is a synchronous callback over our JSON-safe compact result.
    toModelOutput:(output) => [Prompt.makePart("text",{text:Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(studioModelResult(output))})],
  });
- const toolkit = Toolkit.make(tool);
+ const toolkit: Toolkit.Toolkit<Record<string, typeof tool>> = Toolkit.make(tool);
  return Effect.gen(function* () {
    const context = yield* Effect.context<Effect.Services<ReturnType<typeof executor.execute>>>();
    const handlers = yield* toolkit.toHandlers({[tool.name]:(input:S["Type"]) => executor.execute(input).pipe(Effect.provide(context))});

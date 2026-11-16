@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { buildResponse } from "@sketchi/diagrams/build/operation";
-import type { UIMessage } from "ai";
+import type { ChatMessage } from "../../features/playground/chat-message";
 import { convertArrayToReadableStream, MockLanguageModelV4 } from "ai/test";
 import { Effect, Option } from "effect";
 import { makeStudioBuildToolCallback } from "./studio-family-tools.server";
@@ -283,7 +283,7 @@ describe("Studio build results the model reads", () => {
 				formats: [{ format: "scene", inline: { elements: "x".repeat(16_000) } }],
 			},
 		};
-		const messages: UIMessage[] = [];
+		const messages: ChatMessage[] = [];
 		for (let edit = 0; edit < 12; edit += 1) {
 			messages.push({
 				id: `u${edit}`,
@@ -350,7 +350,7 @@ describe("Studio build results the model reads", () => {
 				},
 			},
 		};
-		const messages: UIMessage[] = [
+		const messages: ChatMessage[] = [
 			{
 				id: "u0",
 				role: "user",
