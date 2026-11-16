@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { assert, describe, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Metric, Schema } from "effect";
+import { Effect, Exit, Fiber, Metric, Schema, Scope } from "effect";
 
 import {
 	makeTelemetryTestSink,
@@ -48,19 +48,21 @@ const streamSchema = JSON.parse(
 	readFileSync(new URL("../../spans.schema.json", import.meta.url), "utf8"),
 ) as { readonly fields: readonly StreamField[] };
 
-function fakeExport() {
+function fakeExport(
+	send: (records: readonly unknown[]) => Promise<void> = () => Promise.resolve(),
+) {
 	const sends: TelemetrySpanRow[][] = [];
-	const pending: Promise<unknown>[] = [];
+	const scope = Scope.makeUnsafe();
 	const target: TelemetryExportTarget = {
 		pipeline: {
 			send: (records) => {
 				sends.push(records as TelemetrySpanRow[]);
-				return Promise.resolve();
+				return send(records);
 			},
 		},
-		waitUntil: (promise) => pending.push(promise),
+		scope,
 	};
-	return { pending, sends, target };
+	return { close: Scope.close(scope, Exit.void), sends, target };
 }
 
 function span(overrides: Partial<TelemetrySpan> = {}): TelemetrySpan {
@@ -255,10 +257,10 @@ describe("Workers Effect telemetry", () => {
 });
 
 describe("request span export", () => {
-	it.effect("sends a request's spans in one batch once its root ends", () => {
-		const { pending, sends, target } = fakeExport();
+	it.effect("sends a request's spans with its IDs once its scope closes", () => {
+		const { close, sends, target } = fakeExport();
 		return Effect.gen(function* () {
-			yield* Effect.void.pipe(Effect.withSpan("held.before.request"));
+			yield* Effect.void.pipe(Effect.withSpan("before.request"));
 			yield* Effect.gen(function* () {
 				yield* Effect.annotateCurrentSpan({
 					"cf.ray_id": "ray-test",
@@ -271,80 +273,60 @@ describe("request span export", () => {
 				yield* Effect.void.pipe(
 					Effect.withSpan("request.other_run", { attributes: { "sketchi.run_id": "run-other" } }),
 				);
-				assert.strictEqual(sends.length, 0);
 			}).pipe(withTelemetryExport(target), Effect.withSpan("request.root"));
+			assert.strictEqual(sends.length, 0);
+			yield* close;
 			assert.strictEqual(sends.length, 1);
-			assert.strictEqual(pending.length, 1);
 			const rows = sends[0] ?? [];
+			// A span outside every request is not stored, nor sent with a later one.
 			assert.deepStrictEqual(
 				rows.map((row) => row.name),
-				["held.before.request", "request.child", "request.other_run", "request.root"],
+				["request.child", "request.other_run", "request.root"],
 			);
 			const root = rows.find((row) => row.name === "request.root");
 			const child = rows.find((row) => row.name === "request.child");
 			assert.strictEqual(child?.parent_span_id, root?.span_id);
-			for (const row of rows.slice(1)) {
+			for (const row of rows) {
 				assert.deepInclude(row, { attempt_id: "attempt-test", ray_id: "ray-test" }, row.name);
 			}
 			assert.strictEqual(child?.run_id, "run-test");
 			assert.strictEqual(root?.run_id, "run-test");
 			assert.strictEqual(rows.find((row) => row.name === "request.other_run")?.run_id, "run-other");
-			// A span from before the request belongs to no request.
-			assert.isUndefined(rows[0]?.ray_id);
-			assert.isUndefined(rows[0]?.run_id);
 			assert.strictEqual(JSON.parse(root?.events ?? "[]")[0]?.message, "inside");
 		}).pipe(Effect.provide(makeWorkersTelemetryLayer({ resource: { serviceName: "test" } })));
 	});
 
-	it.effect("sends work the request left running in a later batch", () => {
-		const { sends, target } = fakeExport();
+	it.effect("logs a failed send once, keeps the other batches and never fails the request", () => {
+		const errors: unknown[][] = [];
+		let attempts = 0;
+		const { close, sends, target } = fakeExport(() => {
+			attempts += 1;
+			if (attempts === 1) throw new Error("binding threw");
+			return attempts === 2 ? Promise.reject(new Error("binding rejected")) : Promise.resolve();
+		});
+		const body = "b".repeat(800_000);
 		return Effect.gen(function* () {
-			const release = yield* Deferred.make<void>();
-			const root = yield* Effect.gen(function* () {
-				const current = yield* Effect.currentSpan;
-				yield* Effect.forkDetach(
-					Deferred.await(release).pipe(Effect.withSpan("request.deferred", { parent: current })),
-				);
-				return current;
-			}).pipe(withTelemetryExport(target), Effect.withSpan("request.root"));
+			const result = yield* Effect.forEach(Array.from({ length: 12 }), (_, index) =>
+				Effect.annotateCurrentSpan("body", body).pipe(Effect.withSpan(`request.part${index}`)),
+			).pipe(Effect.as("served"), withTelemetryExport(target), Effect.withSpan("request.root"));
+			const consoleError = console.error;
+			console.error = (...args: unknown[]) => void errors.push(args);
+			yield* close.pipe(Effect.ensuring(Effect.sync(() => (console.error = consoleError))));
+			assert.strictEqual(result, "served");
+			assert.isAbove(sends.length, 2);
+			// One attempt per batch: a retried send would store its rows twice.
+			assert.strictEqual(attempts, sends.length);
 			assert.deepStrictEqual(
-				sends.map((batch) => batch.map((row) => row.name)),
-				[["request.root"]],
+				errors.map(([message]) => message),
+				["Span export failed", "Span export failed"],
 			);
-			yield* Deferred.succeed(release, undefined);
-			while (sends.length < 2) yield* Effect.yieldNow;
-			assert.strictEqual(sends[1]?.[0]?.name, "request.deferred");
-			assert.strictEqual(sends[1]?.[0]?.parent_span_id, root.spanId);
-		}).pipe(Effect.provide(makeWorkersTelemetryLayer({ resource: { serviceName: "test" } })));
-	});
-
-	it.effect("sends the request's spans when its root ends, though one is still open", () => {
-		const { sends, target } = fakeExport();
-		return Effect.gen(function* () {
-			const release = yield* Deferred.make<void>();
-			yield* Effect.gen(function* () {
-				const current = yield* Effect.currentSpan;
-				yield* Effect.forkDetach(
-					Deferred.await(release).pipe(Effect.withSpan("request.stream", { parent: current })),
-				);
-				yield* Effect.yieldNow;
-				yield* Effect.void.pipe(Effect.withSpan("request.child"));
-			}).pipe(withTelemetryExport(target), Effect.withSpan("request.root"));
-			assert.deepStrictEqual(
-				sends.map((batch) => batch.map((row) => row.name)),
-				[["request.child", "request.root"]],
-			);
-			yield* Deferred.succeed(release, undefined);
-			while (sends.length < 2) yield* Effect.yieldNow;
-			assert.deepStrictEqual(
-				sends[1]?.map((row) => row.name),
-				["request.stream"],
-			);
+			assert.include(JSON.stringify(errors), "binding threw");
+			assert.include(JSON.stringify(errors), "binding rejected");
 		}).pipe(Effect.provide(makeWorkersTelemetryLayer({ resource: { serviceName: "test" } })));
 	});
 
 	it.effect("writes rows the spans stream schema accepts", () => {
-		const { sends, target } = fakeExport();
+		const { close, sends, target } = fakeExport();
 		return withTelemetryCorrelation(
 			Effect.fail(new TestFailure({ detail: "d", message: "m" })).pipe(
 				Effect.withSpan("schema.child"),
@@ -359,6 +341,7 @@ describe("request span export", () => {
 					resource: { environment: "test", serviceName: "test", serviceVersion: "1" },
 				}),
 			),
+			Effect.tap(() => close),
 			Effect.tap(() =>
 				Effect.sync(() => {
 					const fields = new Map(streamSchema.fields.map((field) => [field.name, field]));

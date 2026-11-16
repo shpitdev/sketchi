@@ -10,6 +10,7 @@ import {
 	Option,
 	References,
 	Result,
+	Scope,
 	Tracer,
 } from "effect";
 
@@ -89,11 +90,15 @@ export interface TelemetryPipeline {
 	send(records: readonly unknown[]): Promise<void>;
 }
 
-/** Where one request's spans go, and how the request keeps running until they are sent. */
+/** Where one request's spans go, and when. */
 export interface TelemetryExportTarget {
 	/** The spans stream. Without one, the request's spans are not stored. */
 	readonly pipeline: TelemetryPipeline | undefined;
-	readonly waitUntil: (promise: Promise<unknown>) => void;
+	/**
+	 * Closes once the request and the work it left running have ended. Closing it sends
+	 * the request's spans and waits for the sends, so close it under the request's `waitUntil`.
+	 */
+	readonly scope: Scope.Scope;
 }
 
 /** The IDs every row of a request carries. */
@@ -307,27 +312,13 @@ function exitDetails(exit: Exit.Exit<unknown, unknown>): ExitDetails {
 /** Orders spans that start in the same millisecond within one isolate. */
 export const START_SEQ_ATTRIBUTE = "sketchi.span.start_seq";
 
-// A request's held spans, kept for its next flush. Spans outside every request, such as
-// those of a layer built before the first request, wait for the next request's flush.
-const MAX_HELD_SPANS = 1_000;
-
-/**
- * One request's spans. It sends what has finished when the request's root span
- * ends, then sends spans that end later, such as work the request left running,
- * each time none of the request's spans is still open.
- */
-class SpanBatch {
-	readonly #exporter: SpanExporter;
+/** One request's finished spans, sent together when the request's scope closes. */
+class RequestSpans {
 	readonly #root: Tracer.Span;
-	readonly #target: TelemetryExportTarget;
-	#open = 0;
-	#rootEnded = false;
-	#spans: TelemetrySpan[] = [];
+	#spans: TelemetrySpan[] | undefined = [];
 
-	constructor(exporter: SpanExporter, target: TelemetryExportTarget, root: Tracer.Span) {
-		this.#exporter = exporter;
+	constructor(root: Tracer.Span) {
 		this.#root = root;
-		this.#target = target;
 	}
 
 	/** The request's ray, run and attempt IDs, as its root span records them. */
@@ -335,48 +326,36 @@ class SpanBatch {
 		return rowCorrelation(this.#root.attributes);
 	}
 
-	enter(): void {
-		this.#open += 1;
-	}
-
-	leave(span: TelemetrySpan | undefined, root: boolean): void {
-		this.#open -= 1;
-		if (span) this.#spans.push(span);
-		if (root) this.#rootEnded = true;
-		if (root || (this.#rootEnded && this.#open <= 0)) this.flush();
-	}
-
 	add(span: TelemetrySpan): void {
-		this.#spans.push(span);
-		if (this.#rootEnded && this.#open <= 0) this.flush();
+		if (this.#spans) this.#spans.push(span);
+		else console.error("Span ended after its request's spans were sent", { name: span.name });
 	}
 
-	flush(): void {
-		const spans = [...this.#exporter.takeHeld(), ...this.#spans];
-		this.#spans = [];
-		const pipeline = this.#target.pipeline;
-		if (spans.length === 0 || !pipeline) return;
-		const failed = (error: unknown) => {
-			console.error("Span export failed", {
-				error: toJsonValue(error),
-				names: [...new Set(spans.map((span) => span.name))],
-				spans: spans.length,
-			});
-		};
-		try {
-			const rows = spans.flatMap((span) => spanRows(span));
-			const sends = rowBatches(rows).map((batch) => pipeline.send(batch));
-			this.#target.waitUntil(Promise.all(sends).then(() => undefined, failed));
-		} catch (error) {
-			failed(error);
-		}
+	/** Sends every span once, then waits for the sends. A failed send is logged, never raised. */
+	send(pipeline: TelemetryPipeline): Effect.Effect<void> {
+		return Effect.suspend(() => {
+			const spans = this.#spans ?? [];
+			this.#spans = undefined;
+			const failed = (cause: Cause.Cause<unknown>) =>
+				Effect.sync(() =>
+					console.error("Span export failed", {
+						error: toJsonValue(Cause.squash(cause)),
+						names: [...new Set(spans.map((span) => span.name))],
+						spans: spans.length,
+					}),
+				);
+			return Effect.forEach(
+				rowBatches(spans.flatMap((span) => spanRows(span))),
+				(batch) => Effect.promise(() => pipeline.send(batch)).pipe(Effect.catchCause(failed)),
+				{ concurrency: "unbounded", discard: true },
+			).pipe(Effect.catchCause(failed));
+		});
 	}
 }
 
 class SpanExporter implements TelemetryExporterShape {
 	readonly resource: TelemetryResource;
 	readonly #sink: TelemetrySpanSink | undefined;
-	#held: TelemetrySpan[] = [];
 	#sequence = 0;
 
 	constructor(resource: TelemetryResource, sink: TelemetrySpanSink | undefined) {
@@ -389,40 +368,10 @@ class SpanExporter implements TelemetryExporterShape {
 		return this.#sequence;
 	}
 
-	batch(target: TelemetryExportTarget, root: Tracer.Span): SpanBatch {
-		return new SpanBatch(this, target, root);
-	}
-
-	takeHeld(): TelemetrySpan[] {
-		const held = this.#held;
-		this.#held = [];
-		return held;
-	}
-
-	/**
-	 * Hands a finished span to the sink, its request, or the next request's flush.
-	 * `entered` says the span counted as open in `batch`; `root` that it is the request's root.
-	 */
-	finish(
-		span: TelemetrySpan,
-		batch: SpanBatch | undefined,
-		{ entered, root }: { readonly entered: boolean; readonly root: boolean },
-	): void {
+	/** Hands a finished span to the sink and its request. A span outside every request is not stored. */
+	finish(span: TelemetrySpan, request: RequestSpans | undefined): void {
 		this.#sink?.export(span);
-		if (batch) {
-			if (entered) batch.leave(span, root);
-			else batch.add(span);
-			return;
-		}
-		if (this.#sink) return;
-		this.#held.push(span);
-		if (this.#held.length > MAX_HELD_SPANS) {
-			const dropped = this.#held.splice(0, this.#held.length - MAX_HELD_SPANS);
-			console.warn("Dropped spans that no request flushed", {
-				dropped: dropped.length,
-				names: [...new Set(dropped.map((droppedSpan) => droppedSpan.name))],
-			});
-		}
+		request?.add(span);
 	}
 
 	resourceFields() {
@@ -436,7 +385,7 @@ class SpanExporter implements TelemetryExporterShape {
 	/** A log or metric with no open span to hold it becomes a row of its own. */
 	standalone(event: TelemetryEvent, parent: Tracer.AnySpan | undefined): void {
 		const time = "time" in event ? event.time : new Date().toISOString();
-		const batch = parent instanceof ExportingSpan ? parent.batch : undefined;
+		const request = parent instanceof ExportingSpan ? parent.request : undefined;
 		this.finish(
 			{
 				attributes: {},
@@ -447,14 +396,13 @@ class SpanExporter implements TelemetryExporterShape {
 				name: event.type === "log" ? "effect.log" : "effect.metric",
 				outcome: "success",
 				...(parent ? { parent_span_id: parent.spanId } : {}),
-				...batch?.correlation,
+				...request?.correlation,
 				...this.resourceFields(),
 				span_id: randomHex(8),
 				start_time: time,
 				trace_id: parent?.traceId ?? randomHex(16),
 			},
-			batch,
-			{ entered: false, root: false },
+			request,
 		);
 	}
 
@@ -469,30 +417,27 @@ class ExportingSpan extends Tracer.NativeSpan {
 	readonly #exporter: SpanExporter;
 	readonly #events: TelemetryEvent[] = [];
 	readonly #startSeq: number;
-	#batch: SpanBatch | undefined;
-	#root = false;
+	#request: RequestSpans | undefined;
 
 	constructor(options: Parameters<Tracer.Tracer["span"]>[0], exporter: SpanExporter) {
 		super(options);
 		this.#exporter = exporter;
 		this.#startSeq = exporter.nextSeq();
 		const parent = Option.getOrUndefined(options.parent);
-		if (parent instanceof ExportingSpan && parent.#exporter === exporter && parent.#batch) {
-			this.#batch = parent.#batch;
-			this.#batch.enter();
+		if (parent instanceof ExportingSpan && parent.#exporter === exporter) {
+			this.#request = parent.#request;
 		}
 	}
 
-	get batch(): SpanBatch | undefined {
-		return this.#batch;
+	get request(): RequestSpans | undefined {
+		return this.#request;
 	}
 
-	/** Makes this span the root of a request whose spans go to `target`. */
-	adopt(target: TelemetryExportTarget): void {
-		if (this.#batch || this.status._tag === "Ended") return;
-		this.#batch = this.#exporter.batch(target, this);
-		this.#batch.enter();
-		this.#root = true;
+	/** Makes this span the root of a new request, unless it already belongs to one. */
+	adopt(): RequestSpans | undefined {
+		if (this.#request || this.status._tag === "Ended") return undefined;
+		this.#request = new RequestSpans(this);
+		return this.#request;
 	}
 
 	record(event: TelemetryEvent): boolean {
@@ -514,20 +459,12 @@ class ExportingSpan extends Tracer.NativeSpan {
 	override end(endTime: bigint, exit: Exit.Exit<unknown, unknown>): void {
 		if (this.status._tag === "Ended") return;
 		super.end(endTime, exit);
-		let span: TelemetrySpan | undefined;
+		if (!this.sampled) return;
 		// Recording a span must never fail the work it describes.
 		try {
-			if (this.sampled) span = this.#finished(endTime, exit);
+			this.#exporter.finish(this.#finished(endTime, exit), this.#request);
 		} catch (error) {
 			console.error("Span could not be recorded", { error: toJsonValue(error), name: this.name });
-		}
-		if (span) {
-			this.#exporter.finish(span, this.#batch, {
-				entered: this.#batch !== undefined,
-				root: this.#root,
-			});
-		} else {
-			this.#batch?.leave(undefined, this.#root);
 		}
 	}
 
@@ -543,7 +480,7 @@ class ExportingSpan extends Tracer.NativeSpan {
 		}));
 		return {
 			// A span without its own IDs carries its request's.
-			...this.#batch?.correlation,
+			...this.#request?.correlation,
 			...rowCorrelation(attributes),
 			// The Workers clock only advances on I/O, so many spans share a start time.
 			attributes: { ...jsonRecord(attributes), [START_SEQ_ATTRIBUTE]: this.#startSeq },
@@ -563,15 +500,19 @@ class ExportingSpan extends Tracer.NativeSpan {
 }
 
 /**
- * Sends the spans of `effect`'s request to `target` when the request ends. Run it
- * inside the request's root span; every span under that root joins the request.
+ * Makes the current span the root of a request whose spans go to `target` when
+ * `target.scope` closes. Run it inside the request's root span; every span under
+ * that root joins the request, including work the request leaves running.
  */
 export function withTelemetryExport(target: TelemetryExportTarget) {
 	return <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
 		Effect.flatMap(Effect.option(Effect.currentSpan), (span) => {
 			const current = Option.getOrUndefined(span);
-			if (current instanceof ExportingSpan) current.adopt(target);
-			return effect;
+			const pipeline = target.pipeline;
+			if (!pipeline || !(current instanceof ExportingSpan)) return effect;
+			const request = current.adopt();
+			if (!request) return effect;
+			return Effect.andThen(Scope.addFinalizer(target.scope, request.send(pipeline)), effect);
 		});
 }
 
@@ -622,8 +563,8 @@ function normalizedResource(resource: TelemetryResource): TelemetryResource {
 }
 
 /**
- * The tracer, logger and metric exporter for a Worker. Spans of a request wrapped
- * in `withTelemetryExport` go to that request's stream; `sink` also receives every
+ * The tracer, logger and metric exporter for a Worker. Spans of a request rooted
+ * with `withTelemetryExport` go to that request's stream; `sink` also receives every
  * span as it finishes.
  */
 export function makeWorkersTelemetryLayer(options: {

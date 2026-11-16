@@ -24,6 +24,7 @@ import {
 	Option,
 	Record,
 	Scheduler,
+	Scope,
 	String,
 } from "effect";
 import { SecureRandom } from "effect/crypto";
@@ -120,7 +121,7 @@ export function makeIconsHttpHandler(options: { readonly sink?: TelemetrySpanSin
 	).pipe(
 		Layer.provide(HttpServer.layerServices),
 		// icons.http owns the complete request/export lifetime; an automatic outer span
-		// would finish after its export and be held for an unrelated request.
+		// would belong to no request and not be stored.
 		Layer.provideMerge(Layer.succeed(HttpMiddleware.TracerDisabledWhen, () => true)),
 		Layer.provideMerge(
 			makeWorkersTelemetryLayer({ resource: { serviceName: "sketchi-icons" }, ...options }),
@@ -192,10 +193,11 @@ export function makeIconsHttpHandler(options: { readonly sink?: TelemetrySpanSin
 			env: IconsHttpEnv,
 			execution: { readonly waitUntil: (promise: Promise<unknown>) => void },
 		) {
+			const scope = Scope.makeUnsafe();
 			const requestId = `req_${String.replaceAll("-", "")(SecureRandom.uuidV4Unsafe())}`;
 			const runId = `run_${String.replaceAll("-", "")(SecureRandom.uuidV4Unsafe())}`;
 			const rayId = request.headers.get("cf-ray");
-			return runtime.handler(
+			const response = runtime.handler(
 				request,
 				Context.make(CommunityHttpRequest, { env, origin: new URL(request.url).origin }).pipe(
 					Context.add(IconSource, {
@@ -203,10 +205,7 @@ export function makeIconsHttpHandler(options: { readonly sink?: TelemetrySpanSin
 						sourceLoader: createIconSourceLoader(env.ASSETS),
 					}),
 					Context.add(IconsHttpRequest, {
-						target: {
-							pipeline: env.TELEMETRY_SPANS,
-							waitUntil: (promise) => execution.waitUntil(promise),
-						},
+						target: { pipeline: env.TELEMETRY_SPANS, scope },
 						requestId,
 						runId,
 						...(rayId ? { rayId } : {}),
@@ -218,6 +217,10 @@ export function makeIconsHttpHandler(options: { readonly sink?: TelemetrySpanSin
 					}),
 				),
 			);
+			// The response is complete once the handler returns; closing the scope sends its spans.
+			const end = () => Effect.runPromise(Scope.close(scope, Exit.void));
+			execution.waitUntil(response.then(end, end));
+			return response;
 		},
 	};
 }

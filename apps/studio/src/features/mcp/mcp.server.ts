@@ -10,7 +10,7 @@ import {
 	withTelemetryExport,
 	type TelemetryExportTarget,
 } from "@sketchi/observability";
-import { Context, Effect, Layer, Predicate, Scheduler } from "effect";
+import { Context, Effect, Exit, Layer, Predicate, Scheduler, Scope } from "effect";
 import { SecureRandom } from "effect/crypto";
 import { McpProtocol, McpSchema, McpServer } from "effect/ai";
 import { HttpMiddleware, HttpRouter, HttpServer, HttpServerRequest } from "effect/http";
@@ -64,11 +64,9 @@ export const StudioMcpRegistrations = McpServer.toolkit(SketchiToolkit).pipe(
 );
 
 /** One request's native server; bindings, correlation and export come from that request. */
-function makeStudioMcpHandler(
-	origin: string | null,
-	env: StudioEnv,
-	waitUntil: (promise: Promise<unknown>) => void,
-): McpWebHandler {
+function makeStudioMcpHandler(origin: string | null, env: StudioEnv): McpWebHandler {
+	// Closed when the handler is disposed, after the response body, so late spans are sent too.
+	const scope = Scope.makeUnsafe();
 	const app = McpServer.layerHttp({
 		name: "sketchi-code-mode",
 		version: SKETCHI_CODE_MODE_VERSION,
@@ -119,7 +117,10 @@ function makeStudioMcpHandler(
 			}),
 	});
 	return {
-		dispose: runtime.dispose,
+		dispose: () =>
+			Effect.runPromise(
+				Effect.promise(runtime.dispose).pipe(Effect.ensuring(Scope.close(scope, Exit.void))),
+			),
 		fetch(request, { replay }) {
 			const url = new URL(request.url);
 			return runtime.handler(
@@ -138,7 +139,7 @@ function makeStudioMcpHandler(
 					}),
 					Context.add(StudioMcpExport, {
 						pipeline: replay ? undefined : env.TELEMETRY_SPANS,
-						waitUntil,
+						scope,
 					}),
 				),
 			);
@@ -154,7 +155,7 @@ export const handleSketchiMcpRequest = (
 	Effect.runPromise(
 		serveStatelessMcp(
 			request,
-			() => makeStudioMcpHandler(request.headers.get("origin"), env, waitUntil),
+			() => makeStudioMcpHandler(request.headers.get("origin"), env),
 			waitUntil,
 		),
 		{ signal: request.signal },

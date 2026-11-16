@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
+import type { TelemetrySpanRow } from "@sketchi/observability";
 import { Effect } from "effect";
 
 import {
@@ -59,6 +60,88 @@ describe("Playground request runtime", () => {
 			assert.strictEqual(second.metadata.path, "/two?value=2");
 			assert.strictEqual(second.metadata.traceId, "trace-second");
 			assert.strictEqual(second.platform.waitUntilPromise, secondWaitUntil);
+		}),
+	);
+
+	it.effect("sends a request's spans once its stream and callbacks end, under its waitUntil", () =>
+		Effect.promise(async () => {
+			const encoder = new TextEncoder();
+			const callbackRelease = Promise.withResolvers<void>();
+			const sendGate = Promise.withResolvers<void>();
+			const sendStarted = Promise.withResolvers<void>();
+			const pending: Promise<unknown>[] = [];
+			const rows: TelemetrySpanRow[] = [];
+			const late = { callback: false, stream: false };
+			const lateAtSend: (typeof late)[] = [];
+			let source!: ReadableStreamDefaultController<Uint8Array>;
+			const handler = Effect.gen(function* () {
+				const platform = yield* PlaygroundPlatformCallbacks;
+				platform.waitUntil(
+					Effect.promise(() => callbackRelease.promise).pipe(
+						Effect.andThen(Effect.logInfo("late callback")),
+					),
+				);
+				return new Response(
+					new ReadableStream<Uint8Array>({
+						start: (controller) => {
+							source = controller;
+							controller.enqueue(encoder.encode("data: one\n\n"));
+						},
+					}),
+					{ headers: { "content-type": "text/event-stream" } },
+				);
+			});
+			const response = await runPlaygroundEffect(handler, {
+				env: {
+					TELEMETRY_SPANS: {
+						send: (batch) => {
+							lateAtSend.push({ ...late });
+							rows.push(...(batch as TelemetrySpanRow[]));
+							sendStarted.resolve();
+							return sendGate.promise;
+						},
+					},
+				},
+				platform: { waitUntilPromise: (promise) => void pending.push(promise) },
+				request: new Request("https://studio.test/api/studio/chat", {
+					headers: { "x-sketchi-run-id": "run-stream" },
+				}),
+			});
+			const reader = response.body!.getReader();
+			assert.strictEqual(new TextDecoder().decode((await reader.read()).value), "data: one\n\n");
+			source.enqueue(encoder.encode("data: é two\n\n"));
+			source.close();
+			await reader.read();
+			late.stream = (await reader.read()).done;
+			late.callback = true;
+			callbackRelease.resolve();
+			await sendStarted.promise;
+			// The send completes a task later; the request's waitUntil must still be waiting for it.
+			let sent = false;
+			setImmediate(() => {
+				sent = true;
+				sendGate.resolve();
+			});
+			await Promise.all(pending);
+			assert.isTrue(sent);
+
+			assert.deepStrictEqual(lateAtSend[0], { callback: true, stream: true });
+			const root = rows.find((row) => row.name === "playground.request");
+			const stream = rows.find((row) => row.name === "playground.response.stream");
+			const deferred = rows.find((row) => row.name === "playground.request.deferred");
+			assert.strictEqual(stream?.parent_span_id, root?.span_id);
+			assert.strictEqual(deferred?.parent_span_id, root?.span_id);
+			assert.deepInclude(JSON.parse(stream?.attributes ?? "{}"), {
+				"http.response.body": "data: one\n\ndata: é two\n\n",
+			});
+			assert.notProperty(JSON.parse(stream?.attributes ?? "{}"), "http.response.body.complete");
+			assert.include(deferred?.events, "late callback");
+			for (const row of rows) {
+				assert.strictEqual(row.run_id, "run-stream", row.name);
+				assert.strictEqual(row.trace_id, root?.trace_id, row.name);
+			}
+			const parts = rows.map((row) => `${row.span_id}:${row.part_index}`);
+			assert.strictEqual(new Set(parts).size, parts.length);
 		}),
 	);
 });
