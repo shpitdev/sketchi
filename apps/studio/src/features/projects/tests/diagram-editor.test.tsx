@@ -166,6 +166,26 @@ describe("Studio diagram editor", () => {
 		expect(saveButton("Save")).toHaveProperty("disabled", false);
 	});
 
+	// Regression: Excalidraw hands every change the same elements, edited in place.
+	// Comparing against the previous scene then never saw an edit, so no draft was
+	// written and reload lost unsaved work.
+	it("writes a draft for edits Excalidraw makes in place", async () => {
+		renderEditor();
+		const elements = saved.elements.map((element) => ({ ...element }));
+		act(() => canvas.change?.({ ...saved, elements }));
+		const drafted: unknown[] = [];
+		drafts.write.mockImplementationOnce((drawing: unknown) =>
+			drafted.push(structuredClone(drawing)),
+		);
+
+		Object.assign(elements[0]!, { version: 2, x: 20 });
+		act(() => canvas.change?.({ ...saved, elements }));
+
+		await waitFor(() => expect(drafted).toHaveLength(1));
+		expect(drafted[0]).toEqual(drawingFromScene(edit(saved, "box", 2)));
+		expect(saveButton("Save")).toHaveProperty("disabled", false);
+	});
+
 	it("opens a restored draft as unsaved and keeps it when Save fails", async () => {
 		const draft = edit(saved, "box", 5);
 		studio.save.mockRejectedValue(new Error("offline"));
