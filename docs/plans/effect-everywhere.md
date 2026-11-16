@@ -111,7 +111,7 @@ Every current Nx project has an owner below. The native column names an actual h
 | `icon-draw` | 6c author/judge, 8 job requirements, 3b data | Browser/raster imaging engine and gateway binding transport |
 | `studio-projects` | 3a models, 4 API/client, 7 drafts, 8 storage | R2-specific blob/conditional-write adapter |
 | `observability` | 4 request middleware, 5/6 path parity, 9 exporter internals | Pipeline/catalog destination sink |
-| `svg-excalidraw` | 3c onward SVG proof unit | SVG/geometry/Excalidraw domain semantics and measured primitive loops |
+| `drawing` (`src/svg`, formerly `svg-excalidraw`) | 3c onward SVG proof unit | SVG/geometry/Excalidraw domain semantics and measured primitive loops |
 | `social-card` | 3b transformations, 9 render operator | Actual raster/font engine, not its surrounding workflow |
 | `ui` | 7 stateful components, 9 wordmark operator | React/DOM rendering and font/raster engine |
 | `sketchi-generators` | 2 upstream Nx composition | Nx Tree/generator callback contract; Effect owns its substantive helpers |
