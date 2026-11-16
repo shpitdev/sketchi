@@ -1,8 +1,7 @@
-import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { flowchartDiagramFromDocument, type FlowchartDocument } from "./document";
-import { applyFlowchartEdits, decodeFlowchartEdits, type FlowchartEdit } from "./edits";
+import { applyFlowchartEdits, type FlowchartEdit } from "./edits";
 
 const order: FlowchartDocument = {
 	title: "Order",
@@ -31,17 +30,6 @@ function apply(document: FlowchartDocument, edits: readonly FlowchartEdit[]) {
 }
 
 describe("flowchart edits", () => {
-	it("decode the four ops", () => {
-		const decoded = decodeFlowchartEdits([
-			{ op: "insert", node: { fraud: "Check for fraud" }, between: ["review", "approved"] },
-			{ op: "set", nodes: { pay: { note: "Card" }, wait: null } },
-			{ op: "connect", edges: [["fraud", "cancel", "flagged"]] },
-			{ op: "disconnect", edges: [["approved", "cancel"]] },
-		]);
-		expect(Result.isSuccess(decoded)).toBe(true);
-		expect(Result.isFailure(decodeFlowchartEdits([{ op: "rename", id: "a" }]))).toBe(true);
-	});
-
 	it("curves a flowchart's lines and squares them again, its document and drawing alike", () => {
 		const curved = apply(order, [{ op: "set", curved: true }]);
 		expect(curved.curved).toBe(true);

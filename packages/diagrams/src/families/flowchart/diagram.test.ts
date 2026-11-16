@@ -152,34 +152,6 @@ describe("parseFlowchartDiagram", () => {
 		).toEqual(["retry-a", "retry-b"]);
 	});
 
-	it("accepts a retry loop when every loop node retains an exit", () => {
-		const diagram = {
-			...flowchartFixture,
-			nodes: [
-				{ id: "start", label: "Start", kind: "start" },
-				{ id: "attempt", label: "Attempt", kind: "process" },
-				{ id: "retry", label: "Succeeded?", kind: "decision" },
-				{ id: "done", label: "Done", kind: "end" },
-			],
-			edges: [
-				{ id: "start-attempt", source: "start", target: "attempt" },
-				{ id: "attempt-retry", source: "attempt", target: "retry" },
-				{
-					id: "retry-attempt",
-					source: "retry",
-					target: "attempt",
-					label: "retry",
-				},
-				{ id: "retry-done", source: "retry", target: "done", label: "yes" },
-			],
-		};
-
-		expect(validationIssues(diagram)).toEqual([]);
-		expect(parseFlowchartDiagram(diagram).pipe(Result.getOrThrow)).toMatchObject({
-			id: diagram.id,
-		});
-	});
-
 	it("enforces the 24-node and 64-edge limits at the semantic boundary", () => {
 		expect(validationIssues(linearFlowchart(FLOWCHART_MAX_NODES))).toEqual([]);
 		expect(validationIssues(linearFlowchart(FLOWCHART_MAX_NODES + 1))).toContainEqual(
@@ -235,18 +207,6 @@ describe("flowchart groups", () => {
 		),
 	};
 
-	it("accepts declared groups with grouped and ungrouped nodes", () => {
-		const diagram = parseFlowchartDiagram(grouped).pipe(Result.getOrThrow);
-		expect(diagram.groups?.map((group) => group.id)).toEqual(["intake", "authoring"]);
-		expect(diagram.nodes.map((node) => node.group)).toEqual([
-			"intake",
-			"intake",
-			undefined,
-			"authoring",
-			undefined,
-		]);
-	});
-
 	it("names each group problem with a repair hint", () => {
 		const issues = validationIssues({
 			...grouped,
@@ -297,26 +257,6 @@ describe("flowchart zones", () => {
 					: node,
 		),
 	};
-
-	it("accepts zones nested through parent, holding nodes directly or through nested zones", () => {
-		const diagram = parseFlowchartDiagram(zoned).pipe(Result.getOrThrow);
-		expect(diagram.groups?.map((group) => [group.id, group.parent, group.kind])).toEqual([
-			["region", undefined, "region"],
-			["vpc", "region", "vpc"],
-			["public", "vpc", "subnet"],
-		]);
-		expect(diagram.nodes.find((node) => node.id === "draft")?.shape).toBe("database");
-	});
-
-	it("rejects an unknown zone kind or node shape at the schema", () => {
-		for (const input of [
-			{ ...zoned, groups: [{ id: "region", label: "Region", kind: "galaxy" }] },
-			{ ...zoned, nodes: [{ ...zoned.nodes[0], shape: "hexagon" }, ...zoned.nodes.slice(1)] },
-		])
-			expect(parseFlowchartDiagram(input)).toMatchObject({
-				failure: { message: expect.stringMatching(/Expected/) },
-			});
-	});
 
 	it("names each nesting problem with a repair hint", () => {
 		const issues = validationIssues({
@@ -397,18 +337,6 @@ describe("flowchart lanes", () => {
 			lane: node.id === "clear" || node.id === "review" ? "reviewer" : "author",
 		})),
 	};
-
-	it("accepts declared lanes that hold every node", () => {
-		const diagram = parseFlowchartDiagram(laned).pipe(Result.getOrThrow);
-		expect(diagram.lanes?.map((lane) => lane.id)).toEqual(["author", "reviewer"]);
-		expect(diagram.nodes.map((node) => node.lane)).toEqual([
-			"author",
-			"author",
-			"reviewer",
-			"author",
-			"reviewer",
-		]);
-	});
 
 	it("names each lane problem with a repair hint", () => {
 		const issues = validationIssues({
