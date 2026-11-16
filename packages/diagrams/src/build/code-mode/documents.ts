@@ -65,23 +65,7 @@ export function canonicalDocumentFromDiagram(
 		case "er":
 			return familyForType("er").toDocument(diagram);
 		case "class":
-			return {
-				type: "class",
-				spec: {
-					id: diagram.id,
-					title: diagram.title,
-					classes: diagram.classes.map((node) => ({
-						...node,
-						attributes: node.attributes.map((attribute) => ({ ...attribute })),
-						methods: node.methods.map((method) => ({
-							...method,
-							params: method.params.map((param) => ({ ...param })),
-						})),
-					})),
-					relationships: diagram.relationships.map((relationship) => ({ ...relationship })),
-					style: diagram.style,
-				},
-			};
+			return familyForType("class").toDocument(diagram);
 		case "org-chart":
 			return familyForType("org-chart").toDocument(diagram);
 		case "venn": {

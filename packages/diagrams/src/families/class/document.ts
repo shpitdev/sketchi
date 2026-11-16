@@ -1,6 +1,8 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Effect, Schema, Array as Arr, Option, Result } from "effect";
 
+import { cleanToolString, slug } from "../../clean-text.js";
+
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
 export const classDiagramType = "class" as const;
@@ -169,6 +171,113 @@ export const ClassDiagram = Schema.Struct({
 }).annotate({ identifier: "ClassDiagram" });
 
 export interface ClassDiagram extends Schema.Schema.Type<typeof ClassDiagram> {}
+
+/** Authored members share canonical fields, with shorthand and omitted relationship ids. */
+const ClassAuthoredMethod = ClassMethod.mapFields((fields) => ({
+	...fields,
+	params: Schema.Array(Schema.Union([Schema.NonEmptyString, ClassParameter])).pipe(
+		Schema.mutable,
+		Schema.withDecodingDefaultKey(Effect.succeed([])),
+	),
+}));
+export const ClassDocument = ClassDiagram.mapFields(({ type: _type, ...fields }) => ({
+	...fields,
+	id: Schema.optionalKey(ClassDiagram.fields.id),
+	classes: Schema.Array(
+		ClassNode.mapFields((node) => ({
+			...node,
+			attributes: Schema.Array(Schema.Union([Schema.NonEmptyString, ClassAttribute])).pipe(
+				Schema.mutable,
+				Schema.withDecodingDefaultKey(Effect.succeed([])),
+			),
+			methods: Schema.Array(Schema.Union([Schema.NonEmptyString, ClassAuthoredMethod])).pipe(
+				Schema.mutable,
+				Schema.withDecodingDefaultKey(Effect.succeed([])),
+			),
+		})),
+	).pipe(Schema.mutable, Schema.check(Schema.isMinLength(1))),
+	relationships: Schema.Array(
+		ClassRelationship.mapFields((relationship) => ({
+			...relationship,
+			id: Schema.optionalKey(relationship.id),
+		})),
+	).pipe(Schema.mutable, Schema.withDecodingDefaultKey(Effect.succeed([]))),
+})).annotate({ identifier: "ClassDocument" });
+export interface ClassDocument extends Schema.Schema.Type<typeof ClassDocument> {}
+
+/** Clean authored text and reserve explicit relationship ids before filling omissions. */
+export function normalizeClass(spec: ClassDocument): ClassDiagram {
+	const title = cleanToolString(spec.title);
+	const cleaned = (value: string | undefined) => (value && cleanToolString(value)) || undefined;
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	const flag = (key: string, value: boolean | undefined) => (value ? { [key]: true } : {});
+	// An omitted id takes the next `relationship-<n>` no relationship claims explicitly.
+	const used = new Set(
+		Arr.flatMap(spec.relationships, (relationship) => {
+			const id = cleaned(relationship.id);
+			return id === undefined ? [] : [id];
+		}),
+	);
+	const relationshipId = (index: number) => {
+		let number = index + 1;
+		while (used.has(`relationship-${number}`)) number += 1;
+		used.add(`relationship-${number}`);
+		return `relationship-${number}`;
+	};
+	return {
+		id: cleaned(spec.id) ?? (slug(title) || "sketchi-class-diagram"),
+		title,
+		type: classDiagramType,
+		classes: Arr.map(spec.classes, (node) => ({
+			id: cleanToolString(node.id),
+			...optional("name", node.name),
+			...(node.kind ? { kind: node.kind } : {}),
+			...optional("stereotype", node.stereotype),
+			attributes: Arr.map(node.attributes, (input) => {
+				const attribute =
+					typeof input === "string" ? parseClassAttributeShorthand(cleanToolString(input)) : input;
+				return {
+					name: cleanToolString(attribute.name),
+					...optional("type", attribute.type),
+					...(attribute.visibility ? { visibility: attribute.visibility } : {}),
+					...flag("static", attribute.static),
+				};
+			}),
+			methods: Arr.map(node.methods, (input) => {
+				const method =
+					typeof input === "string" ? parseClassMethodShorthand(cleanToolString(input)) : input;
+				return {
+					name: cleanToolString(method.name),
+					params: Arr.map(method.params, (param) => {
+						const read =
+							typeof param === "string"
+								? parseClassParameterShorthand(cleanToolString(param))
+								: param;
+						return { name: cleanToolString(read.name), ...optional("type", read.type) };
+					}),
+					...optional("returns", method.returns),
+					...(method.visibility ? { visibility: method.visibility } : {}),
+					...flag("static", method.static),
+					...flag("abstract", method.abstract),
+				};
+			}),
+		})),
+		relationships: Arr.map(spec.relationships, (relationship, index) => ({
+			id: cleaned(relationship.id) ?? relationshipId(index),
+			kind: relationship.kind,
+			from: cleanToolString(relationship.from),
+			to: cleanToolString(relationship.to),
+			...optional("fromMultiplicity", relationship.fromMultiplicity),
+			...optional("toMultiplicity", relationship.toMultiplicity),
+			...optional("fromRole", relationship.fromRole),
+			...optional("toRole", relationship.toRole),
+			...(relationship.navigable === undefined ? {} : { navigable: relationship.navigable }),
+			...optional("label", relationship.label),
+		})),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
 
 export const ClassValidationIssueCodeSchema = Schema.Literals([
 	"class_too_large",

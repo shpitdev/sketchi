@@ -1,13 +1,21 @@
 import { type CanvasSpec } from "@sketchi/drawing";
 import { describe, expect, it } from "vitest";
 import { Effect, Schema } from "effect";
-import { classFixture } from "../../families/class/document.js";
+import { classFixture } from "./document.js";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { BuildClassDiagramResultSchema } from "./contract.js";
-import { canonicalDocumentFromDiagram } from "./documents.js";
-import { applyDiagramPatch, buildClassDiagram, CodeModeRuntimeEnvironment } from "./runtime.js";
+import {
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+} from "../../build/code-mode/artifacts.js";
+import { classBuild } from "./build.js";
+import { buildResponse } from "../../build/operation.js";
+import { canonicalDocumentFromDiagram } from "../../build/code-mode/documents.js";
+import {
+	applyDiagramPatch,
+	buildClassDiagram,
+	CodeModeRuntimeEnvironment,
+} from "../../build/code-mode/runtime.js";
 
 const storage = makeMemoryArtifactStorage();
 function run<A>(
@@ -30,7 +38,7 @@ function build(spec: unknown) {
 				inlineArtifacts: ["scene", "excalidraw"],
 				artifactFormats: ["scene", "excalidraw"],
 			},
-		}),
+		}).pipe(buildResponse),
 	);
 }
 
@@ -64,7 +72,7 @@ describe("Code Mode native class diagram", () => {
 	it("builds the documented spec into class boxes and lines with UML heads", async () => {
 		const built = await build(shapesSpec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(() => Schema.decodeUnknownSync(BuildClassDiagramResultSchema)(built)).not.toThrow();
+		expect(() => Schema.decodeUnknownSync(classBuild.result)(built)).not.toThrow();
 		expect(built.normalizedSpec.classes[0]).toEqual({
 			id: "Shape",
 			kind: "abstract",
@@ -214,11 +222,11 @@ describe("Code Mode native class diagram", () => {
 	it.each([
 		[
 			{ relationships: [{ kind: "association", from: "Circle", to: "Ghost" }] },
-			"missing_edge_target",
+			"missing_relationship_class",
 		],
 		[
 			{ relationships: [{ kind: "association", from: "Ghost", to: "Circle" }] },
-			"missing_edge_source",
+			"missing_relationship_class",
 		],
 		[
 			{
@@ -227,17 +235,17 @@ describe("Code Mode native class diagram", () => {
 					{ kind: "inheritance", from: "Shape", to: "Circle" },
 				],
 			},
-			"invalid_generalization",
+			"inheritance_cycle",
 		],
 		[
 			{ relationships: [{ kind: "realization", from: "Circle", to: "Shape" }] },
-			"invalid_generalization",
+			"invalid_realization",
 		],
 		[
 			{
 				relationships: [{ kind: "inheritance", from: "Circle", to: "Shape", toMultiplicity: "1" }],
 			},
-			"invalid_relationship",
+			"misplaced_end_label",
 		],
 		[
 			{
@@ -245,12 +253,12 @@ describe("Code Mode native class diagram", () => {
 					{ kind: "association", from: "Circle", to: "Shape", toMultiplicity: "few" },
 				],
 			},
-			"invalid_relationship",
+			"invalid_multiplicity",
 		],
-		[{ classes: [{ id: "Line Item" }], relationships: [] }, "invalid_class"],
+		[{ classes: [{ id: "Line Item" }], relationships: [] }, "invalid_class_id"],
 		[
 			{ classes: [{ id: "A", attributes: ["- x: int", "+ x: double"] }], relationships: [] },
-			"invalid_member",
+			"duplicate_member",
 		],
 	])("rejects %j with a structured repair issue", async (change, code) => {
 		const result = await build({ ...shapesSpec, ...change });

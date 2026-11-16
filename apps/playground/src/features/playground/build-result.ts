@@ -3,11 +3,6 @@ import { sequenceBuild } from "@sketchi/diagrams/families/sequence/build";
 import { familyForType } from "@sketchi/diagrams/family";
 import { stateLabel } from "@sketchi/diagrams/families/state-machine/document";
 import {
-	BuildClassDiagramResultSchema,
-	BuildClassDiagramToolInputSchema,
-	type BuildClassDiagramResult,
-} from "@sketchi/diagrams/build/code-mode/contract";
-import {
 	flowchartBuild,
 	type BuildFlowchartResult,
 } from "@sketchi/diagrams/families/flowchart/build";
@@ -28,7 +23,7 @@ export type StudioBuildResult =
 	| ReturnType<typeof familyForType<"state-machine">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"gantt">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"er">>["contracts"]["output"]["Type"]
-	| BuildClassDiagramResult
+	| ReturnType<typeof familyForType<"class">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"org-chart">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"venn">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"journey">>["contracts"]["output"]["Type"]
@@ -133,9 +128,9 @@ const BUILD_TOOLS = {
 	},
 	"tool-build_class_diagram": {
 		family: "class",
-		decodeResult: Schema.decodeUnknownResult(BuildClassDiagramResultSchema),
+		decodeResult: Schema.decodeUnknownResult(familyForType("class").contracts.output),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildClassDiagramToolInputSchema)(input);
+			const decoded = Schema.decodeUnknownResult(familyForType("class").studioInput)(input);
 			return Result.isSuccess(decoded)
 				? decoded.success.spec.classes.map((node) => node.name ?? node.id)
 				: [];

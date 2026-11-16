@@ -8,12 +8,12 @@ describe("offline class diagram input failures", () => {
 	it.each([
 		{
 			name: "an interface extending a class",
-			issue: "invalid_generalization",
+			issue: "invalid_inheritance",
 			relationship: { kind: "inheritance", from: "Drawable", to: "Shape" },
 		},
 		{
 			name: "an unknown class",
-			issue: "missing_edge_target",
+			issue: "missing_relationship_class",
 			relationship: { kind: "association", from: "Shape", to: "Ghost" },
 		},
 	])("reports $name as invalid_document with exit 3", ({ issue, relationship }) => {

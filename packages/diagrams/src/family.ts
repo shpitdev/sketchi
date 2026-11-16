@@ -3,14 +3,13 @@ import { sequenceFixture } from "./families/sequence/fixtures.js";
 import { sequenceBuild } from "./families/sequence/build.js";
 import { vennBuild } from "./families/venn/build.js";
 import { Effect, Result, Schema } from "effect";
-import * as Build from "./build/code-mode/contract.js";
 import type * as Runtime from "./build/code-mode/runtime.js";
 import { docs as chartFamilyDocs } from "./families/chart/docs.js";
 import * as chartFamily from "./families/chart/document.js";
 import { chartBuild } from "./families/chart/build.js";
 import { docs as classFamilyDocs } from "./families/class/docs.js";
 import * as classFamily from "./families/class/document.js";
-import { renderClassDiagram } from "./families/class/render.js";
+import { classBuild } from "./families/class/build.js";
 import { docs as erFamilyDocs } from "./families/er/docs.js";
 import * as erFamily from "./families/er/document.js";
 import { erBuild } from "./families/er/build.js";
@@ -88,30 +87,6 @@ function canonical<S extends Schema.Top & { readonly Type: { readonly type: stri
 			if (!matches(diagram)) throw new Error("Mismatched canonical family");
 			return render(diagram);
 		},
-	};
-}
-
-function legacyFamily<
-	const Definition extends {
-		readonly type: string;
-		readonly spec: Schema.Top;
-		readonly canonical: {
-			readonly counts: (diagram: {
-				readonly type: string;
-			}) => import("./build/result.js").DiagramCounts;
-		};
-	},
->(definition: Definition) {
-	const type: Definition["type"] = definition.type;
-	const spec: Definition["spec"] = definition.spec;
-	return {
-		...definition,
-		counts: definition.canonical.counts,
-		document: Schema.Struct({ type: Schema.Literal(type), spec }),
-		decodeDocument: (input: unknown) =>
-			Schema.decodeUnknownEffect(spec, { errors: "all" })(input).pipe(
-				Effect.map((value) => ({ type, spec: value })),
-			),
 	};
 }
 
@@ -301,32 +276,13 @@ const erDiagramDescriptor = family({
 	docs: erFamilyDocs,
 });
 
-const classDiagramDescriptor = legacyFamily({
-	type: classFamily.classFixture.type,
+const classDiagramDescriptor = family({
 	operation: "buildClassDiagram",
 	label: "Class diagram",
 	path: "/api/v1/class-diagrams/build",
-	canonical: canonical(
-		classFamily.ClassDiagram,
-		classFamily.classFixture.type,
-		classFamily.validateClassDiagram,
-		renderClassDiagram,
-		classFamily.counts,
-	),
-	validationError: classFamily.ClassValidationError,
+	build: classBuild,
+	...fromBuild(classBuild),
 	fixture: classFamily.classFixture,
-	spec: Build.ClassSpec,
-	request: Build.BuildClassDiagramRequest,
-	contracts: {
-		input: Schema.Struct({
-			...Build.BuildClassDiagramRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: Build.ClassToolSpecSchema,
-		}),
-		output: Build.BuildClassDiagramResultSchema,
-	},
-	studioInput: Build.BuildClassDiagramToolInputSchema,
-	build: (runtime: typeof Runtime) => runtime.buildClassDiagram,
 	docs: classFamilyDocs,
 });
 
