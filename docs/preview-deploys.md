@@ -41,7 +41,7 @@ secrets. These apps use configured API bindings without Worker secrets. If a fut
 feature requires secrets, provision preview-only credentials through a separately
 reviewed change. Do not copy production secrets into the Preview base.
 
-`scripts/01-validate-preview-config.mjs` checks the generated build config before
+`pnpm ops preview settings` checks the generated build config before
 upload: Worker identity, explicit runtime bindings, and that `previews` binds every
 production R2 bucket and Pipeline stream binding to a non-production target (the
 R2 target must match the top-level `preview_bucket_name`). Each binding entry may
@@ -58,7 +58,7 @@ service bindings currently call the target Worker's production deployment.
 Previews are opt-in. A same-repository pull request to `main` with the `preview`
 label deploys the apps it affects (`nx show projects --affected` between the PR's
 merge base and head) on every push; a change to the preview tooling itself
-(`app-preview.yml`, the shared setup action, `scripts/0*-*.mjs`, `scripts/lib/deploy/`)
+(`app-preview.yml`, the shared setup action, `tools/ops/src/deploy/` and the ops command entry)
 deploys all five. Unlabelled PRs deploy nothing, and adding another label runs
 nothing. Forks are excluded. Closing a same-repository PR deletes all five
 Previews when one can exist: the PR carries the `preview` label or a preview
@@ -92,7 +92,7 @@ Pipeline-bound Playground uploads share
 jobs without cancelling active uploads; other apps retain their per-app/per-PR
 concurrency policies.
 
-Preview and production uploads run through `07-wrangler-retry.mjs`. It retries
+Preview and production uploads run through `pnpm ops wrangler-retry`. It retries
 only Cloudflare's `assets-upload-session` failure with code 10013, twice, after
 30s and then 60s
 ([cloudflare/workers-sdk#16447](https://github.com/cloudflare/workers-sdk/issues/16447)).
@@ -118,12 +118,13 @@ an `unconfigured` comment rather than a successful preview claim.
 
 ## Cleanup and legacy Workers
 
-Closing a PR runs `cleanup-preview`. `scripts/04-delete-preview.mjs` deletes
+Closing a PR runs `cleanup-preview`. `pnpm ops preview delete` deletes
 Preview `pr-<number>` from each of the five Workers through the Cloudflare Previews
 API; a missing Preview (HTTP 404) counts as already deleted. A successful delete
 can leave the Preview hostname serving the deleted code
 ([cloudflare/workers-sdk#15945](https://github.com/cloudflare/workers-sdk/issues/15945)),
-so the script then checks the Preview URL every 10 seconds for up to 2 minutes until
+so the command then checks the Preview URL every 10 seconds (each check bounded to 10
+seconds) for up to 2 minutes until
 Cloudflare answers with its no-Preview 404 (`x-preview-user-error: true`). Only then
 is the sticky comment marked `deleted`. If the URL still serves, the comment is
 marked `deletion-pending` with the reachable URL and the job fails, so the leak
@@ -138,16 +139,19 @@ Preview at its limit (100 Free / 500 Paid per Worker; 100 deployments per Previe
 Legacy `sketchi-*-pr-*` Workers from the previous per-PR Worker flow are untouched
 by this migration. Remove them separately; this workflow never deletes a Worker.
 
-## Operational scripts
+## Operator commands
 
-- `00-resolve-worker-app.mjs`: resolve and validate project/Worker identity.
-- `01-validate-preview-config.mjs`: validate the built Preview settings and PR name.
-- `02-extract-preview-url.mjs`: read the Preview entry from Wrangler's output file; production still parses its deploy log.
-- `03-upsert-preview-comment.mjs`: update only the owned, anchored bot comment.
-- `04-delete-preview.mjs`: delete a PR's Preview and confirm its URL stopped serving.
-- `05-prepare-production-domain-deploy.mjs`: prepare an explicitly requested production domain config.
-- `07-wrangler-retry.mjs`: run a Wrangler upload, retrying only the 10013 assets-upload-session error.
-- `09-select-production-projects.mjs`: choose all production Workers or the app named by a manual dispatch.
+The workflows run typed `pnpm ops` commands from `tools/ops`; `pnpm ops --help` lists them.
+
+- `worker resolve`: resolve and validate project/Worker identity.
+- `preview select`, `production select`: choose the Worker apps a run deploys.
+- `preview settings`: validate the built Preview settings and PR name, and write Web's sibling Preview URLs.
+- `preview url`, `production url`: read the Preview entry from Wrangler's output file, or the workers.dev URL from a production deploy log.
+- `preview comment`: update only the owned, anchored bot comment.
+- `preview delete`: delete this PR's Preview of one Worker and confirm its URL stopped serving.
+- `production domains`: require the active zone and prepare an explicitly requested production domain config.
+- `production detach`: detach only the app's approved domains that still point at its Worker.
+- `wrangler-retry`: run a Wrangler upload, retrying only the 10013 assets-upload-session error.
 
 ## Production Worker Deploys
 
@@ -207,7 +211,7 @@ on the preview stream IDs. The validator rejects Previews bound to production ta
 
 Custom domains are a post-merge operator action. The production workflow writes
 a generated `dist/apps/<project>/server/wrangler.domains.json` config from
-`scripts/05-prepare-production-domain-deploy.mjs` and deploys that route-bearing
+`pnpm ops production domains` and deploys that route-bearing
 config only when explicitly dispatched with `domain_action=attach`. Follow
 [Production domain cutover](production-domain-cutover.md); never attach domains
 from a pull request or before the Cloudflare zone is active.

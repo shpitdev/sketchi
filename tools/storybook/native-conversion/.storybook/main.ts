@@ -1,6 +1,6 @@
 import { type StorybookConfig } from "@storybook/react-vite";
 
-import { excalidrawFonts } from "../../../../scripts/lib/excalidraw-fonts.mjs";
+import { excalidrawFonts } from "../../../../tools/ops/src/vite/excalidraw-fonts";
 
 const config: StorybookConfig = {
 	stories: [

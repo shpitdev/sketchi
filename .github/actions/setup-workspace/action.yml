@@ -28,7 +28,7 @@ runs:
         INSTALL_DEPENDENCIES: ${{ inputs.install-dependencies }}
       run: |
         if [[ "$INSTALL_DEPENDENCIES" == "true" ]]; then
-          node scripts/verify-toolchain.mjs
+          node tools/ops/verify-toolchain.mjs
         else
-          node scripts/verify-toolchain.mjs --skip-dependencies
+          node tools/ops/verify-toolchain.mjs --skip-dependencies
         fi

@@ -131,7 +131,7 @@ jobs:
           node --input-type=module <<'NODE'
           import { appendFileSync, readFileSync } from "node:fs";
 
-          // The sticky comment scripts/03-upsert-preview-comment.mjs owns for each app.
+          // The sticky comment `pnpm ops preview comment` owns for each app.
           const marker = /<!-- sketchi-[a-z-]+-preview -->/;
           const found = JSON.parse(readFileSync(process.env.COMMENTS_FILE, "utf8"))
             .flat()
@@ -158,7 +158,7 @@ jobs:
           PREVIEW_SELECTION: ${{ inputs.project || 'affected' }}
           BASE_SHA: ${{ steps.pr.outputs.base_sha }}
           HEAD_SHA: ${{ steps.pr.outputs.sha }}
-        run: node scripts/08-select-preview-projects.mjs
+        run: pnpm --silent ops preview select
 
   deploy-preview:
     needs: resolve-preview-pr
@@ -188,7 +188,7 @@ jobs:
         id: worker-app
         env:
           WORKER_PROJECT: ${{ matrix.project }}
-        run: node scripts/00-resolve-worker-app.mjs --project "$WORKER_PROJECT"
+        run: pnpm --silent ops worker resolve --project "$WORKER_PROJECT"
 
       - run: pnpm nx build "${{ steps.worker-app.outputs.project_id }}"
 
@@ -207,41 +207,17 @@ jobs:
           echo "configured=false" >> "$GITHUB_OUTPUT"
           echo "::warning::Cloudflare preview deploy credentials are not configured. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN."
 
-      - name: Read workers.dev subdomain
-        if: steps.credentials.outputs.configured == 'true' && matrix.project == 'web'
-        id: workers-subdomain
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          response="$(
-            curl --fail-with-body --silent --show-error \
-              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/subdomain"
-          )"
-          subdomain="$(
-            RESPONSE="$response" node --input-type=module <<'NODE'
-          const response = JSON.parse(process.env.RESPONSE ?? "{}");
-          const subdomain = response?.result?.subdomain;
-
-          if (!response.success || typeof subdomain !== "string" || subdomain.length === 0) {
-            throw new Error(`Cloudflare workers.dev subdomain lookup failed: ${JSON.stringify(response.errors ?? [])}`);
-          }
-
-          process.stdout.write(subdomain);
-          NODE
-          )"
-          echo "workers_dev_subdomain=${subdomain}" >> "$GITHUB_OUTPUT"
-
+      # Web also gets its sibling Preview URLs, on the account's workers.dev subdomain when
+      # Cloudflare credentials are configured.
       - name: Validate explicit Preview settings
         id: preview-settings
         env:
-          CF_PREVIEW_WORKERS_SUBDOMAIN: ${{ steps.workers-subdomain.outputs.workers_dev_subdomain }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           PREVIEW_PROJECT_ID: ${{ matrix.project }}
           PR_NUMBER: ${{ needs.resolve-preview-pr.outputs.pr_number }}
         run: >-
-          node scripts/01-validate-preview-config.mjs
+          pnpm --silent ops preview settings
           --project "$PREVIEW_PROJECT_ID"
           --pr-number "$PR_NUMBER"
           --config "${{ steps.worker-app.outputs.worker_config_path }}"
@@ -255,7 +231,7 @@ jobs:
           PREVIEW_STATUS: unconfigured
           PREVIEW_SHA: ${{ needs.resolve-preview-pr.outputs.sha }}
           PREVIEW_NAME: ${{ steps.preview-settings.outputs.preview_name }}
-        run: node scripts/03-upsert-preview-comment.mjs
+        run: pnpm --silent ops preview comment
 
       - name: Re-check PR is open
         if: steps.credentials.outputs.configured == 'true'
@@ -299,7 +275,7 @@ jobs:
             preview_args+=(--var "SKETCHI_PLAYGROUND_URL:${PLAYGROUND_PREVIEW_URL}")
           fi
           # The retry wrapper clears WRANGLER_OUTPUT_FILE_PATH before each attempt.
-          node scripts/07-wrangler-retry.mjs -- pnpm exec wrangler preview \
+          pnpm --silent ops wrangler-retry -- pnpm exec wrangler preview \
             --config "${{ steps.worker-app.outputs.worker_config_path }}" \
             --name "${{ steps.preview-settings.outputs.preview_name }}" \
             --ignore-base-config \
@@ -310,7 +286,7 @@ jobs:
         if: steps.credentials.outputs.configured == 'true' && steps.still-open.outputs.open == 'true'
         id: preview-url
         run: |
-          node scripts/02-extract-preview-url.mjs \
+          pnpm --silent ops preview url \
             ".memory/wrangler-${{ matrix.project }}-preview.ndjson" \
             --worker-name "${{ steps.worker-app.outputs.worker_name }}" \
             --preview-name "${{ steps.preview-settings.outputs.preview_name }}"
@@ -325,7 +301,7 @@ jobs:
           PREVIEW_URL: ${{ steps.preview-url.outputs.preview_url }}
           PREVIEW_SHA: ${{ needs.resolve-preview-pr.outputs.sha }}
           PREVIEW_NAME: ${{ steps.preview-settings.outputs.preview_name }}
-        run: node scripts/03-upsert-preview-comment.mjs
+        run: pnpm --silent ops preview comment
 
       - name: Comment preview failure
         if: failure() && steps.credentials.outputs.configured == 'true'
@@ -336,7 +312,7 @@ jobs:
           PREVIEW_STATUS: failed
           PREVIEW_SHA: ${{ needs.resolve-preview-pr.outputs.sha }}
           PREVIEW_NAME: ${{ steps.preview-settings.outputs.preview_name }}
-        run: node scripts/03-upsert-preview-comment.mjs
+        run: pnpm --silent ops preview comment
 
   cleanup-preview:
     # Runs on a close whenever a Preview can exist, so none outlives its PR.
@@ -368,8 +344,6 @@ jobs:
           ref: ${{ needs.resolve-preview-pr.outputs.sha }}
 
       - uses: ./.github/actions/setup-workspace
-        with:
-          install-dependencies: "false"
 
       - name: Delete official Worker Preview
         id: cleanup
@@ -379,7 +353,7 @@ jobs:
           PREVIEW_PROJECT_ID: ${{ matrix.project }}
           PR_NUMBER: ${{ needs.resolve-preview-pr.outputs.pr_number }}
         # Fails, after recording `deletion-pending`, if the Preview URL keeps serving.
-        run: node scripts/04-delete-preview.mjs --project "$PREVIEW_PROJECT_ID" --pr-number "$PR_NUMBER"
+        run: pnpm --silent ops preview delete --project "$PREVIEW_PROJECT_ID" --pr-number "$PR_NUMBER"
 
       - name: Comment preview cleanup
         if: ${{ !cancelled() && steps.cleanup.outputs.comment_status != '' }}
@@ -391,4 +365,4 @@ jobs:
           PREVIEW_URL: ${{ steps.cleanup.outputs.comment_status == 'deletion-pending' && steps.cleanup.outputs.preview_url || '' }}
           PREVIEW_SHA: ${{ needs.resolve-preview-pr.outputs.sha }}
           PREVIEW_NAME: ${{ steps.cleanup.outputs.preview_name }}
-        run: node scripts/03-upsert-preview-comment.mjs
+        run: pnpm --silent ops preview comment

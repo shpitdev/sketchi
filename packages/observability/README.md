@@ -15,7 +15,7 @@ flowchart LR
 | ---------------------------------------------------- | ------------------------------------- |
 | the tracer, logger and metric exporter               | what each span records (its callers)  |
 | span rows, their splitting, and per-request batches  | the Pipeline, sink and catalog        |
-| request correlation: ray, run, attempt and other IDs | DuckDB views (`scripts/telemetry`)    |
+| request correlation: ray, run, attempt and other IDs | DuckDB views (`tools/ops/src/telemetry`) |
 | the stream schema, `spans.schema.json`               | AI Gateway request logging            |
 
 `withTelemetryExport` makes the current span a request's root; the request's

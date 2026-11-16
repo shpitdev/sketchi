@@ -155,7 +155,7 @@
 			"inputs": ["production", "^production"]
 		},
 		"build-storybook": {
-			"inputs": ["default", "^default", "{workspaceRoot}/scripts/lib/excalidraw-fonts.mjs"],
+			"inputs": ["default", "^default", "{workspaceRoot}/tools/ops/src/vite/excalidraw-fonts.ts"],
 			"cache": true,
 			"dependsOn": ["^build"]
 		}

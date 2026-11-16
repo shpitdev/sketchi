@@ -85,7 +85,8 @@ change UI behavior; use focused tests, the gate and independent review. Changes
 to layout, drawing or graph retain artifact identity, affected fuzz and timing.
 Reuse unchanged proof by identity instead of repeating expensive checks.
 
-`pnpm ci:local` is the local CI gate (`scripts/ci-local.mjs`). It defaults to
+`pnpm ci:local` is the local CI gate (`tools/ops/src/ci-local/gate.ts`, started by the
+`tools/ops/ci-local.mjs` install bootstrap). It defaults to
 `origin/main`, including staged, unstaged and untracked changes. After a frozen
 install and `nx sync:check`, native Nx affected targets own lint/format, tools
 (including custom-rule, domain and font tests), deployment/process behavior,
