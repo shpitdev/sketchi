@@ -103,15 +103,16 @@ const packages = new Map(
 					...manifest.dependencies,
 					...manifest.devDependencies,
 				}),
+				runtimeDependencies: Object.keys({ ...manifest.dependencies }),
 			},
 		];
 	}),
 );
 const dependenciesByName = new Map(
-	[...packages.values()].map((entry) => [entry.name, entry.dependencies]),
+	[...packages.values()].map((entry) => [entry.name, entry.runtimeDependencies]),
 );
 
-/** Depends on Excalidraw directly or through one workspace package. */
+/** Depends on Excalidraw directly or through one workspace package's runtime dependencies. */
 function reachesExcalidraw(directory) {
 	const dependencies = packages.get(directory)?.dependencies ?? [];
 	return dependencies.some(
