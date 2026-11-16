@@ -582,14 +582,15 @@ const broken: Record<string, [ChartDiagram, (scene: CanvasSpec) => CanvasSpec]> 
 	"slice-angle": [
 		pie,
 		(scene) =>
-			edit(scene, "chart:slice:2", (slice) => {
+			edit(scene, "chart:slice:2", (element) => {
+				const slice = element as NodeElement;
 				const { center, radius } = pieGeometry(read(scene));
-				const points = (slice as NodeElement).points!;
+				const points = slice.points!;
 				const lastRim = points.findLastIndex(
 					(point) =>
 						Math.hypot(slice.x + point.x - center.x, slice.y + point.y - center.y) > radius * 0.99,
 				);
-				return { ...(slice as NodeElement), points: points.toSpliced(lastRim, 1) };
+				return { ...slice, points: points.toSpliced(lastRim, 1) } as SceneElement;
 			}),
 	],
 	"slice-share": [

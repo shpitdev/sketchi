@@ -196,7 +196,7 @@ describe("Code Mode class diagram", () => {
 					element.type === "node" && element.id === `node:${id}`,
 			)!;
 		const arrow = (id: string) =>
-			(scene as CanvasSpec).elements.find(
+			scene.elements.find(
 				(element) => element.type === "arrow" && element.edgeId === id,
 			) as Extract<CanvasSpec["elements"][number], { type: "arrow" }>;
 		const below = (lower: string, upper: string) =>
@@ -253,7 +253,9 @@ const bad: Record<string, Partial<ClassDiagram>> = {
 	},
 	class_text_too_long: { classes: withClasses(node("Long", { name: "x".repeat(65) })) },
 	duplicate_relationship_id: {
-		relationships: withRelationships(relate("association", "Circle", "Canvas", { id: "canvas-holds" })),
+		relationships: withRelationships(
+			relate("association", "Circle", "Canvas", { id: "canvas-holds" }),
+		),
 	},
 	missing_relationship_class: {
 		relationships: withRelationships(relate("association", "Circle", "Ghost")),

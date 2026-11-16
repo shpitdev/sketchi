@@ -477,7 +477,7 @@ const find = (scene: CanvasSpec, id: string) =>
 const shiftX =
 	(dx: number): SceneEdit =>
 	(element) =>
-		({ ...element, x: element.x + dx }) as CanvasElement;
+		({ ...element, x: (element as CanvasShapeElement).x + dx }) as CanvasElement;
 const retext =
 	(text: string): SceneEdit =>
 	(element) =>
