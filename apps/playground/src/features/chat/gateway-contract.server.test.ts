@@ -6,7 +6,7 @@ import { families } from "@sketchi/diagrams/family";
 import { toCodeModeJsonSchema } from "@sketchi/diagrams/build/code-mode/contract";
 import type { CloudflareAiGateway } from "@sketchi/cloudflare/ai-gateway";
 import { handleStudioAgentRequest } from "./agent.server";
-import { runPlaygroundEffect } from "../runtime/runtime.server";
+import { runPlaygroundEffect } from "../../server/runtime/runtime.server";
 
 type GatewayData = Parameters<CloudflareAiGateway["run"]>[0];
 const spec = { title: "Review", nodes: { start: "Open", end: "Done" }, edges: [["start", "end"]] };

@@ -2,7 +2,7 @@ import { AsyncResult } from "effect/reactivity";
 import { convertSceneToExcalidraw, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEPLOY_PIPELINE_SCENE } from "../playground/deploy-pipeline-sample";
+import { DEPLOY_PIPELINE_SCENE } from "../chat/deploy-pipeline-sample";
 
 const canvas = vi.hoisted((): { change?: (scene: ExcalidrawScene) => void } => ({}));
 vi.mock("@sketchi/editor", () => ({

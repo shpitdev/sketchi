@@ -140,7 +140,7 @@
               "apps/playground/src/features/build/api.server.ts",
               "apps/playground/src/features/build/capabilities.server.ts",
               "apps/playground/src/server/runtime/runtime.server.ts",
-              "apps/playground/src/server/chat/studio-family-tools.server.ts",
+              "apps/playground/src/features/chat/studio-family-tools.server.ts",
               "apps/playground/src/server/generation/api.server.ts",
               "apps/icons/src/lib/mcp.server.ts",
               "apps/icons/src/lib/mcp-session.server.ts",

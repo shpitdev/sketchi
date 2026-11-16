@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { page } from "vitest/browser";
-import { type ChatStatus, type ChatMessage } from "@/features/playground/chat-message";
+import { type ChatStatus, type ChatMessage } from "@/features/chat/chat-message";
 import { type BuildFlowchartResult } from "@sketchi/diagrams/families/flowchart/build";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 

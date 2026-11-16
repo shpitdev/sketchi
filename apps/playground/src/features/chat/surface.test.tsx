@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { type BuildFlowchartResult } from "@sketchi/diagrams/families/flowchart/build";
 import { getCanvasValidationIssues } from "@sketchi/drawing";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { type ChatMessage } from "@/features/playground/chat-message";
+import { type ChatMessage } from "@/features/chat/chat-message";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 

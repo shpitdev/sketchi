@@ -7,7 +7,7 @@ import {
   CollapsibleTrigger,
 } from "@sketchi/ui/components/collapsible";
 import { cn } from "@sketchi/ui/lib/utils";
-import type { ChatToolPart } from "@/features/playground/chat-message";
+import type { ChatToolPart } from "@/features/chat/chat-message";
 import {
   CheckCircleIcon,
   ChevronDownIcon,

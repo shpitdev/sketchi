@@ -6,7 +6,7 @@ import "@tanstack/react-start/server-only";
 import { buildResponse } from "@sketchi/diagrams/build/operation";
 import { toCodeModeJsonSchema } from "@sketchi/diagrams/build/code-mode/contract";
 import * as Build from "@sketchi/diagrams/build/code-mode/runtime";
-import type { PlaygroundCallbackEffect } from "../runtime/runtime.server";
+import type { PlaygroundCallbackEffect } from "../../server/runtime/runtime.server";
 import {
 	makeStudioFlowchartToolExecutor,
 	makeStudioSequenceToolExecutor,

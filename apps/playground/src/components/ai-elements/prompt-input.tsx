@@ -8,7 +8,7 @@ import {
 } from "@sketchi/ui/components/input-group";
 import { Spinner } from "@sketchi/ui/components/spinner";
 import { cn } from "@sketchi/ui/lib/utils";
-import type { ChatStatus } from "@/features/playground/chat-message";
+import type { ChatStatus } from "@/features/chat/chat-message";
 import { CornerDownLeftIcon, SquareIcon, XIcon } from "lucide-react";
 import { nanoid } from "nanoid";
 import type {

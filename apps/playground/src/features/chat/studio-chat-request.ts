@@ -1,4 +1,4 @@
-import { toAgUiMessages, type ChatMessage } from "@/features/playground/chat-message";
+import { toAgUiMessages, type ChatMessage } from "@/features/chat/chat-message";
 
 /** The most messages one Studio chat request may carry. */
 export const MAX_CHAT_MESSAGES = 64;

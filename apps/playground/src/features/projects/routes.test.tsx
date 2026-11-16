@@ -4,7 +4,7 @@ import { renderToString } from "react-dom/server";
 import { hydrateRoot } from "react-dom/client";
 import type { ComponentType } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEPLOY_PIPELINE_SCENE } from "../playground/deploy-pipeline-sample";
+import { DEPLOY_PIPELINE_SCENE } from "../chat/deploy-pipeline-sample";
 
 const params = vi.hoisted(() => ({
 	artifactId: "artifact_one",
