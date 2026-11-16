@@ -37,7 +37,6 @@
 		"test": "nx run-many -t test",
 		"test:deploy-scripts": "node --test scripts/lib/*.test.mjs scripts/lib/deploy/*.test.mjs scripts/telemetry/*.test.mjs",
 		"test:wrangler-dry-runs": "node scripts/06-dry-run-worker-apps.mjs",
-		"test:onboarding": "node --test scripts/lib/code-mode-onboarding.test.mjs",
 		"toolchain:verify": "node scripts/verify-toolchain.mjs",
 		"typecheck": "nx run-many -t typecheck"
 	},

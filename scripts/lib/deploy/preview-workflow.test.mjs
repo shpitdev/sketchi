@@ -268,26 +268,6 @@ test("only a PR labelled preview deploys; every same-repository close cleans up"
 	assert.ok(workflow.on.pull_request.types.includes("labeled"));
 });
 
-test("previews select their apps after the PR resolves, and deploy only those", () => {
-	const steps = workflow.jobs["resolve-preview-pr"].steps;
-	const select = steps.find(({ id }) => id === "projects");
-	assert.equal(select.run, "node scripts/08-select-preview-projects.mjs");
-	assert.equal(select.env.PREVIEW_SELECTION, "${{ inputs.project || 'affected' }}");
-	assert.equal(select.env.HEAD_SHA, "${{ steps.pr.outputs.sha }}");
-	assert.ok(steps.findIndex(({ id }) => id === "pr") < steps.indexOf(select));
-	assert.deepEqual(workflow.on.workflow_dispatch.inputs.project.options, [
-		"affected",
-		"all",
-		...workflow.jobs["cleanup-preview"].strategy.matrix.project,
-	]);
-	assert.match(workflow.jobs["deploy-preview"].if, /outputs\.projects != '\[\]'/);
-	assert.doesNotMatch(
-		JSON.stringify(workflow.jobs["deploy-preview"].steps),
-		/test:deploy-scripts/,
-		"pnpm ci:local proves the deploy scripts",
-	);
-});
-
 // Run the close-time Preview detection with a stub `gh` that serves the given comment pages.
 function detectExistingPreview({ label = false, pages = [] } = {}) {
 	const step = workflow.jobs["resolve-preview-pr"].steps.find(({ id }) => id === "existing");

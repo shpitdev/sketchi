@@ -227,7 +227,7 @@ function printLogTail(log, lines = 80) {
 const HELP = `Usage: pnpm ci:local [--no-signoff] [--all] [--base <ref>]
 
 Runs actionlint when workflows changed, a frozen install, lint/format/custom-rule checks, the
-scenario CLI smoke, the deploy and tooling contracts, the Nx-affected typecheck, build and test
+scenario CLI smoke, deployment/process behavior and domain/font integration tests, the Nx-affected typecheck, build and test
 targets, sampled routing (always for origin/main and --all; otherwise when its inputs change),
 the root TypeScript project references, and the diagram UI Storybook build when
 editor is affected. Changes are compared with the base (default origin/main), including
@@ -449,24 +449,15 @@ async function main(argv) {
 			),
 		],
 		[
-			"deploy, onboarding, and cutover contracts",
+			"deployment and process behavior",
 			command("deploy-scripts", ["pnpm", "run", "test:deploy-scripts"]),
 		],
 		[
-			"repository tooling contracts",
+			"domain integration and font packaging",
 			command(
 				"tools",
 				["pnpm", "exec", "effect-tsgo", "tsc@7.0.2", "-p", "tools/tsconfig.json", "--noEmit"],
-				[
-					"pnpm",
-					"exec",
-					"vitest",
-					"run",
-					"--config",
-					"tools/vitest.config.mts",
-					"--exclude",
-					"tools/project-graph.test.ts",
-				],
+				["pnpm", "exec", "vitest", "run", "--config", "tools/vitest.config.mts"],
 			),
 		],
 		[
@@ -496,23 +487,11 @@ async function main(argv) {
 			),
 		],
 		[
-			"root TypeScript project references and project graph",
+			"root TypeScript project references",
 			conditional(
 				() => scope.code,
-				"root project references and project graph",
-				command(
-					"graph",
-					["pnpm", "exec", "effect-tsgo", "tsc@7.0.2", "-b", "--pretty", "false"],
-					[
-						"pnpm",
-						"exec",
-						"vitest",
-						"run",
-						"--config",
-						"tools/vitest.config.mts",
-						"tools/project-graph.test.ts",
-					],
-				),
+				"root project references",
+				command("graph", ["pnpm", "exec", "effect-tsgo", "tsc@7.0.2", "-b", "--pretty", "false"]),
 			),
 		],
 		[

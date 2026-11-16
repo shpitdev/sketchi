@@ -59,9 +59,10 @@ Reuse unchanged proof by identity instead of repeating expensive checks.
 
 `pnpm ci:local` is the local CI gate (`scripts/ci-local.mjs`). It defaults to
 `origin/main`, including staged, unstaged and untracked changes, and runs actionlint when workflows
-change, a frozen install, `pnpm run check`, the scenario CLI smoke, the deploy
-and tooling contracts, the Nx-affected native `typecheck`, `build`
-and `test` targets, sampled routing as described below, the root `effect-tsgo tsc@7.0.2 -b` and project-graph test, and
+change, a frozen install, `pnpm run check`, the scenario CLI smoke, deployment/process
+behavior and domain/font integration tests, the Nx-affected native `typecheck`,
+`build` and `test` targets, sampled routing as described below, the root
+`effect-tsgo tsc@7.0.2 -b`, and
 `pnpm nx build-storybook editor` when `editor` is affected.
 
 - Before publishing an accepted unit, run `pnpm ci:local --no-signoff`.

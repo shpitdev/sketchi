@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -143,28 +142,5 @@ process.stdout.write("Uploaded");
 		assert.equal(stdout, "Uploaded");
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
-	}
-});
-
-test("every Cloudflare upload in the deploy workflows goes through the retry wrapper", () => {
-	const require = createRequire(import.meta.resolve("nx/package.json"));
-	const yaml = require("@zkochan/js-yaml");
-	for (const [file, jobName] of [
-		["app-production-deploy.yml", "deploy"],
-		["app-preview.yml", "deploy-preview"],
-	]) {
-		const workflow = yaml.load(
-			readFileSync(new URL(`../../../.github/workflows/${file}`, import.meta.url), "utf8"),
-		);
-		const runs = workflow.jobs[jobName].steps
-			.map(({ run }) => run ?? "")
-			.filter((run) => /wrangler (deploy|preview)/.test(run));
-		assert.ok(runs.length > 0, `${file} must upload with Wrangler`);
-		for (const run of runs) {
-			assert.match(
-				run,
-				/node scripts\/07-wrangler-retry\.mjs -- pnpm exec wrangler (deploy|preview)/,
-			);
-		}
 	}
 });

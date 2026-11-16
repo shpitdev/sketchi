@@ -33,7 +33,7 @@ export function ciScope({ all, full, projects, changedFiles }) {
 	const affected = new Set(projects);
 	const code = all || affected.size > 0 || changedFiles.some((file) => WORKSPACE_FILE.test(file));
 	return {
-		// Root native `tsc -b` and the project-graph structural tests read every project.
+		// Root native `tsc -b` reads every project.
 		code,
 		storybook: all || affected.has("editor"),
 		routing: all || full || changedFiles.some(routingInput),

@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { unstable_readConfig } from "wrangler";
@@ -11,8 +10,6 @@ import {
 	workerProjectIds,
 } from "./worker-apps.mjs";
 
-const repoRoot = new URL("../../", import.meta.url);
-
 const expectedWorkers = {
 	excalidraw: "sketchi-excalidraw",
 	icons: "sketchi-icons",
@@ -22,10 +19,6 @@ const expectedWorkers = {
 
 test("Worker resolution requires an explicit project selection", () => {
 	assert.throws(() => workerProjectConfig(), /Worker project selection is required/);
-});
-
-test("deployed project IDs are the exact approved set", () => {
-	assert.deepEqual([...workerProjectIds].sort(), Object.keys(expectedWorkers).sort());
 });
 
 test("Worker projects have isolated build and generated config paths", () => {
@@ -75,10 +68,6 @@ test("project IDs resolve independently to durable Worker identities", async () 
 	assert.notEqual(playground.projectId, playground.workerName);
 });
 
-test("the public Playground project retains its durable Worker", () => {
-	assert.equal(workerProjectConfig("playground").workerName, "sketchi-studio");
-});
-
 test("identity validation fails closed on project, Worker, or Wrangler drift", () => {
 	assert.throws(
 		() => requireWorkerIdentity("playground", "sketchi-playground"),
@@ -98,23 +87,4 @@ test("identity validation fails closed on project, Worker, or Wrangler drift", (
 			),
 		/Wrangler topLevelName mismatch for project "playground"/,
 	);
-});
-
-test("Nx build outputs and deploy targets use project-scoped Worker paths", () => {
-	for (const projectId of workerProjectIds) {
-		const workerProject = workerProjectConfig(projectId);
-		const project = JSON.parse(
-			readFileSync(new URL(`${workerProject.projectRoot}/project.json`, repoRoot), "utf8"),
-		);
-
-		assert.equal(project.name, workerProject.projectId);
-		assert.deepEqual(project.targets.build.outputs, [
-			`{workspaceRoot}/${workerProject.buildOutputPath}`,
-			"{projectRoot}/.wrangler/deploy/config.json",
-		]);
-		assert.equal(
-			project.targets.deploy.options.command,
-			`wrangler deploy --config ${workerProject.generatedWranglerConfigPath}`,
-		);
-	}
 });

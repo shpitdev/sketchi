@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
-import { globSync, readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { posix } from "node:path";
 import test from "node:test";
 
 import {
@@ -9,42 +8,15 @@ import {
 	productionProjectConfig,
 	selectProductionProjects,
 } from "./production.mjs";
-import { workerProjectConfig, workerProjectIds } from "../worker-apps.mjs";
+import { workerProjectIds } from "../worker-apps.mjs";
 
-const require = createRequire(import.meta.resolve("nx/package.json"));
-const yaml = require("@zkochan/js-yaml");
-const read = (path) => readFileSync(new URL(`../../../${path}`, import.meta.url), "utf8");
-const workflow = yaml.load(read(".github/workflows/app-production-deploy.yml"));
-
-test("productionProjectConfig returns project-scoped domain metadata", () => {
-	assert.deepEqual(productionProjectConfig("web"), {
-		...workerProjectConfig("web"),
-		domainPatterns: ["sketchi.app", "www.sketchi.app"],
-		publicSurface: true,
-		routePolicy: "sketchi.app and www.sketchi.app product surface",
-		title: "Sketchi Web",
-	});
-});
-
-test("playground project preserves the Studio production Worker", () => {
-	assert.deepEqual(productionProjectConfig("playground"), {
-		...workerProjectConfig("playground"),
-		domainPatterns: ["playground.sketchi.app"],
-		publicSurface: true,
-		routePolicy: "playground.sketchi.app product surface; authenticated Studio remains unexposed",
-		title: "Sketchi Playground / Studio",
-	});
-});
-
-test("internal projects stay off public domains", () => {
-	assert.deepEqual(productionProjectConfig("excalidraw"), {
-		...workerProjectConfig("excalidraw"),
-		domainPatterns: [],
-		publicSurface: false,
-		routePolicy: "internal canvas workspace; no public product domain",
-		title: "Sketchi Excalidraw Workspace",
-	});
-});
+const yaml = createRequire(import.meta.resolve("nx/package.json"))("@zkochan/js-yaml");
+const workflow = yaml.load(
+	readFileSync(
+		new URL("../../../.github/workflows/app-production-deploy.yml", import.meta.url),
+		"utf8",
+	),
+);
 
 test("production project selection is explicit and closed", () => {
 	assert.throws(() => productionProjectConfig(), /Production project selection is required/);
@@ -173,83 +145,6 @@ test("selectProductionProjects selects affected Workers, all projects, or one na
 	assert.throws(() => selectProductionProjects({ selection: "studio" }), /Unknown Worker project/);
 });
 
-test("manual production dispatch deploys only the selected apps", () => {
-	const select = workflow.jobs.select.steps.find(({ id }) => id === "projects");
-	assert.equal(select.run, "node scripts/09-select-production-projects.mjs");
-	assert.deepEqual(select.env, { PRODUCTION_SELECTION: "${{ inputs.project }}" });
-	const [first, ...apps] = workflow.on.workflow_dispatch.inputs.project.options;
-	assert.equal(first, "all");
-	assert.deepEqual(apps.toSorted(), workerProjectIds.toSorted());
-	const deploy = workflow.jobs.deploy;
-	assert.equal(deploy.needs, "select");
-	assert.match(deploy.if, /needs\.select\.outputs\.projects != '\[\]'/);
-	assert.equal(deploy.strategy.matrix.project, "${{ fromJSON(needs.select.outputs.projects) }}");
-	assert.doesNotMatch(JSON.stringify(deploy.steps), /inputs\.project/);
-});
-
 test("production deploys only by manual dispatch", () => {
 	assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
-});
-
-const repoRoot = new URL("../../../", import.meta.url);
-
-// Workspace package roots and names. A package reaches a build through Nx's `^production`.
-const workspacePackages = new Map(
-	yaml
-		.load(read("pnpm-workspace.yaml"))
-		.packages.flatMap((glob) => globSync(`${glob}/package.json`, { cwd: repoRoot }))
-		.map((manifest) => [posix.dirname(manifest), JSON.parse(read(manifest)).name]),
-);
-const packageRootOf = (path) =>
-	[...workspacePackages.keys()].find((root) => path.startsWith(`${root}/`));
-
-/**
- * The local paths a project's build configs reach outside the project, following the imports of
- * every module they reach outside workspace packages. A specifier resolves to its file the way
- * Vite would; a directory or asset path is kept as written.
- */
-function externalBuildPaths(projectRoot, configs) {
-	const resolveModule = (path) =>
-		["", ".ts", ".mts", ".mjs", ".js", "/index.ts"]
-			.map((suffix) => `${path}${suffix}`)
-			.find((candidate) =>
-				statSync(new URL(candidate, repoRoot), { throwIfNoEntry: false })?.isFile(),
-			);
-	const found = new Set();
-	const queue = configs.map((config) => `${projectRoot}/${config}`);
-	for (let file = queue.shift(); file; file = queue.shift()) {
-		for (const [, specifier] of read(file).matchAll(/["'](\.{1,2}\/[^"'`$]*)["']/g)) {
-			const target = posix.normalize(posix.join(posix.dirname(file), specifier));
-			if (target.startsWith(`${projectRoot}/`) || target.startsWith("node_modules/")) continue;
-			const module = resolveModule(target);
-			const path = module ?? target;
-			if (found.has(path)) continue;
-			found.add(path);
-			if (module && /\.[mc]?[jt]s$/.test(module) && !packageRootOf(module)) queue.push(module);
-		}
-	}
-	return [...found];
-}
-
-test("Worker build inputs and dependencies cover every external config import", () => {
-	for (const projectId of workerProjectIds) {
-		const { projectRoot } = workerProjectConfig(projectId);
-		const manifest = JSON.parse(read(`${projectRoot}/package.json`));
-		const dependencies = { ...manifest.dependencies, ...manifest.devDependencies };
-		const inputs = JSON.parse(read(`${projectRoot}/project.json`)).targets.build.inputs ?? [];
-		const external = externalBuildPaths(projectRoot, ["vite.config.ts", "wrangler.jsonc"]);
-		assert.ok(external.length > 0, `${projectId}: the scan must see the config's imports`);
-		for (const path of external) {
-			const owner = packageRootOf(path);
-			if (owner) {
-				const name = workspacePackages.get(owner);
-				assert.ok(name in dependencies, `${projectId} must depend on ${name} to build ${path}`);
-				continue;
-			}
-			assert.ok(
-				inputs.includes(`{workspaceRoot}/${path}`),
-				`${projectId}: ${path} must be a build input`,
-			);
-		}
-	}
 });

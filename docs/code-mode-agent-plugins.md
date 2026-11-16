@@ -191,10 +191,9 @@ The distributable sources are:
 - `.agents/skills/sketchi-code-mode/SKILL.md` and
   `.agents/mcp_config.json` for portable Agy and OpenCode setup.
 
-Run the focused drift checks with:
+Validate the Claude plugin packages with:
 
 ```sh
-pnpm test:onboarding
 claude plugin validate .
 claude plugin validate plugins/sketchi-code-mode-claude
 ```
