@@ -1,7 +1,7 @@
-export * from "./capabilities.js";
-export * from "./convert.js";
-export * from "./library.js";
-export * from "./parse.js";
+export * from "./capabilities";
+export * from "./convert";
+export * from "./library";
+export * from "./parse";
 export type {
 	AdaptiveFlatteningOptions,
 	CanonicalMetrics,
@@ -36,4 +36,4 @@ export type {
 	SvgToExcalidrawOptions,
 	SvgToExcalidrawResult,
 	UseExpansionOptions,
-} from "./types.js";
+} from "./types";

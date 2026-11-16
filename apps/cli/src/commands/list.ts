@@ -2,12 +2,12 @@ import { DIAGRAM_TYPES } from "@sketchi/diagrams/family";
 import { Clock, Effect, Option } from "effect";
 import stringWidth from "string-width";
 
-import type { DiagramListEntry } from "../contracts.js";
-import { entryTime, matchesQuery, newestFirst, relativeTime } from "../diagram-catalog.js";
-import { DiagramStore } from "../store/service.js";
-import { Argument, Command, Flag } from "../terminal/effect-cli.js";
-import { runReported } from "../terminal/output.js";
-import { rootCommand } from "./root.js";
+import type { DiagramListEntry } from "../contracts";
+import { entryTime, matchesQuery, newestFirst, relativeTime } from "../diagram-catalog";
+import { DiagramStore } from "../store/service";
+import { Argument, Command, Flag } from "../terminal/effect-cli";
+import { runReported } from "../terminal/output";
+import { rootCommand } from "./root";
 
 const DEFAULT_LIST_LIMIT = 20;
 const LIST_TITLE_WIDTH = 48;

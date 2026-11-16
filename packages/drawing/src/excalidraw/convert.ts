@@ -1,4 +1,4 @@
-import { type ExcalidrawElement, type ExcalidrawScene, type ExcalidrawFile } from "./scene.js";
+import { type ExcalidrawElement, type ExcalidrawScene, type ExcalidrawFile } from "./scene";
 import {
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasFrameElement as FrameSceneElement,
@@ -34,11 +34,11 @@ import {
 	SKETCHI_DIAGRAM_PALETTE,
 	wrappedLabelWidth,
 	wrapTextToWidth,
-} from "../index.js";
+} from "../index";
 
 import { generateKeyBetween } from "fractional-indexing";
 
-import { fixedBoundEnds, focusBoundEnds } from "./bound-ends.js";
+import { fixedBoundEnds, focusBoundEnds } from "./bound-ends";
 import {
 	type BindableShape,
 	EXCALIDRAW_BINDING_GAP,
@@ -50,9 +50,9 @@ import {
 	type FocusBinding,
 	isExcalidrawBindableType,
 	type Point,
-} from "./excalidraw-binding.js";
-import { iconRecipeElements } from "./icon-recipe.js";
-import { elbowFixedPointAt } from "./route-folds.js";
+} from "./excalidraw-binding";
+import { iconRecipeElements } from "./icon-recipe";
+import { elbowFixedPointAt } from "./route-folds";
 
 /** Excalidraw BinaryFileData: the image bytes an `image` element points at. */
 export interface ExcalidrawBinaryFile {

@@ -1,1 +1,1 @@
-export * from "./excalidraw-workspace.js";
+export * from "./excalidraw-workspace";

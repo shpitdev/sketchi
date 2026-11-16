@@ -2,9 +2,9 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 
 import { Effect } from "effect";
 
-import { CliExportError } from "../errors.js";
-import { LocalFileSystem } from "../filesystem.js";
-import { StorageRoot } from "./service.js";
+import { CliExportError } from "../errors";
+import { LocalFileSystem } from "../filesystem";
+import { StorageRoot } from "./service";
 
 export const writeExportFile = Effect.fn("sketchi.cli.export.writeFile")(function* (
 	destination: string,

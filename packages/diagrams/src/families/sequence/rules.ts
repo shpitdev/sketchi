@@ -1,5 +1,5 @@
-import type { RuleSource } from "../../rule-source.js";
-import { SEQUENCE_MAX_MESSAGES, SEQUENCE_MAX_PARTICIPANTS } from "./document.js";
+import type { RuleSource } from "../../rule-source";
+import { SEQUENCE_MAX_MESSAGES, SEQUENCE_MAX_PARTICIPANTS } from "./document";
 
 /** How a request becomes a sequence diagram; see FLOWCHART_RULES. */
 export const SEQUENCE_RULES = {

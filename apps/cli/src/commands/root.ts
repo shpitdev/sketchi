@@ -1,5 +1,5 @@
-import { LATEST_DIAGRAM } from "../diagram-catalog.js";
-import { Argument, Command, Flag } from "../terminal/effect-cli.js";
+import { LATEST_DIAGRAM } from "../diagram-catalog";
+import { Argument, Command, Flag } from "../terminal/effect-cli";
 
 const HUMAN_HELP = "Turn one prompt into a validated PNG and editable local diagram.";
 

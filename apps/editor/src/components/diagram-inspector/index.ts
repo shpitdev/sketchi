@@ -1,1 +1,1 @@
-export * from "./diagram-inspector.js";
+export * from "./diagram-inspector";

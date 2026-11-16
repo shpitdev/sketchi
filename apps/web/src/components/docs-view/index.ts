@@ -1,1 +1,1 @@
-export * from "./docs-view.js";
+export * from "./docs-view";

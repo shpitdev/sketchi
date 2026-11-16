@@ -1,6 +1,6 @@
 import { Array, Result } from "effect";
-import { defineBuild } from "../../build/operation.js";
-import { PublishedBuildIssue } from "../../build/result.js";
+import { defineBuild } from "../../build/operation";
+import { PublishedBuildIssue } from "../../build/result";
 import {
 	ClassDocument,
 	ClassDiagram,
@@ -10,8 +10,8 @@ import {
 	validateClassDiagram,
 	resolveClassShorthand,
 	counts,
-} from "./document.js";
-import { renderClassDiagram } from "./render.js";
+} from "./document";
+import { renderClassDiagram } from "./render";
 
 /** Class authoring policy; shared build owns decoding, delivery and the response envelope. */
 export const classBuild = defineBuild({

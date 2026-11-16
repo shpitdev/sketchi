@@ -10,8 +10,8 @@ import {
 } from "@sketchi/diagrams/families/org-chart/document";
 import { orgChartLayoutIssues } from "@sketchi/diagrams/families/org-chart/readout";
 
-import { type ScenarioCheck } from "./evaluate.js";
-import { type DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate";
+import { type DiagramScenarioDifficulty } from "./scenarios";
 
 /** A person the prompt names: the names and titles they may go by, and whom they report to. */
 export interface OrgChartScenarioPerson {

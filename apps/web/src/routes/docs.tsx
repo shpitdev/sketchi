@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { DocsView } from "../components/docs-view/index.js";
-import { SiteShell } from "../components/site-shell/site-shell.js";
+import { DocsView } from "../components/docs-view/index";
+import { SiteShell } from "../components/site-shell/site-shell";
 import { pageMeta } from "../lib/site-meta";
 import { getWebSurfaceUrls } from "../lib/surface-urls-rpc";
 

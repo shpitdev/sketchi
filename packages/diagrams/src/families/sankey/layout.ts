@@ -1,7 +1,7 @@
 import { estimateTextWidth, wrapTextToWidth } from "@sketchi/drawing";
-import { sankeyColumns, sankeyNodeTotals, type SankeyDiagram } from "./document.js";
+import { sankeyColumns, sankeyNodeTotals, type SankeyDiagram } from "./document";
 
-import { formatValue, unitParts } from "../chart/scale.js";
+import { formatValue, unitParts } from "../chart/scale";
 
 /** Categorical colors in fixed order, shared with charts: adjacent pairs stay apart for color-vision deficiencies. */
 const SANKEY_COLORS = [

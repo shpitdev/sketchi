@@ -3,22 +3,19 @@ import { useState } from "react";
 import { useAtom } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
 
-import type { PackExcalidrawState } from "./publication.js";
+import type { PackExcalidrawState } from "./publication";
 import {
 	ALL_ICONS_PACK_ID,
+	iconCount,
 	packPagePath,
 	SHELF_FIRST_PACK_IDS,
 	type PackSummary,
-} from "../../lib/packs.js";
-import type { PreviewMode } from "../../components/preview-toggle/preview-toggle.js";
-import { RecipePreview } from "../../components/recipe-preview/recipe-preview.js";
-import { PackActions } from "./pack-actions.js";
-import { PackPublishDialog } from "./pack-publish-dialog.js";
-import { usePackPublishing } from "./use-pack-publishing.js";
-
-export function iconCount(count: number): string {
-	return `${count.toLocaleString("en-US")} ${count === 1 ? "icon" : "icons"}`;
-}
+} from "../../lib/packs";
+import type { PreviewMode } from "../../components/preview-toggle/preview-toggle";
+import { RecipePreview } from "../../components/recipe-preview/recipe-preview";
+import { PackActions } from "./pack-actions";
+import { PackPublishDialog } from "./pack-publish-dialog";
+import { usePackPublishing } from "./use-pack-publishing";
 
 /** The packs, each a strip of its own drawings, its size, and its actions. */
 export function PackShelf({

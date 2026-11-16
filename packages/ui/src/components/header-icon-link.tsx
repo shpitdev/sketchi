@@ -1,7 +1,7 @@
 import * as React from "react"
 
-import { cn } from "../lib/utils.js"
-import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip.js"
+import { cn } from "../lib/utils"
+import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip"
 
 /**
  * An icon-only header link with an accessible name and a hover/focus tooltip.

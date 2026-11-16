@@ -1,2 +1,2 @@
-export { IconWall } from "./icon-wall.js";
-export type { IconWallProps } from "./icon-wall.js";
+export { IconWall } from "./icon-wall";
+export type { IconWallProps } from "./icon-wall";

@@ -1,10 +1,10 @@
 import { Context, Effect, Layer } from "effect";
 
-import { decodeInlineArtifacts } from "../code-mode-artifacts.js";
-import type { DiagramFormat } from "../contracts.js";
-import { CliExportError, CliFilesystemError, CliStorageError } from "../errors.js";
-import { CliPngRenderer, type HeadlessPngRenderError } from "./png-renderer.js";
-import { DiagramStore } from "../store/service.js";
+import { decodeInlineArtifacts } from "../code-mode-artifacts";
+import type { DiagramFormat } from "../contracts";
+import { CliExportError, CliFilesystemError, CliStorageError } from "../errors";
+import { CliPngRenderer, type HeadlessPngRenderError } from "./png-renderer";
+import { DiagramStore } from "../store/service";
 
 export class DiagramExporter extends Context.Service<
 	DiagramExporter,

@@ -1,6 +1,6 @@
 /** Preserves actionable request diagnostics from native schema issues at the build boundary. */
 import { Schema, SchemaAST, SchemaIssue } from "effect";
-import { type CodeModeIssue, type CodeModeIssueCode } from "./result.js";
+import { type CodeModeIssue, type CodeModeIssueCode } from "./result";
 
 export const contractDiscriminatorAnnotation = "codeModeDiscriminator";
 export const contractMissingKeyCodeAnnotation = "codeModeMissingKeyCode";

@@ -1,6 +1,6 @@
-import { type CodeModeIssue } from "../build/result.js";
-import { cleanToolString } from "../clean-text.js";
-import { families } from "../family.js";
+import { type CodeModeIssue } from "../build/result";
+import { cleanToolString } from "../clean-text";
+import { families } from "../family";
 
 import {
 	CANVAS_LIMITS,
@@ -15,11 +15,11 @@ import {
 import { type validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect } from "effect";
 
-import { jsonSizeBytes } from "../build/artifacts.js";
-import { exportIssues } from "../build/export.js";
-import { iconRefSlug, undrawableIconIssue } from "../build/icons.js";
-import { issue } from "../build/issues.js";
-import { type CanvasInput } from "./input.js";
+import { jsonSizeBytes } from "../build/artifacts";
+import { exportIssues } from "../build/export";
+import { iconRefSlug, undrawableIconIssue } from "../build/icons";
+import { issue } from "../build/issues";
+import { type CanvasInput } from "./input";
 
 export function canvasExportIssues(
 	validationIssues: ReturnType<typeof validateExcalidrawScene>["issues"],

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 
-import { DIAGRAM_TYPES } from "../../family.js";
-import type { DiagramGenerationRequest } from "../candidates.js";
-import { DiagramFamilyNarrowing, workersAiFamilyNarrowingLayer } from "../family-narrowing.js";
-import type { WorkersAiRunner } from "../jev-workers-ai.js";
-import { buildDiagramGenerationMessages } from "../messages.js";
-import { withNarrowedFamilyRoute } from "../routing.js";
+import { DIAGRAM_TYPES } from "../../family";
+import type { DiagramGenerationRequest } from "../candidates";
+import { DiagramFamilyNarrowing, workersAiFamilyNarrowingLayer } from "../family-narrowing";
+import type { WorkersAiRunner } from "../jev-workers-ai";
+import { buildDiagramGenerationMessages } from "../messages";
+import { withNarrowedFamilyRoute } from "../routing";
 
 const JevRequest = Schema.Struct({
 	questions: Schema.Record(

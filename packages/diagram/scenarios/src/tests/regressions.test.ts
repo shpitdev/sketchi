@@ -4,9 +4,9 @@ import { readFileSync } from "node:fs";
 import { Option, Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { getDiagramScenario } from "../lib/diagram-scenarios.js";
-import { evaluateScenarioDiagram } from "../lib/evaluate.js";
-import { candidateFromMcpResult } from "../lib/mcp-results.js";
+import { getDiagramScenario } from "../lib/diagram-scenarios";
+import { evaluateScenarioDiagram } from "../lib/evaluate";
+import { candidateFromMcpResult } from "../lib/mcp-results";
 
 const load = (name: string): unknown =>
 	JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), "utf8"));

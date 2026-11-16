@@ -2,7 +2,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { openD1 } from "./support/d1.js";
+import { openD1 } from "./support/d1";
 
 import { makeTelemetryTestSink } from "@sketchi/observability";
 import { afterEach, expect, it } from "vitest";

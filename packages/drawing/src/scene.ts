@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { IconRecipeSchema } from "./recipe-schema.js";
+import { IconRecipeSchema } from "./recipe-schema";
 /**
  * Canonical, renderer-independent scene IR used by every Sketchi diagram.
  *
@@ -8,10 +8,10 @@ import { IconRecipeSchema } from "./recipe-schema.js";
  * PNG, or another render target without changing the authored scene.
  */
 
-import { cubicConnectorPoints } from "./geometry/curves.js";
-import { isDiagramIconSlug, isDrawnIconSlug } from "./icon.js";
-import { iconRecipeByteLength, iconRecipeIssues } from "./icon-recipe.js";
-import { boundLabelWidth, estimateTextWidth } from "./geometry/text-metrics.js";
+import { cubicConnectorPoints } from "./geometry/curves";
+import { isDiagramIconSlug, isDrawnIconSlug } from "./icon";
+import { iconRecipeByteLength, iconRecipeIssues } from "./icon-recipe";
+import { boundLabelWidth, estimateTextWidth } from "./geometry/text-metrics";
 
 export const CANVAS_SPEC_VERSION = 1 as const;
 

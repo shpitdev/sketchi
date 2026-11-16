@@ -1,8 +1,8 @@
-import { PublishedBuildIssue } from "../../build/result.js";
+import { PublishedBuildIssue } from "../../build/result";
 import { String as Str, Array as Arr, Result } from "effect";
 import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
-import { defineBuild } from "../../build/operation.js";
-import { type QualityReport } from "../../build/result.js";
+import { defineBuild } from "../../build/operation";
+import { type QualityReport } from "../../build/result";
 import {
 	Mindmap,
 	counts,
@@ -12,8 +12,8 @@ import {
 	checkMindmapRoot,
 	normalizeMindmap,
 	type MindmapTopic,
-} from "./document.js";
-import { renderMindmap } from "./layout.js";
+} from "./document";
+import { renderMindmap } from "./layout";
 function assess(document: Mindmap, threshold: number): QualityReport {
 	const generic: {
 		id: string;

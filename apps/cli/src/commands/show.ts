@@ -1,13 +1,13 @@
 import { Clock, Effect } from "effect";
 
-import type { StoredDiagram } from "../contracts.js";
-import { relativeTime, resolveDiagramId } from "../diagram-catalog.js";
-import { encodeJson } from "../document.js";
-import { DiagramStore } from "../store/service.js";
-import { Command, Flag } from "../terminal/effect-cli.js";
-import { runReported } from "../terminal/output.js";
-import { headline, row, storageLocation, storedData } from "./present.js";
-import { diagramIdArgument, rootCommand } from "./root.js";
+import type { StoredDiagram } from "../contracts";
+import { relativeTime, resolveDiagramId } from "../diagram-catalog";
+import { encodeJson } from "../document";
+import { DiagramStore } from "../store/service";
+import { Command, Flag } from "../terminal/effect-cli";
+import { runReported } from "../terminal/output";
+import { headline, row, storageLocation, storedData } from "./present";
+import { diagramIdArgument, rootCommand } from "./root";
 
 function showText(diagram: StoredDiagram, now: number, document: boolean): string {
 	const { manifest } = diagram;

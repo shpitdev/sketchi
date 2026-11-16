@@ -14,7 +14,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { type SvgHandoff } from "../../lib/svg-handoff";
 import { svgSourceAtom } from "../../lib/svg-source-atom";
-import { WorkspaceTopBar } from "../workspace-top-bar/index.js";
+import { WorkspaceTopBar } from "../workspace-top-bar/index";
 
 export interface SvgIconWorkspaceProps {
 	handoff: SvgHandoff;

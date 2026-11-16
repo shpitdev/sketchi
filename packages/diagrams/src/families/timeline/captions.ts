@@ -3,7 +3,7 @@ import {
 	parseTimelineDate,
 	type TimelineDate,
 	type TimelineDiagram,
-} from "./document.js";
+} from "./document";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 

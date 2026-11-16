@@ -1,7 +1,7 @@
 import { RuleTester } from "oxlint/plugins-dev";
 import { describe, it } from "vitest";
 
-import plugin from "./sketchi-plugin.ts";
+import plugin from "./sketchi-plugin";
 
 RuleTester.describe = describe;
 RuleTester.it = it;
@@ -276,6 +276,34 @@ tester.run("no-restricted-import-types", noRestrictedImportTypes, {
 			code: 'type Schema = import("zod").ZodType<string>; type Many = Array<typeof import("zod/v4")>;',
 			options: schemaImports,
 			errors: [restricted("zod"), restricted("zod/v4")],
+		},
+	],
+});
+
+const extensionlessImportExpressions = plugin.rules["extensionless-import-expressions"];
+if (!extensionlessImportExpressions) {
+	throw new Error("sketchi/extensionless-import-expressions is not registered.");
+}
+
+const extension = (specifier: string) => ({ messageId: "extension", data: { specifier } });
+
+tester.run("extensionless-import-expressions", extensionlessImportExpressions, {
+	valid: [
+		{
+			name: "extensionless relative modules, packages and non-code files",
+			code: 'const a = import("./a"); type B = typeof import("../b/index"); const c = import("pkg/file.js"); const d = import("../../scripts/lib/run.mjs"); const e = import("./data.json");',
+		},
+	],
+	invalid: [
+		{
+			name: "import() expression",
+			code: 'const a = import("./a.js");',
+			errors: [extension("./a.js")],
+		},
+		{
+			name: "import type",
+			code: 'type B = typeof import("../b.ts"); let c: import("./c.tsx").C;',
+			errors: [extension("../b.ts"), extension("./c.tsx")],
 		},
 	],
 });

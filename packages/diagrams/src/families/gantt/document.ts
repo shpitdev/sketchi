@@ -1,8 +1,8 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { DateTime, Effect, Graph, Schema, Array as Arr, Option, Result } from "effect";
-import { cleanToolString, slug } from "../../clean-text.js";
+import { cleanToolString, slug } from "../../clean-text";
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
-import { parseTimelineDate } from "../timeline/document.js";
+import { parseTimelineDate } from "../timeline/document";
 
 export const ganttDiagramType = "gantt" as const;
 /** More tasks or phases stop reading as one plan; split the plan instead. */

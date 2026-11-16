@@ -2,18 +2,18 @@ import { join, resolve } from "node:path";
 
 import { Effect } from "effect";
 
-import type { DiagramFormat, StoredDiagram } from "./contracts.js";
-import { DiagramExporter } from "./render/exporter.js";
+import type { DiagramFormat, StoredDiagram } from "./contracts";
+import { DiagramExporter } from "./render/exporter";
 import {
 	generateDiagram,
 	type GenerateDiagramInput,
 	type GenerateDiagramResult,
 	reviseDiagram,
 	type ReviseDiagramInput,
-} from "./generation.js";
-import { LocalFileSystem } from "./filesystem.js";
-import { CliExportError, type CliFilesystemError, type CliStorageError } from "./errors.js";
-import { writeExportFile } from "./store/export-file.js";
+} from "./generation";
+import { LocalFileSystem } from "./filesystem";
+import { CliExportError, type CliFilesystemError, type CliStorageError } from "./errors";
+import { writeExportFile } from "./store/export-file";
 
 export type GenerationDestination =
 	| { readonly _tag: "Default" }

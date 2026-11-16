@@ -19,7 +19,7 @@ import {
 	QuadrantValidationError,
 	type QuadrantDiagram,
 	type QuadrantKey,
-} from "./document.js";
+} from "./document";
 
 export const QUADRANT_MARK_ROLE = "quadrant-mark";
 

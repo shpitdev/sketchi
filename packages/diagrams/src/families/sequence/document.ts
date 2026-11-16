@@ -1,4 +1,4 @@
-import { cleanToolString, slug } from "../../clean-text.js";
+import { cleanToolString, slug } from "../../clean-text";
 import {
 	Effect,
 	Schema,

@@ -1,1 +1,1 @@
-export * from "./generation-workspace.js";
+export * from "./generation-workspace";

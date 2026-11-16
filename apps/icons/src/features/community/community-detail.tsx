@@ -3,10 +3,10 @@ import { X } from "lucide-react";
 import { useRef } from "react";
 import { Dialog as Modal } from "radix-ui";
 
-import type { CommunityIconEntry } from "../../lib/community-client.js";
-import { DrawnIcon } from "../../components/drawn-icon/drawn-icon.js";
-import { NamesToggle } from "../../components/names-toggle/names-toggle.js";
-import { PreviewToggle, type PreviewMode } from "../../components/preview-toggle/preview-toggle.js";
+import type { CommunityIconEntry } from "../../lib/community-client";
+import { DrawnIcon } from "../../components/drawn-icon/drawn-icon";
+import { NamesToggle } from "../../components/names-toggle/names-toggle";
+import { PreviewToggle, type PreviewMode } from "../../components/preview-toggle/preview-toggle";
 
 export type CommunityDetailAction = "copy-excalidraw" | "copy-slug" | "download";
 

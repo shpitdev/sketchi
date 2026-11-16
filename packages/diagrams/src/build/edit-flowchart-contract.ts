@@ -1,6 +1,6 @@
-import { flowchartBuild, FlowchartRequestText } from "../families/flowchart/build.js";
-import { FlowchartEditsSchema } from "../families/flowchart/edits.js";
-import { BuildOptions } from "./result.js";
+import { flowchartBuild, FlowchartRequestText } from "../families/flowchart/build";
+import { FlowchartEditsSchema } from "../families/flowchart/edits";
+import { BuildOptions } from "./result";
 
 import { Schema } from "effect";
 
@@ -10,7 +10,7 @@ import {
 	optionalContract,
 	requiredObject,
 	RequiredNonEmptyString,
-} from "./schema.js";
+} from "./schema";
 
 /**
  * A change to a built flowchart: the artifact it starts from and the edits, by id. The edited

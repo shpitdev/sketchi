@@ -4,10 +4,10 @@ import { type CanvasElement as SceneElement, type CanvasSpec } from "@sketchi/dr
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { describe, expect, it } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
-import { buildJourneyMap } from "../../../build/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
-import { buildResponse } from "../../../build/operation.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { buildJourneyMap } from "../../../build/builds";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { buildResponse } from "../../../build/operation";
 import {
 	JOURNEY_MAX_STAGE_STEPS,
 	journeyDiagramType,
@@ -15,9 +15,9 @@ import {
 	JourneyValidationIssueCodeSchema,
 	parseJourneyDiagram,
 	resolveJourneyShorthand,
-} from "../document.js";
-import { type JourneyLayoutIssue, journeyLayoutIssues } from "../readout.js";
-import { renderJourneyDiagram } from "../render.js";
+} from "../document";
+import { type JourneyLayoutIssue, journeyLayoutIssues } from "../readout";
+import { renderJourneyDiagram } from "../render";
 
 const storage = makeMemoryArtifactStorage();
 function build(spec: unknown) {

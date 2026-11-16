@@ -1,5 +1,5 @@
-import { parseLength, viewportDiagonal, type SvgViewport } from "./length.js";
-import type { CanonicalPaint, PaintSource, SvgDiagnostic } from "./types.js";
+import { parseLength, viewportDiagonal, type SvgViewport } from "./length";
+import type { CanonicalPaint, PaintSource, SvgDiagnostic } from "./types";
 
 export type SvgAttributes = Readonly<Record<string, string>>;
 

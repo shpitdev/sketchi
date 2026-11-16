@@ -1,17 +1,17 @@
 import { Effect } from "effect";
 import isCI from "is-ci";
 
-import type { OutputFormat } from "../contracts.js";
-import type { CliFailure } from "../errors.js";
-import type { GeneratedArtifact, GenerateWorkflowResult } from "../generate-workflow.js";
-import type { GenerateDiagramResult } from "../generation.js";
+import type { OutputFormat } from "../contracts";
+import type { CliFailure } from "../errors";
+import type { GeneratedArtifact, GenerateWorkflowResult } from "../generate-workflow";
+import type { GenerateDiagramResult } from "../generation";
 import {
 	automaticCopySkipReason,
 	Clipboard,
 	clipboardData,
 	type ClipboardOutcome,
-} from "../terminal/clipboard.js";
-import { runReportedArtifact } from "../terminal/output.js";
+} from "../terminal/clipboard";
+import { runReportedArtifact } from "../terminal/output";
 import {
 	COPIED_ROW,
 	displayHint,
@@ -20,7 +20,7 @@ import {
 	row,
 	storedData,
 	warningLines,
-} from "./present.js";
+} from "./present";
 
 function generatedData(result: GenerateDiagramResult) {
 	return {

@@ -6,9 +6,9 @@ import {
 	SCENE_FILE,
 	type DiagramAuthority,
 	type DiagramFormat,
-} from "../contracts.js";
-import { CliStorageError, type CliFilesystemError } from "../errors.js";
-import type { LocalEntry } from "../filesystem.js";
+} from "../contracts";
+import { CliStorageError, type CliFilesystemError } from "../errors";
+import type { LocalEntry } from "../filesystem";
 
 export const LOCKS_DIRECTORY = ".locks";
 export const BACKUP_PREFIX = ".backup.";

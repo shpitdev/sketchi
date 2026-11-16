@@ -1,5 +1,5 @@
-import type { RuleSource } from "../../rule-source.js";
-import { TIMELINE_MAX_EVENTS, TIMELINE_MAX_LANES } from "./document.js";
+import type { RuleSource } from "../../rule-source";
+import { TIMELINE_MAX_EVENTS, TIMELINE_MAX_LANES } from "./document";
 
 /** How a request becomes a timeline; see FLOWCHART_RULES. */
 export const TIMELINE_RULES = {

@@ -4,14 +4,14 @@ import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Schema, SchemaIssue, Result } from "effect";
 import { FetchHttpClient } from "effect/http";
 
-import { type BuiltDiagram, type StoredDiagram } from "./contracts.js";
-import { validateStorageId } from "./document.js";
-import { CliCanvasError, CliInputError, CliValidationError } from "./errors.js";
-import { type InputSource } from "./terminal/effect-cli.js";
-import { InputReader } from "./terminal/input.js";
-import { DiagramStore } from "./store/service.js";
-import { decodeCreateCanvas, diagramsClient } from "./diagrams-client.js";
-import { API_REQUEST_TIMEOUT, boundedResponse, MAX_API_RESPONSE_BYTES } from "./response-body.js";
+import { type BuiltDiagram, type StoredDiagram } from "./contracts";
+import { validateStorageId } from "./document";
+import { CliCanvasError, CliInputError, CliValidationError } from "./errors";
+import { type InputSource } from "./terminal/effect-cli";
+import { InputReader } from "./terminal/input";
+import { DiagramStore } from "./store/service";
+import { decodeCreateCanvas, diagramsClient } from "./diagrams-client";
+import { API_REQUEST_TIMEOUT, boundedResponse, MAX_API_RESPONSE_BYTES } from "./response-body";
 
 export const DEFAULT_CANVAS_ENDPOINT = "https://playground.sketchi.app/api/v1/canvases/create";
 export const SKETCHI_CANVAS_ENDPOINT_ENV = "SKETCHI_CANVAS_ENDPOINT";

@@ -1,1 +1,1 @@
-export { CommandBlock, type CommandBlockProps } from "./command-block.js";
+export { CommandBlock, type CommandBlockProps } from "./command-block";

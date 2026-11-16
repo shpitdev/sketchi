@@ -11,7 +11,7 @@ import {
 	VENN_LINE_HEIGHT,
 	type VennBox,
 	type VennCircle,
-} from "./layout.js";
+} from "./layout";
 export interface VennSetReadout {
 	readonly index: number;
 	readonly label: string;

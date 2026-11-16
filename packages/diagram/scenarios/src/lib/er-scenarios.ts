@@ -12,8 +12,8 @@ import {
 	parseErFieldShorthand,
 } from "@sketchi/diagrams/families/er/document";
 
-import { type ScenarioCheck } from "./evaluate.js";
-import { type DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate";
+import { type DiagramScenarioDifficulty } from "./scenarios";
 
 /** A field the prompt states, with every marker it states. */
 export interface ErScenarioField {

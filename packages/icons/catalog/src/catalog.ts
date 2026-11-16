@@ -1,7 +1,7 @@
 import generatedCatalogJson from "./generated/icon-catalog.json" with { type: "json" };
-import { decodeIconManifest, type IconManifest, type SketchiIcon } from "./manifest.js";
-import { canonicalIconSlug } from "./folded-slugs.js";
-import { isNodeLogoEligible, isStandaloneWordmark } from "./node-logos.js";
+import { decodeIconManifest, type IconManifest, type SketchiIcon } from "./manifest";
+import { canonicalIconSlug } from "./folded-slugs";
+import { isNodeLogoEligible, isStandaloneWordmark } from "./node-logos";
 
 interface IconCatalog {
 	readonly manifest: IconManifest;

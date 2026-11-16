@@ -1,7 +1,7 @@
-import { PublishedBuildIssue } from "../../build/result.js";
+import { PublishedBuildIssue } from "../../build/result";
 import { Array, Effect } from "effect";
-import { defineBuild } from "../../build/operation.js";
-import { BuildIconSource, resolveNodeIcons, embedSceneIcons } from "../../build/icons.js";
+import { defineBuild } from "../../build/operation";
+import { BuildIconSource, resolveNodeIcons, embedSceneIcons } from "../../build/icons";
 import {
 	SequenceDocument,
 	SequenceDiagram,
@@ -10,8 +10,8 @@ import {
 	normalizeSequence,
 	validateSequenceDiagram,
 	counts,
-} from "./document.js";
-import { renderSequenceDiagram } from "./render.js";
+} from "./document";
+import { renderSequenceDiagram } from "./render";
 
 export const sequenceBuild = defineBuild({
 	publishedIssues: PublishedBuildIssue,

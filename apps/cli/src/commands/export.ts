@@ -1,12 +1,12 @@
 import { Effect } from "effect";
 
-import { resolveDiagramId } from "../diagram-catalog.js";
-import { DiagramExporter } from "../render/exporter.js";
-import { writeExportFile } from "../store/export-file.js";
-import { Command, Flag } from "../terminal/effect-cli.js";
-import { runReportedArtifact } from "../terminal/output.js";
-import { displayHint, exportData } from "./present.js";
-import { diagramIdArgument, rootCommand } from "./root.js";
+import { resolveDiagramId } from "../diagram-catalog";
+import { DiagramExporter } from "../render/exporter";
+import { writeExportFile } from "../store/export-file";
+import { Command, Flag } from "../terminal/effect-cli";
+import { runReportedArtifact } from "../terminal/output";
+import { displayHint, exportData } from "./present";
+import { diagramIdArgument, rootCommand } from "./root";
 
 export const exportCommand = Command.make(
 	"export",

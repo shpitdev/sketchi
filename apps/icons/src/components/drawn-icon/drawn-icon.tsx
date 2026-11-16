@@ -1,7 +1,7 @@
 import { type IconRecipe } from "@sketchi/drawing";
 
-import { type PreviewMode } from "../preview-toggle/preview-toggle.js";
-import { RecipePreview } from "../recipe-preview/recipe-preview.js";
+import { type PreviewMode } from "../preview-toggle/preview-toggle";
+import { RecipePreview } from "../recipe-preview/recipe-preview";
 
 /**
  * A drawing as it lands in Excalidraw: alone, or with its name written under

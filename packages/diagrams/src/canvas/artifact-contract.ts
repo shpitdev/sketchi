@@ -1,4 +1,4 @@
-import { CodeModeIssue } from "../build/result.js";
+import { CodeModeIssue } from "../build/result";
 
 import { ArtifactFormatSchema, ArtifactProvenance } from "@sketchi/drawing/artifacts";
 import { Schema } from "effect";
@@ -8,7 +8,7 @@ import {
 	literals,
 	optionalContract,
 	RequiredNonEmptyString,
-} from "../build/schema.js";
+} from "../build/schema";
 
 export const GetArtifactRequest = Schema.Struct({
 	artifactId: RequiredNonEmptyString,

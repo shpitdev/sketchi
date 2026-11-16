@@ -1,24 +1,24 @@
 import { COMMUNITY_ICON_COLLECTION, COMMUNITY_ICON_SLUG_PREFIX } from "@sketchi/drawing";
-import { cleanToolString } from "../clean-text.js";
+import { cleanToolString } from "../clean-text";
 
 import { Effect, Result, Schema } from "effect";
 
-import { boundary, type CodeModeWorkflowEffect } from "./boundary.js";
-import { type CodeModeCommunityIcon, type CodeModeIconCatalog } from "./icons.js";
+import { boundary, type CodeModeWorkflowEffect } from "./boundary";
+import { type CodeModeCommunityIcon, type CodeModeIconCatalog } from "./icons";
 import {
 	codeModeInputIssues,
 	failureResult,
 	FailureContextSchema,
 	issue,
 	workflowFailure,
-} from "./issues.js";
-import { CodeModeRuntimeEnvironment } from "./runtime.js";
+} from "./issues";
+import { CodeModeRuntimeEnvironment } from "./runtime";
 import {
 	DEFAULT_ICON_SEARCH_LIMIT,
 	SearchIconsRejected,
 	SearchIconsRequest,
 	type SearchIconsResult,
-} from "./search-icons-contract.js";
+} from "./search-icons-contract";
 
 const SearchIconsFailure = workflowFailure(
 	"SearchIconsFailure",

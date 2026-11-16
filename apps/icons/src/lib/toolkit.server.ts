@@ -1,7 +1,7 @@
 import { IconDetail, IconSearchPage } from "@sketchi/icon-catalog/http-api";
 import { Effect, Schema } from "effect";
 import { Tool, Toolkit } from "effect/ai";
-import { getIconDetail, searchIconResults, IconSource, IconSourceError } from "./api.server.js";
+import { getIconDetail, searchIconResults, IconSource, IconSourceError } from "./api.server";
 
 export class IconNotFound extends Schema.TaggedError<
 	IconNotFound,

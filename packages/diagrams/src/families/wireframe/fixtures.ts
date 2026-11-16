@@ -1,6 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Result } from "effect";
-import { parseWireframeDiagram, type WireframeDiagram } from "./document.js";
+import { parseWireframeDiagram, type WireframeDiagram } from "./document";
 
 const kpi = (title: string, value: string, change: string) => ({
 	type: "card",

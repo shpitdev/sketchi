@@ -4,7 +4,7 @@ import { type Meta, type StoryObj } from "@storybook/react-vite";
 import { journeyScenarios } from "@sketchi/diagram-scenarios";
 import { journeyStressFixtures } from "@sketchi/diagrams/families/journey/fixtures";
 
-import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index.js";
+import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index";
 
 const journeyFixture = familyForType("journey").fixture;
 

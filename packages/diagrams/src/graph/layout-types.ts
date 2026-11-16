@@ -1,5 +1,5 @@
 /** Owns trusted per-render measurement, placement, routing and candidate records. */
-import { type GraphEdge, type GraphInput, type GraphGroup } from "./input.js";
+import { type GraphEdge, type GraphInput, type GraphGroup } from "./input";
 import {
 	type CanvasShapeElement as NodeSceneElement,
 	type AxisAlignedSegment,

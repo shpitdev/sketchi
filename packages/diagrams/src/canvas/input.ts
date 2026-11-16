@@ -13,7 +13,7 @@ import {
 } from "@sketchi/drawing";
 import { Schema } from "effect";
 
-import { optionalContract, requiredArray } from "../build/schema.js";
+import { optionalContract, requiredArray } from "../build/schema";
 
 /** Authoring adds inline recipes; accepted scenes resolve them to slugs and assets. */
 const CanvasIconInput = Schema.Struct({

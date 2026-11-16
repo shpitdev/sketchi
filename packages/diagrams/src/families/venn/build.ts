@@ -1,6 +1,6 @@
-import { PublishedBuildIssue } from "../../build/result.js";
+import { PublishedBuildIssue } from "../../build/result";
 import { Array, Result } from "effect";
-import { defineBuild } from "../../build/operation.js";
+import { defineBuild } from "../../build/operation";
 import {
 	VennDocument,
 	counts,
@@ -10,8 +10,8 @@ import {
 	normalizeVenn,
 	validateVennDiagram,
 	resolveVennShorthand,
-} from "./document.js";
-import { renderVennDiagram } from "./render.js";
+} from "./document";
+import { renderVennDiagram } from "./render";
 
 export const vennBuild = defineBuild({
 	publishedIssues: PublishedBuildIssue,

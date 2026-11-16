@@ -15,18 +15,18 @@ import {
 	parseGanttDay,
 	parseGanttDiagram,
 	type GanttDiagram,
-} from "../document.js";
+} from "../document";
 
-import { readGanttScene, type GanttReadout } from "../readout.js";
+import { readGanttScene, type GanttReadout } from "../readout";
 import {
 	GANTT_MIN_BAR_WIDTH,
 	JOIN_BUDGET,
 	REPAIR_BUDGET,
 	layoutGanttDiagram,
 	renderGanttDiagram,
-} from "../render.js";
-import { ROUTE_BUDGET, ROUTE_CHART_BUDGET, ROUTE_KINK_BUDGET } from "../routing.js";
-import { GANTT_TICK_FONT_SIZE, ganttAxis } from "../scale.js";
+} from "../render";
+import { ROUTE_BUDGET, ROUTE_CHART_BUDGET, ROUTE_KINK_BUDGET } from "../routing";
+import { GANTT_TICK_FONT_SIZE, ganttAxis } from "../scale";
 
 interface Box {
 	readonly id: string;

@@ -1,5 +1,5 @@
-import type { RuleSource } from "../../rule-source.js";
-import { CHART_MAX_CATEGORIES, CHART_MAX_PIE_SLICES, CHART_MAX_SERIES } from "./document.js";
+import type { RuleSource } from "../../rule-source";
+import { CHART_MAX_CATEGORIES, CHART_MAX_PIE_SLICES, CHART_MAX_SERIES } from "./document";
 
 /** How a request becomes a chart; see FLOWCHART_RULES. */
 export const CHART_RULES = {

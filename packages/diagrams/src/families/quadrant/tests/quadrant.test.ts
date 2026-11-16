@@ -3,20 +3,20 @@ import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect, Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
-import { buildQuadrantChart } from "../../../build/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
-import { applyDiagramPatch } from "../../../canvas/patch.js";
-import { buildResponse, type BuildRejection } from "../../../build/operation.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { buildQuadrantChart } from "../../../build/builds";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { applyDiagramPatch } from "../../../canvas/patch";
+import { buildResponse, type BuildRejection } from "../../../build/operation";
 import {
 	getQuadrantValidationIssues,
 	QUADRANT_MAX_POINTS,
 	type QuadrantDiagram,
 	quadrantFixture,
 	QuadrantValidationIssueCodeSchema,
-} from "../document.js";
-import { type QuadrantLayoutIssue, quadrantLayoutIssues, readQuadrantScene } from "../readout.js";
-import { renderQuadrantDiagram } from "../render.js";
+} from "../document";
+import { type QuadrantLayoutIssue, quadrantLayoutIssues, readQuadrantScene } from "../readout";
+import { renderQuadrantDiagram } from "../render";
 
 const storage = makeMemoryArtifactStorage();
 const environment = {

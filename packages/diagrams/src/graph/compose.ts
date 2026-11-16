@@ -11,7 +11,7 @@ import {
 	NODE_DESCRIPTION_MAX_LINES,
 	PADDING,
 	branchLabelMetrics,
-} from "./measure.js";
+} from "./measure";
 import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasTextElement as TextSceneElement,
@@ -24,7 +24,7 @@ import {
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasFrameElement as FrameSceneElement,
 } from "@sketchi/drawing";
-import { type RoutedEdge, type LaneLayout, type GroupLayout } from "./layout-types.js";
+import { type RoutedEdge, type LaneLayout, type GroupLayout } from "./layout-types";
 import {
 	laneElementId,
 	LANE_LABEL_FONT_SIZE,
@@ -33,7 +33,7 @@ import {
 	ZONE_LABEL_FONT_SIZE,
 	ZONE_HEADER,
 	insideBox,
-} from "./containers.js";
+} from "./containers";
 
 function textForNode(shape: NodeSceneElement, described = false): TextSceneElement {
 	return {

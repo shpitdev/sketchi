@@ -6,9 +6,9 @@ import { Array, Clock, Effect, Option, String, type Schedule } from "effect";
 import { type AiError, Prompt } from "effect/ai";
 import { HttpClient } from "effect/http";
 
-import { IconModelError } from "./errors.js";
-import { JUDGE_PROMPT } from "./judge.js";
-import type { IconDrawGatewayConfigValue, JudgeCallReply } from "./models.js";
+import { IconModelError } from "./errors";
+import { JUDGE_PROMPT } from "./judge";
+import type { IconDrawGatewayConfigValue, JudgeCallReply } from "./models";
 
 /** The reply's shape, constrained by the provider; `decodeJudgeReply` still reads it tolerantly. */
 const JUDGE_REPLY_FORMAT = {

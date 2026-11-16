@@ -1,12 +1,8 @@
 /** Resolves authored Flowchart drawing choices before the shared geometry engine. */
 import { type CanvasShapeKind, type CanvasSpec } from "@sketchi/drawing";
-import { type GraphInput } from "../../graph/input.js";
-import { renderGraphDiagram } from "../../graph/scene.js";
-import {
-	FLOWCHART_NODE_COLORS,
-	type FlowchartDiagram,
-	type FlowchartNodeShape,
-} from "./document.js";
+import { type GraphInput } from "../../graph/input";
+import { renderGraphDiagram } from "../../graph/scene";
+import { FLOWCHART_NODE_COLORS, type FlowchartDiagram, type FlowchartNodeShape } from "./document";
 
 const SHAPES: Readonly<Record<FlowchartNodeShape, CanvasShapeKind>> = {
 	database: "cylinder",

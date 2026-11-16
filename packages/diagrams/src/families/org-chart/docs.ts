@@ -1,4 +1,4 @@
-import { ORG_CHART_RULES } from "./rules.js";
+import { ORG_CHART_RULES } from "./rules";
 const PROMPT = "the prompt";
 const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] }`;
 

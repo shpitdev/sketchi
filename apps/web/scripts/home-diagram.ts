@@ -20,7 +20,7 @@ import { dirname, join, resolve } from "node:path";
 
 import * as Linkedom from "linkedom";
 
-import { HOME_DIAGRAM } from "../src/components/home-diagram/home-diagram-data.js";
+import { HOME_DIAGRAM } from "../src/components/home-diagram/home-diagram-data";
 
 const media = resolve(import.meta.dirname, "../public/media");
 const require = createRequire(import.meta.url);

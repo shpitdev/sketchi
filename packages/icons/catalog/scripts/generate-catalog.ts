@@ -1,9 +1,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-import { catalogCommonWords, loadCommonEnglishWords } from "../src/common-words-generation.js";
-import { buildIconCatalog, shippedSourceIcons } from "../src/manifest-generation.js";
-import { initIconColorRenderer, measureIconColor } from "../src/icon-color-render.js";
+import { catalogCommonWords, loadCommonEnglishWords } from "../src/common-words-generation";
+import { buildIconCatalog, shippedSourceIcons } from "../src/manifest-generation";
+import { initIconColorRenderer, measureIconColor } from "../src/icon-color-render";
 
 const packageRoot = resolve(import.meta.dirname, "..");
 const sourcePath = resolve(packageRoot, "pipeline-output/review/review-data.json");

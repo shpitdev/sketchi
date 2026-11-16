@@ -1,6 +1,6 @@
-import { canonicalIconSlug } from "./folded-slugs.js";
-import { formatCollectionLabel, type SketchiIcon } from "./manifest.js";
-import { isDistinctiveWord, termTokens } from "./terms.js";
+import { canonicalIconSlug } from "./folded-slugs";
+import { formatCollectionLabel, type SketchiIcon } from "./manifest";
+import { isDistinctiveWord, termTokens } from "./terms";
 
 export interface IconSearchOptions {
 	readonly collection?: string;

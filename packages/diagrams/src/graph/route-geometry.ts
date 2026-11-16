@@ -30,10 +30,10 @@ import {
 	type CrossingRun,
 	type ConnectionEdge,
 	type CrossingLookup,
-} from "./layout-types.js";
-import { groupBlocks, GROUP_OUTLINE, LANE_OUTLINE, LANE_OUTLINE_CLEARANCE } from "./containers.js";
-import { openEnd, ROUTE_STUB_LENGTH, reservedArrivals } from "./geometry.js";
-import { ARROWHEAD_LENGTH } from "./measure.js";
+} from "./layout-types";
+import { groupBlocks, GROUP_OUTLINE, LANE_OUTLINE, LANE_OUTLINE_CLEARANCE } from "./containers";
+import { openEnd, ROUTE_STUB_LENGTH, reservedArrivals } from "./geometry";
+import { ARROWHEAD_LENGTH } from "./measure";
 
 export function compactPoints(points: readonly ScenePoint[]): [ScenePoint, ...ScenePoint[]] {
 	const compacted: ScenePoint[] = [];

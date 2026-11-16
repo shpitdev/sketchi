@@ -1,6 +1,6 @@
-import { getIconBySlug } from "./catalog.js";
+import { getIconBySlug } from "./catalog";
 import lookAlikesJson from "./generated/look-alikes.json" with { type: "json" };
-import { markDistance, type MarkFeatures } from "./mark-features.js";
+import { markDistance, type MarkFeatures } from "./mark-features";
 
 /** Catalog marks and uploads are measured at this longest side. */
 export const LOOK_ALIKE_RENDER_SIZE = 256;

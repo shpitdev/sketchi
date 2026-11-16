@@ -1,1 +1,1 @@
-export * from "./<%= fileName %>.js";
+export * from "./<%= fileName %>";

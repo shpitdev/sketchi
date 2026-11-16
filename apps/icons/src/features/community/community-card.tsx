@@ -1,9 +1,9 @@
 import { String as Str } from "effect";
 import { Info } from "lucide-react";
 
-import type { CommunityIconEntry } from "../../lib/community-client.js";
-import { DrawnIcon } from "../../components/drawn-icon/drawn-icon.js";
-import type { PreviewMode } from "../../components/preview-toggle/preview-toggle.js";
+import type { CommunityIconEntry } from "../../lib/community-client";
+import { DrawnIcon } from "../../components/drawn-icon/drawn-icon";
+import type { PreviewMode } from "../../components/preview-toggle/preview-toggle";
 
 /** One community icon. The tile copies it as Excalidraw shapes; the corner opens its details. */
 export function CommunityCard({

@@ -18,8 +18,8 @@ import {
 	erFieldKeys,
 	erNameKey,
 	parseErEnd,
-} from "./document.js";
-import { type GraphInput } from "../../graph/input.js";
+} from "./document";
+import { type GraphInput } from "../../graph/input";
 
 import {
 	ER_FAN_STEP,
@@ -27,10 +27,10 @@ import {
 	type ErPlacement,
 	type ErPlacementOptions,
 	placeErTables,
-} from "./layout.js";
-import { arrowCrossings } from "../../graph/readability.js";
-import { type GraphAnchor } from "../../graph/options.js";
-import { renderGraphDiagram } from "../../graph/scene.js";
+} from "./layout";
+import { arrowCrossings } from "../../graph/readability";
+import { type GraphAnchor } from "../../graph/options";
+import { renderGraphDiagram } from "../../graph/scene";
 
 /** The band at a table's top that carries its name. */
 const HEADER_HEIGHT = 40;

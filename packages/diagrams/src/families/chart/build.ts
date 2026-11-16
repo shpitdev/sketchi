@@ -1,6 +1,6 @@
-import { PublishedBuildIssue } from "../../build/result.js";
+import { PublishedBuildIssue } from "../../build/result";
 import { Array } from "effect";
-import { defineBuild } from "../../build/operation.js";
+import { defineBuild } from "../../build/operation";
 import {
 	ChartDocument,
 	ChartDiagram,
@@ -9,8 +9,8 @@ import {
 	normalizeChart,
 	validateChartDiagram,
 	counts,
-} from "./document.js";
-import { renderChartDiagram } from "./render.js";
+} from "./document";
+import { renderChartDiagram } from "./render";
 
 export const chartBuild = defineBuild({
 	publishedIssues: PublishedBuildIssue,

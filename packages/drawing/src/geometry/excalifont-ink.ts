@@ -4,7 +4,7 @@
  * uniform advance that errs wide; this measures each printable ASCII glyph.
  */
 
-import { textLineUnits } from "./text-metrics.js";
+import { textLineUnits } from "./text-metrics";
 
 /**
  * Printable ASCII glyphs in thousandths of an em: advance, then the painted

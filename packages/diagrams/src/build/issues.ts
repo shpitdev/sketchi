@@ -1,9 +1,9 @@
-import { inputIssues, formatContractSchemaError } from "./input.js";
-import { CodeModeIssue, type CodeModeIssueCode, type CodeModeIssueRef } from "./result.js";
+import { inputIssues, formatContractSchemaError } from "./input";
+import { CodeModeIssue, type CodeModeIssueCode, type CodeModeIssueRef } from "./result";
 
 import { type Cause, Schema } from "effect";
 
-import { storageIssue, type CodeModeArtifactStorageError } from "./artifacts.js";
+import { storageIssue, type CodeModeArtifactStorageError } from "./artifacts";
 
 export function issue(input: {
 	code: CodeModeIssueCode;

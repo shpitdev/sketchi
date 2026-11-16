@@ -1,6 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Result } from "effect";
-import { parseSankeyDiagram, type SankeyDiagram } from "./document.js";
+import { parseSankeyDiagram, type SankeyDiagram } from "./document";
 
 const flow = (source: string, target: string, value: number, label?: string) => ({
 	source,

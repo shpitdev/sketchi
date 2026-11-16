@@ -6,15 +6,15 @@ import path from "node:path";
 import { Cause, Effect, Exit, Fiber, Schema } from "effect";
 import { vi } from "vitest";
 
-import { runScenarioCli, ScenarioCliUsageError, scenarioCliExitCode } from "../cli.js";
+import { runScenarioCli, ScenarioCliUsageError, scenarioCliExitCode } from "../cli";
 import {
 	requireSuccessfulToolProcess,
 	runToolProcess,
 	ToolProcessSpawnerLive,
-} from "../internal/tool-process.js";
-import { diagramScenarios } from "../lib/diagram-scenarios.js";
-import { scenarioFlowchartDocument } from "../lib/flowchart-document.js";
-import { getFlowchartScenario } from "../lib/scenarios.js";
+} from "../internal/tool-process";
+import { diagramScenarios } from "../lib/diagram-scenarios";
+import { scenarioFlowchartDocument } from "../lib/flowchart-document";
+import { getFlowchartScenario } from "../lib/scenarios";
 
 const Report = Schema.fromJsonString(
 	Schema.Struct({

@@ -17,15 +17,15 @@ import {
 	type BuiltDiagram,
 	revisionFileName,
 	revisionDirectoryName,
-} from "../contracts.js";
-import { decodeCanonicalDiagramDocument, encodeJson } from "../document.js";
-import { isValidPng } from "../render/png-validate.js";
-import { validateShareScene } from "../share/protocol.js";
-import { formatsFor, recordPath, storageError, unsafeEntry } from "./entries.js";
-import type { makeLocks } from "./locks.js";
-import type { makeRecordReader } from "./record.js";
-import type { RestoreResult, RevisionSource, StoreContext } from "./service.js";
-import type { makeTransactions } from "./transaction.js";
+} from "../contracts";
+import { decodeCanonicalDiagramDocument, encodeJson } from "../document";
+import { isValidPng } from "../render/png-validate";
+import { validateShareScene } from "../share/protocol";
+import { formatsFor, recordPath, storageError, unsafeEntry } from "./entries";
+import type { makeLocks } from "./locks";
+import type { makeRecordReader } from "./record";
+import type { RestoreResult, RevisionSource, StoreContext } from "./service";
+import type { makeTransactions } from "./transaction";
 
 export function makeRevisions(
 	{ fs, root }: StoreContext,

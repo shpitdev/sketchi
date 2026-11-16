@@ -1,4 +1,4 @@
-import type { RuleSource } from "../../rule-source.js";
+import type { RuleSource } from "../../rule-source";
 
 /** How a request becomes a wireframe; see FLOWCHART_RULES. */
 export const WIREFRAME_RULES = {

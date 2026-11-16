@@ -7,7 +7,7 @@ import {
 	type JourneyDiagram,
 	journeyDiagramType,
 	parseJourneyDiagram,
-} from "./document.js";
+} from "./document";
 
 const VERBS = [
 	"Compares",

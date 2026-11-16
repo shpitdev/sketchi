@@ -1,7 +1,7 @@
-import { type IconColor, isIconColor } from "./color-mode.js";
-import type { IconManifest, SketchiIcon, SketchiIconViewBox } from "./manifest.js";
-import { canonicalIconSlug, FOLDED_INTO_SLUG } from "./folded-slugs.js";
-import { vendorAliases } from "./vendor-aliases.js";
+import { type IconColor, isIconColor } from "./color-mode";
+import type { IconManifest, SketchiIcon, SketchiIconViewBox } from "./manifest";
+import { canonicalIconSlug, FOLDED_INTO_SLUG } from "./folded-slugs";
+import { vendorAliases } from "./vendor-aliases";
 
 interface SourceIcon {
 	/** Other official names a vendor icon set gives the product ("Amazon Simple Storage Service"). */

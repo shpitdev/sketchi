@@ -6,8 +6,8 @@ import {
 	flowchartLabelMatches,
 	flowchartLabelWords,
 	flowchartObjectPhraseMatches,
-} from "./flowchart-labels.js";
-import type { FlowchartScenario } from "./scenarios.js";
+} from "./flowchart-labels";
+import type { FlowchartScenario } from "./scenarios";
 
 export type FlowchartConnection = Pick<
 	FlowchartDiagram["edges"][number],

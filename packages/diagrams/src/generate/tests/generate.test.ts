@@ -8,29 +8,29 @@ import { Cause, Effect, Exit, Fiber, Layer, Result } from "effect";
 import { describe, expect, it } from "@effect/vitest";
 import { TestClock } from "effect/testing";
 
-import { parseFlowchartDiagram } from "../../families/flowchart/document.js";
+import { parseFlowchartDiagram } from "../../families/flowchart/document";
 import {
 	candidateFromText,
 	type DiagramGenerationCandidate,
 	type DiagramGenerationRequest,
-} from "../candidates.js";
+} from "../candidates";
 import {
 	DiagramGenerationClient,
 	DiagramGenerationPolicy,
 	type DiagramGenerationPolicyConfig,
 	diagramGenerationPolicyDefaults,
 	MEASURED_OUTPUT_TOKENS_PER_SECOND,
-} from "../client.js";
+} from "../client";
 import {
 	anthropicGatewayChatRoute,
 	CloudflareGatewayChatClientLive,
 	CloudflareGatewayChatConfig,
 	type GatewayChatRoute,
 	googleGatewayChatRoute,
-} from "../cloudflare-gateway-chat.js";
-import { DiagramGenerationHttpError } from "../errors.js";
-import { buildDiagramGenerationMessages, DEFAULT_MAX_OUTPUT_TOKENS } from "../messages.js";
-import { runDiagramGenerationWithPolicy } from "../policy.js";
+} from "../cloudflare-gateway-chat";
+import { DiagramGenerationHttpError } from "../errors";
+import { buildDiagramGenerationMessages, DEFAULT_MAX_OUTPUT_TOKENS } from "../messages";
+import { runDiagramGenerationWithPolicy } from "../policy";
 
 type RunArgs = Parameters<CloudflareAiGateway["run"]>;
 type RunFn = (...args: RunArgs) => Promise<Response>;

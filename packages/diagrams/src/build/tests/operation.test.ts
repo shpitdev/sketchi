@@ -1,17 +1,17 @@
 import { Effect, Result } from "effect";
 import { expect, it } from "@effect/vitest";
 import { vi } from "vitest";
-import { type ArtifactBuildCapabilities } from "../result.js";
-import { buildResponse, defineBuild } from "../operation.js";
-import { sankeyBuild } from "../../families/sankey/build.js";
-import { sankeyFixture } from "../../families/sankey/document.js";
-import { renderSankeyDiagram } from "../../families/sankey/render.js";
-import { mindmapBuild } from "../../families/mindmap/build.js";
-import { vennBuild } from "../../families/venn/build.js";
-import { renderMindmap } from "../../families/mindmap/layout.js";
+import { type ArtifactBuildCapabilities } from "../result";
+import { buildResponse, defineBuild } from "../operation";
+import { sankeyBuild } from "../../families/sankey/build";
+import { sankeyFixture } from "../../families/sankey/document";
+import { renderSankeyDiagram } from "../../families/sankey/render";
+import { mindmapBuild } from "../../families/mindmap/build";
+import { vennBuild } from "../../families/venn/build";
+import { renderMindmap } from "../../families/mindmap/layout";
 
-vi.mock("../../families/mindmap/layout.js", async (original) => {
-	const actual = await original<typeof import("../../families/mindmap/layout.js")>();
+vi.mock("../../families/mindmap/layout", async (original) => {
+	const actual = await original<typeof import("../../families/mindmap/layout")>();
 	return { ...actual, renderMindmap: vi.fn(actual.renderMindmap) };
 });
 const input = {

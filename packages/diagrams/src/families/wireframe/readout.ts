@@ -10,7 +10,7 @@ import {
 	WIREFRAME_SPACING,
 	type WireframeLayout,
 	type WireframeLayoutComponent,
-} from "./render.js";
+} from "./render";
 
 interface Bounds {
 	readonly left: number;

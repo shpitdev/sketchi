@@ -1,4 +1,4 @@
-import { contractMissingKeyCodeAnnotation } from "./input.js";
+import { contractMissingKeyCodeAnnotation } from "./input";
 
 import { Effect, Schema, SchemaAST, SchemaGetter, SchemaIssue } from "effect";
 

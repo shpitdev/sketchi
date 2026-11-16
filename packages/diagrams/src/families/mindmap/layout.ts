@@ -1,4 +1,4 @@
-import { type Mindmap, type MindmapTopic } from "./document.js";
+import { type Mindmap, type MindmapTopic } from "./document";
 import {
 	boundLabelWidth,
 	CANVAS_SPEC_VERSION,

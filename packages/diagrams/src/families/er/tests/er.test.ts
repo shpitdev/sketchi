@@ -7,15 +7,15 @@ import {
 	ErValidationIssueCodeSchema,
 	getErValidationIssues,
 	orgChartEr,
-} from "../document.js";
+} from "../document";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
-import { erBuild } from "../build.js";
-import { buildResponse } from "../../../build/operation.js";
-import { canonicalDocumentFromDiagram } from "../../../build/documents.js";
-import { buildErDiagram } from "../../../build/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { erBuild } from "../build";
+import { buildResponse } from "../../../build/operation";
+import { canonicalDocumentFromDiagram } from "../../../build/documents";
+import { buildErDiagram } from "../../../build/builds";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
 
 const storage = makeMemoryArtifactStorage();
 function run<A>(

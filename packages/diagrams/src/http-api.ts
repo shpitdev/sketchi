@@ -7,20 +7,20 @@ import {
 	EditFlowchartAccepted,
 	EditFlowchartRejected,
 	EditFlowchartRequest,
-} from "./build/edit-flowchart-contract.js";
-import { GetArtifactAccepted, GetArtifactRejected } from "./canvas/artifact-contract.js";
+} from "./build/edit-flowchart-contract";
+import { GetArtifactAccepted, GetArtifactRejected } from "./canvas/artifact-contract";
 import {
 	CreateCanvasAccepted,
 	CreateCanvasRejected,
 	CreateCanvasRequest,
-} from "./canvas/create-contract.js";
+} from "./canvas/create-contract";
 import {
 	ApplyDiagramPatchAccepted,
 	ApplyDiagramPatchRejected,
 	ApplyDiagramPatchRequest,
-} from "./canvas/patch-contract.js";
-import { families, type DiagramFamily } from "./family.js";
-import { GenerateAccepted, GenerateRejected, GenerateRequest } from "./generate/contract.js";
+} from "./canvas/patch-contract";
+import { families, type DiagramFamily } from "./family";
+import { GenerateAccepted, GenerateRejected, GenerateRequest } from "./generate/contract";
 
 /** The HTTP status of each refusal a build, canvas or generate response can carry. */
 export const FAILURE_HTTP_STATUS = {

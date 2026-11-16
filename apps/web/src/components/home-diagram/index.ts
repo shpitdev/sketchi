@@ -1,1 +1,1 @@
-export * from "./home-diagram.js";
+export * from "./home-diagram";

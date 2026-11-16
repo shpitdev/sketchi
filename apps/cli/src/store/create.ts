@@ -8,12 +8,12 @@ import {
 	RECORD_SCHEMA_VERSION,
 	type BuiltDiagram,
 	type StoredDiagram,
-} from "../contracts.js";
-import { encodeJson } from "../document.js";
-import { STAGE_PREFIX, formatsFor, recordPath, storageError } from "./entries.js";
-import type { makeLocks } from "./locks.js";
-import type { StoreContext } from "./service.js";
-import type { makeTransactions } from "./transaction.js";
+} from "../contracts";
+import { encodeJson } from "../document";
+import { STAGE_PREFIX, formatsFor, recordPath, storageError } from "./entries";
+import type { makeLocks } from "./locks";
+import type { StoreContext } from "./service";
+import type { makeTransactions } from "./transaction";
 
 export function makeCreate(
 	{ fs, root }: StoreContext,

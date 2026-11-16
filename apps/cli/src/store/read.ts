@@ -2,13 +2,13 @@ import { join } from "node:path";
 
 import { Effect } from "effect";
 
-import type { DiagramFormat } from "../contracts.js";
-import { CliExportError } from "../errors.js";
-import { isValidPng } from "../render/png-validate.js";
-import { artifactFile, recordPath, storageError } from "./entries.js";
-import type { makeLocks } from "./locks.js";
-import type { makeRecordReader } from "./record.js";
-import type { ExportSource, StoreContext } from "./service.js";
+import type { DiagramFormat } from "../contracts";
+import { CliExportError } from "../errors";
+import { isValidPng } from "../render/png-validate";
+import { artifactFile, recordPath, storageError } from "./entries";
+import type { makeLocks } from "./locks";
+import type { makeRecordReader } from "./record";
+import type { ExportSource, StoreContext } from "./service";
 
 export function makeRead(
 	{ fs, root }: StoreContext,

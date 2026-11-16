@@ -3,7 +3,7 @@ import {
 	excalidrawFixedPoint,
 	excalidrawOutlineDistance,
 	type Point,
-} from "./excalidraw-binding.js";
+} from "./excalidraw-binding";
 
 /**
  * How far inside its shape's outline a bound route must run to pass through

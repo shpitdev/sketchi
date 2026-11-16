@@ -1,1 +1,1 @@
-export { BenefitStrip } from "./benefit-strip.js";
+export { BenefitStrip } from "./benefit-strip";

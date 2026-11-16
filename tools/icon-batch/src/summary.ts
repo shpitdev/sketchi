@@ -1,4 +1,4 @@
-import { type MarkRecord, recordCost } from "./store.js";
+import { type MarkRecord, recordCost } from "./store";
 
 export interface BatchSummary {
 	readonly settled: number;

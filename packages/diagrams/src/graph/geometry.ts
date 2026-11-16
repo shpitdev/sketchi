@@ -1,6 +1,6 @@
 /** Owns shape-side geometry, port coordinates, endpoint reservations and shared spacing. */
-import { type ConnectionEdge, type RoutedEdge } from "./layout-types.js";
-import { type GraphInput } from "./input.js";
+import { type ConnectionEdge, type RoutedEdge } from "./layout-types";
+import { type GraphInput } from "./input";
 import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasPoint as ScenePoint,
@@ -9,7 +9,7 @@ import {
 	type CanvasConnectorElement as ArrowSceneElement,
 	AXIS_ALIGNED_EPSILON,
 } from "@sketchi/drawing";
-import { branches } from "./measure.js";
+import { branches } from "./measure";
 
 export const PORT_SPACING = 18;
 

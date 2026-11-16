@@ -7,9 +7,9 @@ import { getIconSourceFile } from "@sketchi/icon-catalog/catalog";
 import { previewScene, roundSheet } from "@sketchi/icon-draw";
 import { describe, expect, it } from "vitest";
 
-import { exportScenePng, initializeResvg } from "./excalidraw-export.js";
-import { httpGateway } from "./gateway.js";
-import { prepareSvg, reframeSvg } from "./imaging.js";
+import { exportScenePng, initializeResvg } from "./excalidraw-export";
+import { httpGateway } from "./gateway";
+import { prepareSvg, reframeSvg } from "./imaging";
 
 const catalogSvg = (slug: string) =>
 	readFile(

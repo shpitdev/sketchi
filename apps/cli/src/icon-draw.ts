@@ -2,13 +2,13 @@ import { basename, extname, join, resolve } from "node:path";
 
 import { Clock, Duration, Effect, Schema } from "effect";
 
-import { publishIcon, type PublishedIcon } from "./community-client.js";
-export { publishIcon } from "./community-client.js";
-export type { PublishedIcon } from "./community-client.js";
+import { publishIcon, type PublishedIcon } from "./community-client";
+export { publishIcon } from "./community-client";
+export type { PublishedIcon } from "./community-client";
 
-import { type CliFailure, type CliFilesystemError, CliIconError } from "./errors.js";
-import { LocalFileSystem } from "./filesystem.js";
-import { MAX_API_RESPONSE_BYTES, readBoundedText } from "./response-body.js";
+import { type CliFailure, type CliFilesystemError, CliIconError } from "./errors";
+import { LocalFileSystem } from "./filesystem";
+import { MAX_API_RESPONSE_BYTES, readBoundedText } from "./response-body";
 
 export const DEFAULT_ICON_DRAW_ENDPOINT = "https://playground.sketchi.app/api/v1/icons/draw";
 export const SKETCHI_ICON_DRAW_ENDPOINT_ENV = "SKETCHI_ICON_DRAW_ENDPOINT";

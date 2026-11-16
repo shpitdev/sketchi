@@ -1,4 +1,4 @@
-import type { RuleSource } from "../../rule-source.js";
+import type { RuleSource } from "../../rule-source";
 
 /** How a request becomes an org chart; see FLOWCHART_RULES. */
 export const ORG_CHART_RULES = {

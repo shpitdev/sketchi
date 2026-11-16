@@ -16,7 +16,7 @@ import {
 import { Resvg } from "@resvg/resvg-wasm";
 import { Effect, Layer } from "effect";
 
-import { exportScenePng, initializeResvg } from "./excalidraw-export.js";
+import { exportScenePng, initializeResvg } from "./excalidraw-export";
 
 /**
  * The draw service's raster work in Node: the steps of Studio's harness page

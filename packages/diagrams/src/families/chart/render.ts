@@ -1,4 +1,4 @@
-import { type ChartDiagram, type ChartOrientation } from "./document.js";
+import { type ChartDiagram, type ChartOrientation } from "./document";
 import {
 	CANVAS_SPEC_VERSION,
 	estimateTextWidth,
@@ -24,9 +24,9 @@ import {
 	valueDomain,
 	type UnitParts,
 	type ValueScale,
-} from "./scale.js";
+} from "./scale";
 
-import { breakRulesUnderText } from "../../graph/scene-rules.js";
+import { breakRulesUnderText } from "../../graph/scene-rules";
 
 export const CHART_MARK_ROLE = "chart-mark";
 

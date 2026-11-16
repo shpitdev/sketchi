@@ -17,8 +17,8 @@ import {
 import { GANTT_MIN_BAR_WIDTH, ganttCaptions } from "@sketchi/diagrams/families/gantt/render";
 import { readGanttScene } from "@sketchi/diagrams/families/gantt/readout";
 
-import { type DiagramScenarioDifficulty } from "./scenarios.js";
-import { type ScenarioCheck } from "./evaluate.js";
+import { type DiagramScenarioDifficulty } from "./scenarios";
+import { type ScenarioCheck } from "./evaluate";
 
 /** One task the prompt states, with everything about it the prompt fixes. */
 export interface GanttScenarioTask {

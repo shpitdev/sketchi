@@ -1,5 +1,5 @@
 import { Array as Arr, String as Str } from "effect";
-import { vennSetColor, type VennDiagram } from "./document.js";
+import { vennSetColor, type VennDiagram } from "./document";
 import {
 	CANVAS_SPEC_VERSION,
 	SKETCHI_DIAGRAM_PALETTE,
@@ -14,7 +14,7 @@ import {
 	type VennBox,
 	type VennCircle,
 	type VennLayout,
-} from "./layout.js";
+} from "./layout";
 export const VENN_SET_ROLE = "venn-set";
 /** A set's circle keeps its role only while it still reads as one: an unlabeled ellipse on its set id. */
 export function isStructurallyValidVennSet(element: {

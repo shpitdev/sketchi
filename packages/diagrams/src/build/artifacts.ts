@@ -7,7 +7,7 @@ import {
 	type ArtifactFormatRef,
 	type InlineArtifactFormat,
 } from "@sketchi/drawing/artifacts";
-import { type CodeModeIssue } from "./result.js";
+import { type CodeModeIssue } from "./result";
 
 export interface StoredArtifactFormat {
 	format: ArtifactFormat;

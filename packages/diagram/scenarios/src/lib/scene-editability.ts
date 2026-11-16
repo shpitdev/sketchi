@@ -1,8 +1,8 @@
 import { Effect, Schema } from "effect";
 
-import { createEditSession } from "./edit-session.js";
-import { type EditabilityMetrics, measureEditability } from "./editability.js";
-import { loadExcalidrawEditor, withoutHeldTimers } from "./excalidraw-editor.js";
+import { createEditSession } from "./edit-session";
+import { type EditabilityMetrics, measureEditability } from "./editability";
+import { loadExcalidrawEditor, withoutHeldTimers } from "./excalidraw-editor";
 
 class EditabilityError extends Schema.TaggedError<
 	EditabilityError,

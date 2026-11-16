@@ -1,6 +1,6 @@
 /** Owns rank, group, zone and lane positions, including flow/pool/zone wrap plans. */
 import { Graph } from "effect";
-import { type GraphGroup, type GraphInput, type GraphEdge } from "./input.js";
+import { type GraphGroup, type GraphInput, type GraphEdge } from "./input";
 import {
 	type CanvasNodeIcon,
 	CANVAS_GROUP_ICON,
@@ -22,7 +22,7 @@ import {
 	squareChoice,
 	PADDING,
 	MAX_DIAMOND_LABEL_LINE_UNITS,
-} from "./measure.js";
+} from "./measure";
 import {
 	HORIZONTAL_GAP,
 	VERTICAL_GAP,
@@ -34,7 +34,7 @@ import {
 	FORWARD_SIDE,
 	ROUTE_STUB_LENGTH,
 	OPPOSITE_EDGE,
-} from "./geometry.js";
+} from "./geometry";
 import {
 	type FlowGraph,
 	outgoingEdges,
@@ -50,7 +50,7 @@ import {
 	nodeOrderMap,
 	RANK_SWEEP_COUNT,
 	GROUP_UNIT_PREFIX,
-} from "./topology.js";
+} from "./topology";
 import {
 	type LayoutDirection,
 	type ConnectionEdge,
@@ -64,8 +64,8 @@ import {
 	type Box,
 	type GroupFrame,
 	type LaneFrame,
-} from "./layout-types.js";
-import { exportAspect } from "./readability.js";
+} from "./layout-types";
+import { exportAspect } from "./readability";
 import {
 	boundsOf,
 	groupBlocks,
@@ -78,8 +78,8 @@ import {
 	measureLaneLabel,
 	LANE_HEADER_PADDING,
 	laneElementBases,
-} from "./containers.js";
-import { padBox } from "./label-geometry.js";
+} from "./containers";
+import { padBox } from "./label-geometry";
 
 /** Inner padding of a group's frame around its members. */
 const GROUP_PADDING = 40;

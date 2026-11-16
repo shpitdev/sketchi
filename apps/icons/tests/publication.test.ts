@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { openD1 } from "./support/d1.js";
+import { openD1 } from "./support/d1";
 import { Effect } from "effect";
 
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";

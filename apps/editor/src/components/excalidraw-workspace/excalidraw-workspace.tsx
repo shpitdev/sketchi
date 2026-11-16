@@ -16,9 +16,9 @@ import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
 import { copyText, DrawingEditor } from "@sketchi/editor";
 import { useMemo, useState } from "react";
 
-import { DiagramInspector } from "../diagram-inspector/index.js";
-import { type DiagramOption, DiagramSwitcher } from "../diagram-switcher/index.js";
-import { WorkspaceTopBar, type WorkspaceStatus } from "../workspace-top-bar/index.js";
+import { DiagramInspector } from "../diagram-inspector/index";
+import { type DiagramOption, DiagramSwitcher } from "../diagram-switcher/index";
+import { WorkspaceTopBar, type WorkspaceStatus } from "../workspace-top-bar/index";
 
 const defaultDiagrams: readonly CanonicalDiagram[] = [
 	pharmaBatchDispositionFlowchart,

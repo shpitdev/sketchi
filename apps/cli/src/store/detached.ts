@@ -7,10 +7,10 @@ import {
 	EXCALIDRAW_FILE,
 	PNG_FILE,
 	RECORD_SCHEMA_VERSION,
-} from "../contracts.js";
-import { formatsFor, storageError } from "./entries.js";
-import type { StoreContext } from "./service.js";
-import type { makeTransactions } from "./transaction.js";
+} from "../contracts";
+import { formatsFor, storageError } from "./entries";
+import type { StoreContext } from "./service";
+import type { makeTransactions } from "./transaction";
 
 export function makeReplaceWithDetached(
 	{ fs }: StoreContext,

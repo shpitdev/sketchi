@@ -11,13 +11,13 @@ import {
 	SCENE_FILE,
 	type PatchedDiagramArtifacts,
 	type PatchSource,
-} from "../contracts.js";
-import { encodeJson } from "../document.js";
-import { formatsFor, recordPath, storageError } from "./entries.js";
-import type { makeLocks } from "./locks.js";
-import type { makeRecordReader } from "./record.js";
-import type { StoreContext } from "./service.js";
-import type { makeTransactions } from "./transaction.js";
+} from "../contracts";
+import { encodeJson } from "../document";
+import { formatsFor, recordPath, storageError } from "./entries";
+import type { makeLocks } from "./locks";
+import type { makeRecordReader } from "./record";
+import type { StoreContext } from "./service";
+import type { makeTransactions } from "./transaction";
 
 export function makePatch(
 	{ fs, root }: StoreContext,

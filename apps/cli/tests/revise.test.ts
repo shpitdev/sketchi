@@ -8,15 +8,15 @@ import {
 import { afterEach, assert, describe, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
-import { DiagramBuilder, DiagramBuilderLive } from "../src/builder.js";
-import { decodeCanonicalDiagramDocument } from "../src/document.js";
-import { DEFAULT_GENERATE_ENDPOINT, reviseDiagram } from "../src/generation.js";
-import { exitCodeForFailure } from "../src/errors.js";
-import { LocalFileSystem } from "../src/filesystem.js";
-import { DiagramPatcher } from "../src/patch.js";
-import { DiagramStore, makeStorageRootLayer } from "../src/store/service.js";
-import { DiagramStoreLive } from "../src/store/live.js";
-import { builtDiagram, flowchartInput, localFileSystemLive, swappableFetch } from "./fixtures.js";
+import { DiagramBuilder, DiagramBuilderLive } from "../src/builder";
+import { decodeCanonicalDiagramDocument } from "../src/document";
+import { DEFAULT_GENERATE_ENDPOINT, reviseDiagram } from "../src/generation";
+import { exitCodeForFailure } from "../src/errors";
+import { LocalFileSystem } from "../src/filesystem";
+import { DiagramPatcher } from "../src/patch";
+import { DiagramStore, makeStorageRootLayer } from "../src/store/service";
+import { DiagramStoreLive } from "../src/store/live";
+import { builtDiagram, flowchartInput, localFileSystemLive, swappableFetch } from "./fixtures";
 
 const codeModeLayer = Layer.mergeAll(
 	CodeModeArtifactStorageMemory,

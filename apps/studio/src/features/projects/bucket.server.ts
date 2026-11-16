@@ -7,7 +7,7 @@ import {
 	StudioNotFoundError,
 	StudioStorageError,
 	type StudioResourceKind,
-} from "./errors.server.js";
+} from "./errors.server";
 
 export interface StudioObjectMetadata {
 	readonly uploaded: Date;

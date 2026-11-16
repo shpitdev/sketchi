@@ -2,8 +2,8 @@ import { Search, X } from "lucide-react";
 import type { RefObject } from "react";
 import type { SketchiIcon } from "@sketchi/icon-catalog";
 
-import { PreviewToggle, type PreviewMode } from "../../components/preview-toggle/preview-toggle.js";
-import { CollectionFilter } from "./collection-filter.js";
+import { PreviewToggle, type PreviewMode } from "../../components/preview-toggle/preview-toggle";
+import { CollectionFilter } from "./collection-filter";
 
 /** The page heading, search field, collection filter, and preview background. */
 export function IconToolbar({

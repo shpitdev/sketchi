@@ -1,1 +1,1 @@
-export * from "./svg-icon-workspace.js";
+export * from "./svg-icon-workspace";

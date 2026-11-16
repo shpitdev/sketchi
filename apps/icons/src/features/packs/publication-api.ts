@@ -6,8 +6,8 @@ import {
 	HttpApiMiddleware,
 	HttpApiSchema,
 } from "effect/http-api";
-import type { PublicationRequest } from "./publication.server.js";
-import { PublishPayload, PublishResult } from "./publication.js";
+import type { PublicationRequest } from "./publication.server";
+import { PublishPayload, PublishResult } from "./publication";
 const FailureBody = Schema.Struct({
 	error: Schema.Struct({ code: Schema.String, message: Schema.String }),
 });

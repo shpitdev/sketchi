@@ -1,4 +1,4 @@
-import { BuildOptions, CodeModeIssue } from "../build/result.js";
+import { BuildOptions, CodeModeIssue } from "../build/result";
 
 import { CanvasSpec } from "@sketchi/drawing";
 import { ArtifactBundleSchema, PartialArtifactBundleSchema } from "@sketchi/drawing/artifacts";
@@ -11,8 +11,8 @@ import {
 	optionalContract,
 	requiredObject,
 	stringLiteral,
-} from "../build/schema.js";
-import { CanvasInput } from "./input.js";
+} from "../build/schema";
+import { CanvasInput } from "./input";
 
 export const CreateCanvasRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),

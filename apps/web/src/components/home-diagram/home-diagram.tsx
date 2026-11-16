@@ -8,8 +8,8 @@ import { Spinner } from "@sketchi/ui/components/spinner";
 import { Pencil, RotateCcw } from "lucide-react";
 import { type ComponentType, useRef, useState } from "react";
 
-import { HomeDiagramEditor } from "./home-diagram-editor.js";
-import { HOME_DIAGRAM } from "./home-diagram-data.js";
+import { HomeDiagramEditor } from "./home-diagram-editor";
+import { HOME_DIAGRAM } from "./home-diagram-data";
 
 interface LoadedEditor {
 	Excalidraw: ComponentType<ExcalidrawProps>;

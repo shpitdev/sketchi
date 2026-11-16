@@ -4,19 +4,19 @@ import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect, Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
-import { buildClassDiagram } from "../../../build/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
-import { buildResponse } from "../../../build/operation.js";
-import { renderDiagram } from "../../../family.js";
-import { classBuild } from "../build.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { buildClassDiagram } from "../../../build/builds";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { buildResponse } from "../../../build/operation";
+import { renderDiagram } from "../../../family";
+import { classBuild } from "../build";
 import {
 	CLASS_MAX_CLASSES,
 	type ClassDiagram,
 	classFixture,
 	ClassValidationIssueCodeSchema,
 	getClassValidationIssues,
-} from "../document.js";
+} from "../document";
 
 const storage = makeMemoryArtifactStorage();
 function build(spec: unknown) {

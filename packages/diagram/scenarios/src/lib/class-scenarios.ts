@@ -19,8 +19,8 @@ import {
 import { estimateTextWidth, segmentsFromPoints, type CanvasSpec } from "@sketchi/drawing";
 import { classRelationshipHeads } from "@sketchi/diagrams/families/class/render";
 
-import { type ScenarioCheck } from "./evaluate.js";
-import { type DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate";
+import { type DiagramScenarioDifficulty } from "./scenarios";
 
 /** An attribute the prompt states: its name, accepted types and the markers it states. */
 export interface ClassScenarioAttribute {

@@ -1,6 +1,6 @@
 import type { Tracer } from "effect";
 
-import { fittingPrefix, type JsonValue, utf8Length } from "./json.js";
+import { fittingPrefix, type JsonValue, utf8Length } from "./json";
 
 export const SPAN_ROW_SCHEMA = "sketchi.telemetry.span.v1";
 

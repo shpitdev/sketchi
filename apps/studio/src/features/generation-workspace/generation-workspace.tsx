@@ -10,7 +10,7 @@ import {
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
 import { DrawingEditor } from "@sketchi/editor";
-import { FlowchartValidationPanel } from "../flowchart-validation-panel/index.js";
+import { FlowchartValidationPanel } from "../flowchart-validation-panel/index";
 
 export interface GenerationWorkspaceProps {
 	diagram: CanonicalDiagram;

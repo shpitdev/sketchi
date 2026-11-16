@@ -1,5 +1,5 @@
-import { type StoredDiagram, summaryFromStored } from "../contracts.js";
-import type { GeneratedArtifact } from "../generate-workflow.js";
+import { type StoredDiagram, summaryFromStored } from "../contracts";
+import type { GeneratedArtifact } from "../generate-workflow";
 
 export function storageLocation(id: string): string {
 	return `~/.sketchi/diagrams/${id}`;

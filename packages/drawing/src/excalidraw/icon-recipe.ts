@@ -7,9 +7,9 @@ import {
 	type IconRecipe,
 	type IconRecipePart,
 	type IconRecipePoint,
-} from "../index.js";
+} from "../index";
 
-import { type ExcalidrawElement } from "./scene.js";
+import { type ExcalidrawElement } from "./scene";
 
 /** Below this edge Excalidraw's jitter turns a small filled shape into a ragged blob. */
 const SMALL_ICON_EDGE = 48;

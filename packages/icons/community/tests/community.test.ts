@@ -4,11 +4,11 @@ import { HttpRouter, HttpServer } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
-import { takeClientRequest } from "../src/client-limit.js";
-import { CommunityHttpHandlers, CommunityHttpRequest, type CommunityEnv } from "../src/http.js";
-import { CommunityHttpApi } from "../src/http-api.js";
-import { communityIconHash, communityIconStoreLayer, CommunityIconStore } from "../src/index.js";
-import { openD1 } from "./d1.js";
+import { takeClientRequest } from "../src/client-limit";
+import { CommunityHttpHandlers, CommunityHttpRequest, type CommunityEnv } from "../src/http";
+import { CommunityHttpApi } from "../src/http-api";
+import { communityIconHash, communityIconStoreLayer, CommunityIconStore } from "../src/index";
+import { openD1 } from "./d1";
 
 const ORIGIN = "https://icons.sketchi.app";
 const RING: IconRecipe = {

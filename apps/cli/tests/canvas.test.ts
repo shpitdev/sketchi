@@ -3,11 +3,11 @@ import { afterEach, assert, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Schema } from "effect";
 import { TestClock } from "effect/testing";
 
-import { createCanvasDiagram, DEFAULT_CANVAS_ENDPOINT } from "../src/canvas.js";
-import { type BuiltDiagram, DiagramRecordManifest, type StoredDiagram } from "../src/contracts.js";
-import { exitCodeForFailure } from "../src/errors.js";
-import { DiagramStore } from "../src/store/service.js";
-import { swappableFetch } from "./fixtures.js";
+import { createCanvasDiagram, DEFAULT_CANVAS_ENDPOINT } from "../src/canvas";
+import { type BuiltDiagram, DiagramRecordManifest, type StoredDiagram } from "../src/contracts";
+import { exitCodeForFailure } from "../src/errors";
+import { DiagramStore } from "../src/store/service";
+import { swappableFetch } from "./fixtures";
 
 const canvasSpec = Schema.decodeUnknownSync(CreateCanvasRequest.fields.spec)({
 	kind: "canvas",

@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { Context, type Duration, Effect, FileSystem, Layer } from "effect";
 
-import type { DiagramFormat } from "../contracts.js";
+import type { DiagramFormat } from "../contracts";
 
 /** What happened when Sketchi tried, or declined, to put a PNG on the clipboard. */
 export type ClipboardOutcome =

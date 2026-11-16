@@ -1,6 +1,6 @@
 import { Array as Arr } from "effect";
 import { type CanvasValidationIssue } from "@sketchi/drawing";
-import { type CodeModeIssue, type CodeModeIssueCode } from "./result.js";
+import { type CodeModeIssue, type CodeModeIssueCode } from "./result";
 function canvasIssueCode(validationIssue: CanvasValidationIssue): CodeModeIssueCode {
 	switch (validationIssue.code) {
 		case "duplicate_element_id":

@@ -7,10 +7,10 @@ import {
 import { type FamilyBuildResult } from "@sketchi/diagrams/family";
 import { Context, Effect, Layer } from "effect";
 
-import { codeModeFailure, decodeInlineArtifacts, withCodeMode } from "./code-mode-artifacts.js";
-import type { BuiltDiagram } from "./contracts.js";
-import { documentId, validateStorageId, type CanonicalDiagramDocument } from "./document.js";
-import { CliBuildError, CliStorageError, CliValidationError } from "./errors.js";
+import { codeModeFailure, decodeInlineArtifacts, withCodeMode } from "./code-mode-artifacts";
+import type { BuiltDiagram } from "./contracts";
+import { documentId, validateStorageId, type CanonicalDiagramDocument } from "./document";
+import { CliBuildError, CliStorageError, CliValidationError } from "./errors";
 
 export class DiagramBuilder extends Context.Service<
 	DiagramBuilder,

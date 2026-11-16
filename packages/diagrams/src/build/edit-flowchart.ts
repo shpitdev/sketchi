@@ -1,18 +1,18 @@
-import { flowchartBuild } from "../families/flowchart/build.js";
-import { decodeFlowchartDocument } from "../families/flowchart/document.js";
-import { applyFlowchartEdits } from "../families/flowchart/edits.js";
-import { type PublishedBuildIssue } from "./result.js";
+import { flowchartBuild } from "../families/flowchart/build";
+import { decodeFlowchartDocument } from "../families/flowchart/document";
+import { applyFlowchartEdits } from "../families/flowchart/edits";
+import { type PublishedBuildIssue } from "./result";
 
 import { Effect, Result, Schema } from "effect";
 
-import { CodeModeArtifactStorage, type CodeModeArtifactStorageError } from "./artifacts.js";
-import { boundary, unknownRecord, type CodeModeWorkflowEffect } from "./boundary.js";
-import { runFamilyBuild } from "./builds.js";
+import { CodeModeArtifactStorage, type CodeModeArtifactStorageError } from "./artifacts";
+import { boundary, unknownRecord, type CodeModeWorkflowEffect } from "./boundary";
+import { runFamilyBuild } from "./builds";
 import {
 	EditFlowchartRejected,
 	EditFlowchartRequest,
 	type EditFlowchartResult,
-} from "./edit-flowchart-contract.js";
+} from "./edit-flowchart-contract";
 import {
 	codeModeInputIssues,
 	failureResult,
@@ -21,7 +21,7 @@ import {
 	responseRequestId,
 	storageFailureIssue,
 	workflowFailure,
-} from "./issues.js";
+} from "./issues";
 
 const EditFlowchartFailure = workflowFailure(
 	"EditFlowchartFailure",

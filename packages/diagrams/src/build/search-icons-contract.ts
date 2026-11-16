@@ -1,4 +1,4 @@
-import { CodeModeIssue } from "./result.js";
+import { CodeModeIssue } from "./result";
 
 import { Schema } from "effect";
 
@@ -9,7 +9,7 @@ import {
 	optionalContract,
 	requiredString,
 	stringLiteral,
-} from "./schema.js";
+} from "./schema";
 
 const maximumIconQueryLength = 120;
 const minimumIconSearchLimit = 1;

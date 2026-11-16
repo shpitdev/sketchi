@@ -1,4 +1,4 @@
-import { CopyButton } from "../copy-button/index.js";
+import { CopyButton } from "../copy-button/index";
 
 export interface CommandBlockProps {
 	/** Exactly what the copy button writes; shell commands must run as pasted. */

@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@sketchi/ui/components/
 import { BookOpen, Command } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { PLAYGROUND_URL, REPO_URL } from "../lib/home-url.js";
+import { PLAYGROUND_URL, REPO_URL } from "../lib/home-url";
 
 export function IconsChrome({
 	children,

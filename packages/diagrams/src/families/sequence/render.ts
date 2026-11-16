@@ -1,10 +1,10 @@
-import { type SequenceActivation, sequenceActivations } from "./layout.js";
+import { type SequenceActivation, sequenceActivations } from "./layout";
 import {
 	SEQUENCE_LIFELINE_SUFFIX,
 	type SequenceDiagram,
 	sequenceActivationId,
 	sequenceLifelineId,
-} from "./document.js";
+} from "./document";
 import {
 	canvasNodeIconBand,
 	CANVAS_SPEC_VERSION,

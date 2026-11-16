@@ -7,8 +7,8 @@ import {
 	CommunityIconStorageError,
 	CommunityIconVerdict,
 	type CommunityIcon,
-} from "./contracts.js";
-import { communityIconColors, communityIconSlugCandidates } from "./recipe.js";
+} from "./contracts";
+import { communityIconColors, communityIconSlugCandidates } from "./recipe";
 
 const SCHEMA = [
 	`CREATE TABLE IF NOT EXISTS community_icons (

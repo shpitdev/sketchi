@@ -2,9 +2,9 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { svgPng, initializeResvg } from "./excalidraw-export.js";
-import { prepareSvg } from "./imaging.js";
-import { type MarkRecord, recordCost, type RunStore } from "./store.js";
+import { svgPng, initializeResvg } from "./excalidraw-export";
+import { prepareSvg } from "./imaging";
+import { type MarkRecord, recordCost, type RunStore } from "./store";
 
 /** Marks per sheet: enough to scan hundreds quickly, few enough to read each. */
 export const SHEET_COLUMNS = 4;

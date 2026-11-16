@@ -5,8 +5,8 @@ import type {
 	DiagramGenerationCandidate,
 	DiagramGenerationProviderId,
 	DiagramGenerationRequest,
-} from "./candidates.js";
-import { DiagramGenerationProviderIdSchema } from "./candidates.js";
+} from "./candidates";
+import { DiagramGenerationProviderIdSchema } from "./candidates";
 
 export class DiagramGenerationConfigurationError extends Schema.TaggedError<
 	DiagramGenerationConfigurationError,

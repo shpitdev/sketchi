@@ -2,27 +2,26 @@ import { Array as Arr, Effect } from "effect";
 import { TooltipProvider } from "@sketchi/ui/components/tooltip";
 import { useCallback, useState } from "react";
 
-import { copyText } from "../export/actions.js";
-import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
-import type { PackExcalidrawState } from "./publication.js";
-import type { PackIcon, PackSummary } from "../../lib/packs.js";
+import { copyText } from "../export/actions";
+import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url";
+import type { PackExcalidrawState } from "./publication";
+import { iconCount, type PackIcon, type PackSummary } from "../../lib/packs";
 import { useAtom, useAtomSet } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
-import { useExportFeedback } from "../browser/feedback.js";
-import { drawnNames } from "../browser/drawn-names.js";
-import { useLoadOnScroll } from "../browser/use-load-on-scroll.js";
-import { DrawnIcon } from "../../components/drawn-icon/drawn-icon.js";
-import { IconsChrome } from "../../components/icons-chrome.js";
-import { NamesToggle } from "../../components/names-toggle/names-toggle.js";
-import { PreviewToggle, type PreviewMode } from "../../components/preview-toggle/preview-toggle.js";
-import { PackActions } from "./pack-actions.js";
-import { PackPublishDialog } from "./pack-publish-dialog.js";
-import { iconCount } from "./pack-shelf.js";
-import { usePackPublishing } from "./use-pack-publishing.js";
+import { useExportFeedback } from "../browser/feedback";
+import { drawnNames } from "../browser/drawn-names";
+import { useLoadOnScroll } from "../browser/use-load-on-scroll";
+import { DrawnIcon } from "../../components/drawn-icon/drawn-icon";
+import { IconsChrome } from "../../components/icons-chrome";
+import { NamesToggle } from "../../components/names-toggle/names-toggle";
+import { PreviewToggle, type PreviewMode } from "../../components/preview-toggle/preview-toggle";
+import { PackActions } from "./pack-actions";
+import { PackPublishDialog } from "./pack-publish-dialog";
+import { usePackPublishing } from "./use-pack-publishing";
 
 const PAGE_SIZE = 96;
 
-const loadExcalidrawExport = () => import("../export/excalidraw-export.js");
+const loadExcalidrawExport = () => import("../export/excalidraw-export");
 // A failed prefetch is retried by the copy that needs the code, which reports it.
 const preloadExcalidrawExport = () => {
 	loadExcalidrawExport().catch(() => undefined);

@@ -12,18 +12,18 @@ import {
 	sourceTone,
 	repairRequestText,
 	REVIEW_REQUEST_TEXT,
-} from "./author.js";
-import { IconInputError, IconRecipeError, IconTimeoutError } from "./errors.js";
-import { IconImaging, type IconImageExport, type IconImagePrepare } from "./imaging.js";
-import { type IconDrawInput, type IconSource } from "./input.js";
+} from "./author";
+import { IconInputError, IconRecipeError, IconTimeoutError } from "./errors";
+import { IconImaging, type IconImageExport, type IconImagePrepare } from "./imaging";
+import { type IconDrawInput, type IconSource } from "./input";
 import {
 	decodeJudgeReply,
 	type IconJudgeVerdict,
 	JUDGE_LOOK_ALIKES,
 	type JudgeCandidate,
 	judgeLineup,
-} from "./judge.js";
-import { type IconAuthorModel, IconDrawModels, type ModelCall } from "./models.js";
+} from "./judge";
+import { type IconAuthorModel, IconDrawModels, type ModelCall } from "./models";
 import {
 	ICON_EXPORT_SCALE,
 	iconLibrary,
@@ -32,7 +32,7 @@ import {
 	NODE_ICON_SIZE,
 	previewScene,
 	roundSheet,
-} from "./scenes.js";
+} from "./scenes";
 
 /** Catalog marks by slug, as SVG markup, for the judge's lineup. */
 export class IconCatalogSvgs extends Context.Service<

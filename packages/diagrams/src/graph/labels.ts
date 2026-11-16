@@ -6,7 +6,7 @@ import {
 	type LabelShortfall,
 	type LabelBox,
 	type DiagramLayout,
-} from "./layout-types.js";
+} from "./layout-types";
 import {
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
@@ -22,9 +22,9 @@ import {
 	boundsOf,
 	groupBlocks,
 	laneBlocks,
-} from "./containers.js";
-import { branchLabelMetrics, branches, branchLabelMaxWidth } from "./measure.js";
-import { branchLabelPosition } from "./ports.js";
+} from "./containers";
+import { branchLabelMetrics, branches, branchLabelMaxWidth } from "./measure";
+import { branchLabelPosition } from "./ports";
 import {
 	labelBox,
 	arrowheadBox,
@@ -41,22 +41,22 @@ import {
 	labelAlign,
 	LABEL_OTHER_LINE_CLEARANCE,
 	boxSegmentDistance,
-} from "./label-geometry.js";
+} from "./label-geometry";
 import {
 	arrowCrossings,
 	exportRouteDefects,
 	readerFindingCount,
 	headCrossers,
 	inwardEndpoints,
-} from "./readability.js";
+} from "./readability";
 import {
 	alongsideReach,
 	routeClearanceCount,
 	routeAlongsideCount,
 	straightRuns,
 	compactPoints,
-} from "./route-geometry.js";
-import { runsClearOfOutlines, orthogonalRoute, keepsStubs } from "./routing.js";
+} from "./route-geometry";
+import { runsClearOfOutlines, orthogonalRoute, keepsStubs } from "./routing";
 
 /**
  * Unbound, grouped text keeps its authored position through Excalidraw export.

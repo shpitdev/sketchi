@@ -2,7 +2,7 @@ import { type CanvasSpec } from "@sketchi/drawing";
 import { type ArtifactFormat } from "@sketchi/drawing/artifacts";
 import { Context, Effect, Layer, Schema } from "effect";
 
-import { type CodeModeCommunityIcons, type CodeModeIconCatalog } from "./icons.js";
+import { type CodeModeCommunityIcons, type CodeModeIconCatalog } from "./icons";
 
 /** What a host supplies to every Code Mode operation: ids, icons, rendering and artifact URLs. */
 export interface CodeModeRuntimeOptions {

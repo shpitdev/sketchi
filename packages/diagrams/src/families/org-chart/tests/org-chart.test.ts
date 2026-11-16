@@ -5,10 +5,10 @@ import { CANVAS_SPEC_VERSION, type CanvasSpec } from "@sketchi/drawing";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { describe, expect, it, vi } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
-import { buildOrgChart } from "../../../build/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
-import { buildResponse } from "../../../build/operation.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { buildOrgChart } from "../../../build/builds";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { buildResponse } from "../../../build/operation";
 import {
 	ORG_CHART_MAX_DEPTH,
 	ORG_CHART_MAX_PEOPLE,
@@ -17,9 +17,9 @@ import {
 	OrgChartValidationIssueCodeSchema,
 	parseOrgChartDiagram,
 	resolveOrgChartShorthand,
-} from "../document.js";
-import { type OrgChartLayoutIssue, orgChartLayoutIssues } from "../readout.js";
-import { layoutOrgChartDiagram, renderOrgChartDiagram } from "../render.js";
+} from "../document";
+import { type OrgChartLayoutIssue, orgChartLayoutIssues } from "../readout";
+import { layoutOrgChartDiagram, renderOrgChartDiagram } from "../render";
 
 // Count the box comparisons the layout packs subtrees with and the label wraps it
 // measures with. Both are deterministic, so they bound layout work without a

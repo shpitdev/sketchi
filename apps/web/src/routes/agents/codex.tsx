@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { AgentSetupView } from "../../components/agent-setup-view/index.js";
-import type { AgentSetupId } from "../../components/agent-setup-view/index.js";
+import { AgentSetupView } from "../../components/agent-setup-view/index";
+import type { AgentSetupId } from "../../components/agent-setup-view/index";
 import { pageMeta } from "../../lib/site-meta";
 
 const agentId = "codex" satisfies AgentSetupId;

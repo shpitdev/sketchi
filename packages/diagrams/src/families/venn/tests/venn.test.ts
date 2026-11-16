@@ -4,26 +4,26 @@ import { type CanvasSpec, SKETCHI_DIAGRAM_PALETTE } from "@sketchi/drawing";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { describe, expect, it } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
-import { buildVennDiagram } from "../../../build/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
-import { buildResponse } from "../../../build/operation.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { buildVennDiagram } from "../../../build/builds";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { buildResponse } from "../../../build/operation";
 import {
 	parseVennDiagram,
 	VENN_COLORS,
 	vennFixture,
 	VennValidationIssueCodeSchema,
-} from "../document.js";
-import { vennStressFixtures } from "../fixtures.js";
-import { layoutVennDiagram } from "../layout.js";
-import { type VennLayoutIssue, vennLayoutIssues } from "../readout.js";
+} from "../document";
+import { vennStressFixtures } from "../fixtures";
+import { layoutVennDiagram } from "../layout";
+import { type VennLayoutIssue, vennLayoutIssues } from "../readout";
 import {
 	contrastRatio,
 	renderVennDiagram,
 	vennFills,
 	vennLabelColor,
 	vennRegionFill,
-} from "../render.js";
+} from "../render";
 
 const storage = makeMemoryArtifactStorage();
 function build(spec: unknown) {

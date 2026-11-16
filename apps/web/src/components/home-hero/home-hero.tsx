@@ -2,8 +2,8 @@ import { Button } from "@sketchi/ui/components/button";
 import type { CSSProperties } from "react";
 
 import { DEFAULT_WEB_SURFACE_URLS } from "../../lib/surface-urls";
-import { getAgentSetupEntry } from "../agent-setup-view/agent-setup-data.js";
-import { HomeDiagram } from "../home-diagram/index.js";
+import { getAgentSetupEntry } from "../agent-setup-view/agent-setup-data";
+import { HomeDiagram } from "../home-diagram/index";
 
 export interface HomeHeroProps {
 	agentsHref?: string;

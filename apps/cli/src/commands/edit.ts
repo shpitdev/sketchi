@@ -2,15 +2,15 @@ import type { CodeModeIssue } from "@sketchi/diagrams/build/contract";
 import { applyFlowchartEdits } from "@sketchi/diagrams/families/flowchart/edits";
 import { Effect } from "effect";
 
-import { DiagramBuilder } from "../builder.js";
-import { resolveDiagramId } from "../diagram-catalog.js";
-import { CliValidationError } from "../errors.js";
-import { DiagramStore } from "../store/service.js";
-import { Command, exclusiveInputSourceFlags, resolveInputSource } from "../terminal/effect-cli.js";
-import { readEditInput } from "../terminal/input.js";
-import { runReported } from "../terminal/output.js";
-import { storedData, summaryText } from "./present.js";
-import { diagramIdArgument, rootCommand } from "./root.js";
+import { DiagramBuilder } from "../builder";
+import { resolveDiagramId } from "../diagram-catalog";
+import { CliValidationError } from "../errors";
+import { DiagramStore } from "../store/service";
+import { Command, exclusiveInputSourceFlags, resolveInputSource } from "../terminal/effect-cli";
+import { readEditInput } from "../terminal/input";
+import { runReported } from "../terminal/output";
+import { storedData, summaryText } from "./present";
+import { diagramIdArgument, rootCommand } from "./root";
 
 export const editCommand = Command.make(
 	"edit",

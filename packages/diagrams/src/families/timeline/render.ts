@@ -4,7 +4,7 @@ import {
 	timelineLanes,
 	type TimelineDiagram,
 	type TimelineEvent,
-} from "./document.js";
+} from "./document";
 import {
 	boundLabelWidth,
 	CANVAS_SPEC_VERSION,
@@ -18,7 +18,7 @@ import {
 	type CanvasSpec,
 } from "@sketchi/drawing";
 
-import { timelineCaptions, timelineDurationCaption } from "./captions.js";
+import { timelineCaptions, timelineDurationCaption } from "./captions";
 
 export const TIMELINE_MARKER_ROLE = "timeline-marker";
 

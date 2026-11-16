@@ -1,72 +1,72 @@
-import { flowchartBuild } from "./families/flowchart/build.js";
-import { sequenceFixture } from "./families/sequence/fixtures.js";
-import { sequenceBuild } from "./families/sequence/build.js";
-import { vennBuild } from "./families/venn/build.js";
+import { flowchartBuild } from "./families/flowchart/build";
+import { sequenceFixture } from "./families/sequence/fixtures";
+import { sequenceBuild } from "./families/sequence/build";
+import { vennBuild } from "./families/venn/build";
 import { Effect, Result, Schema } from "effect";
-import type * as Builds from "./build/builds.js";
-import type { CodeModeRuntimeEnvironment } from "./build/runtime.js";
-import { docs as chartFamilyDocs } from "./families/chart/docs.js";
-import * as chartFamily from "./families/chart/document.js";
-import { chartBuild } from "./families/chart/build.js";
-import { docs as classFamilyDocs } from "./families/class/docs.js";
-import * as classFamily from "./families/class/document.js";
-import { classBuild } from "./families/class/build.js";
-import { docs as erFamilyDocs } from "./families/er/docs.js";
-import * as erFamily from "./families/er/document.js";
-import { erBuild } from "./families/er/build.js";
-import * as flowchartFamily from "./families/flowchart/document.js";
-import { docs as flowchartFamilyDocs } from "./families/flowchart/docs.js";
-import { docs as ganttFamilyDocs } from "./families/gantt/docs.js";
-import * as ganttFamily from "./families/gantt/document.js";
-import { ganttBuild } from "./families/gantt/build.js";
-import { docs as journeyFamilyDocs } from "./families/journey/docs.js";
-import * as journeyFamily from "./families/journey/document.js";
-import { journeyBuild } from "./families/journey/build.js";
-import { mindmapBuild } from "./families/mindmap/build.js";
-import { docs as mindmapFamilyDocs } from "./families/mindmap/docs.js";
-import { mindmapFixture } from "./families/mindmap/fixtures.js";
+import type * as Builds from "./build/builds";
+import type { CodeModeRuntimeEnvironment } from "./build/runtime";
+import { docs as chartFamilyDocs } from "./families/chart/docs";
+import * as chartFamily from "./families/chart/document";
+import { chartBuild } from "./families/chart/build";
+import { docs as classFamilyDocs } from "./families/class/docs";
+import * as classFamily from "./families/class/document";
+import { classBuild } from "./families/class/build";
+import { docs as erFamilyDocs } from "./families/er/docs";
+import * as erFamily from "./families/er/document";
+import { erBuild } from "./families/er/build";
+import * as flowchartFamily from "./families/flowchart/document";
+import { docs as flowchartFamilyDocs } from "./families/flowchart/docs";
+import { docs as ganttFamilyDocs } from "./families/gantt/docs";
+import * as ganttFamily from "./families/gantt/document";
+import { ganttBuild } from "./families/gantt/build";
+import { docs as journeyFamilyDocs } from "./families/journey/docs";
+import * as journeyFamily from "./families/journey/document";
+import { journeyBuild } from "./families/journey/build";
+import { mindmapBuild } from "./families/mindmap/build";
+import { docs as mindmapFamilyDocs } from "./families/mindmap/docs";
+import { mindmapFixture } from "./families/mindmap/fixtures";
 
-import { docs as orgChartFamilyDocs } from "./families/org-chart/docs.js";
-import * as orgChartFamily from "./families/org-chart/document.js";
-import { orgChartBuild } from "./families/org-chart/build.js";
-import { docs as quadrantFamilyDocs } from "./families/quadrant/docs.js";
-import * as quadrantFamily from "./families/quadrant/document.js";
-import { quadrantBuild } from "./families/quadrant/build.js";
-import { docs as sankeyFamilyDocs } from "./families/sankey/docs.js";
-import * as sankeyFamily from "./families/sankey/document.js";
-import { sankeyBuild } from "./families/sankey/build.js";
-import { docs as sequenceFamilyDocs } from "./families/sequence/docs.js";
+import { docs as orgChartFamilyDocs } from "./families/org-chart/docs";
+import * as orgChartFamily from "./families/org-chart/document";
+import { orgChartBuild } from "./families/org-chart/build";
+import { docs as quadrantFamilyDocs } from "./families/quadrant/docs";
+import * as quadrantFamily from "./families/quadrant/document";
+import { quadrantBuild } from "./families/quadrant/build";
+import { docs as sankeyFamilyDocs } from "./families/sankey/docs";
+import * as sankeyFamily from "./families/sankey/document";
+import { sankeyBuild } from "./families/sankey/build";
+import { docs as sequenceFamilyDocs } from "./families/sequence/docs";
 
-import { docs as stateMachineFamilyDocs } from "./families/state-machine/docs.js";
-import * as stateMachineFamily from "./families/state-machine/document.js";
-import { stateMachineBuild } from "./families/state-machine/build.js";
-import { renderStateMachineDiagram } from "./families/state-machine/render.js";
-import { docs as timelineFamilyDocs } from "./families/timeline/docs.js";
-import * as timelineFamily from "./families/timeline/document.js";
-import { timelineBuild } from "./families/timeline/build.js";
-import { docs as vennFamilyDocs } from "./families/venn/docs.js";
-import * as vennFamily from "./families/venn/document.js";
+import { docs as stateMachineFamilyDocs } from "./families/state-machine/docs";
+import * as stateMachineFamily from "./families/state-machine/document";
+import { stateMachineBuild } from "./families/state-machine/build";
+import { renderStateMachineDiagram } from "./families/state-machine/render";
+import { docs as timelineFamilyDocs } from "./families/timeline/docs";
+import * as timelineFamily from "./families/timeline/document";
+import { timelineBuild } from "./families/timeline/build";
+import { docs as vennFamilyDocs } from "./families/venn/docs";
+import * as vennFamily from "./families/venn/document";
 
-import { docs as wireframeFamilyDocs } from "./families/wireframe/docs.js";
-import * as wireframeFamily from "./families/wireframe/document.js";
-import { wireframeBuild } from "./families/wireframe/build.js";
-import { renderFlowchartDiagram } from "./families/flowchart/render.js";
-import { flowchartFixture } from "./families/flowchart/fixtures/index.js";
-import { isStructurallyValidChartMark } from "./families/chart/render.js";
-import { isStructurallyValidClassBox } from "./families/class/render.js";
-import { isStructurallyValidErOptional, isStructurallyValidErTable } from "./families/er/render.js";
-import { isStructurallyValidGanttMark } from "./families/gantt/render.js";
-import { isStructurallyValidJourneyMark } from "./families/journey/render.js";
-import { isStructurallyValidQuadrantMark } from "./families/quadrant/render.js";
-import { isStructurallyValidSankeyMark } from "./families/sankey/render.js";
+import { docs as wireframeFamilyDocs } from "./families/wireframe/docs";
+import * as wireframeFamily from "./families/wireframe/document";
+import { wireframeBuild } from "./families/wireframe/build";
+import { renderFlowchartDiagram } from "./families/flowchart/render";
+import { flowchartFixture } from "./families/flowchart/fixtures/index";
+import { isStructurallyValidChartMark } from "./families/chart/render";
+import { isStructurallyValidClassBox } from "./families/class/render";
+import { isStructurallyValidErOptional, isStructurallyValidErTable } from "./families/er/render";
+import { isStructurallyValidGanttMark } from "./families/gantt/render";
+import { isStructurallyValidJourneyMark } from "./families/journey/render";
+import { isStructurallyValidQuadrantMark } from "./families/quadrant/render";
+import { isStructurallyValidSankeyMark } from "./families/sankey/render";
 import {
 	isStructurallyValidSequenceActivation,
 	isStructurallyValidSequenceLifeline,
-} from "./families/sequence/render.js";
-import { isStructurallyValidTimelineMarker } from "./families/timeline/render.js";
-import { isStructurallyValidVennSet } from "./families/venn/render.js";
-import { isStructurallyValidStateMarker } from "./graph/compose.js";
-import type { CanvasInput } from "./canvas/input.js";
+} from "./families/sequence/render";
+import { isStructurallyValidTimelineMarker } from "./families/timeline/render";
+import { isStructurallyValidVennSet } from "./families/venn/render";
+import { isStructurallyValidStateMarker } from "./graph/compose";
+import type { CanvasInput } from "./canvas/input";
 
 type CanvasNodeInput = Extract<CanvasInput["elements"][number], { readonly type: "node" }>;
 /**
@@ -83,12 +83,10 @@ function canonical<S extends Schema.Top & { readonly Type: { readonly type: stri
 	type: S["Type"]["type"],
 	validate: (diagram: S["Type"]) => Result.Result<S["Type"], E>,
 	render: (diagram: S["Type"]) => Result.Result<import("@sketchi/drawing").CanvasSpec, RE>,
-	counts: (diagram: S["Type"]) => import("./build/result.js").DiagramCounts,
+	counts: (diagram: S["Type"]) => import("./build/result").DiagramCounts,
 ): {
 	readonly schema: S;
-	readonly counts: (diagram: {
-		readonly type: string;
-	}) => import("./build/result.js").DiagramCounts;
+	readonly counts: (diagram: { readonly type: string }) => import("./build/result").DiagramCounts;
 	readonly validate: (diagram: { readonly type: string }) => Result.Result<S["Type"], E>;
 	readonly render: (diagram: {
 		readonly type: string;
@@ -124,7 +122,7 @@ function fromBuild<
 	const S extends string,
 	T extends Schema.Top,
 	R,
->(build: ReturnType<typeof import("./build/operation.js").defineBuild<D, N, E, S, T, R>>) {
+>(build: ReturnType<typeof import("./build/operation").defineBuild<D, N, E, S, T, R>>) {
 	return {
 		canonical: canonical(
 			build.normalized,
@@ -153,8 +151,8 @@ function family<
 	E,
 	const S extends string,
 	T extends Schema.Top,
-	P extends Schema.Codec<import("./build/result.js").CodeModeIssue>,
-	R extends import("./build/icons.js").BuildIconSource,
+	P extends Schema.Codec<import("./build/result").CodeModeIssue>,
+	R extends import("./build/icons").BuildIconSource,
 	const F extends {
 		readonly operation: O;
 		readonly label: string;
@@ -164,7 +162,7 @@ function family<
 			readonly schema: Schema.Top;
 			readonly counts: (diagram: {
 				readonly type: string;
-			}) => import("./build/result.js").DiagramCounts;
+			}) => import("./build/result").DiagramCounts;
 		};
 		readonly validationError: Schema.Top;
 		readonly docs: unknown;
@@ -173,7 +171,7 @@ function family<
 >(
 	definition: F & {
 		readonly build: ReturnType<
-			typeof import("./build/operation.js").defineBuild<D, N, E, S, T, R, C, P>
+			typeof import("./build/operation").defineBuild<D, N, E, S, T, R, C, P>
 		>;
 	},
 ) {
@@ -506,8 +504,8 @@ export interface FamilyOperation<A> {
 		input: unknown,
 	) => Effect.Effect<
 		A,
-		import("./build/operation.js").BuildRejection<A>,
-		import("./build/artifacts.js").CodeModeArtifactStorage | CodeModeRuntimeEnvironment
+		import("./build/operation").BuildRejection<A>,
+		import("./build/artifacts").CodeModeArtifactStorage | CodeModeRuntimeEnvironment
 	>;
 }
 

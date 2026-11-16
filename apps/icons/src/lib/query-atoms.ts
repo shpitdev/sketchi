@@ -3,8 +3,8 @@ import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { Atom, AsyncResult } from "effect/reactivity";
 import { decodeIconManifest } from "@sketchi/icon-catalog";
 
-import { decodeDrawings, DRAWINGS_PATH } from "./drawings.js";
-import { decodePackIcons, packIconsPath } from "./packs.js";
+import { decodeDrawings, DRAWINGS_PATH } from "./drawings";
+import { decodePackIcons, packIconsPath } from "./packs";
 
 export class IconQueryError extends Schema.TaggedError<
 	IconQueryError,

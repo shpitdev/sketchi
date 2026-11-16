@@ -1,4 +1,4 @@
-import { publishPack } from "./publication-client.js";
+import { publishPack } from "./publication-client";
 import {
 	Dialog,
 	DialogContent,
@@ -9,17 +9,16 @@ import { useState, type ClipboardEvent, type FormEvent } from "react";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { Effect } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
-import { queryError, queryRuntime } from "../../lib/query-atoms.js";
+import { queryError, queryRuntime } from "../../lib/query-atoms";
 
 import {
 	AUTHOR_NAME_MAX_LENGTH,
 	parseXHandle,
 	type PublishResult,
 	WEBSITE_MAX_LENGTH,
-} from "./publication.js";
-import { findPack, packPreviewImagePath, type PackSummary } from "../../lib/packs.js";
-import { AddToExcalidrawLink, PullRequestLink } from "./pack-actions.js";
-import { iconCount } from "./pack-shelf.js";
+} from "./publication";
+import { findPack, iconCount, packPreviewImagePath, type PackSummary } from "../../lib/packs";
+import { AddToExcalidrawLink, PullRequestLink } from "./pack-actions";
 
 /** Shows a pasted or typed profile link as the handle it names. */
 function showHandle(input: HTMLInputElement, value: string): boolean {

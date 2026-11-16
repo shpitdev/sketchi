@@ -1,5 +1,5 @@
 import { Result } from "effect";
-import { parseMindmap } from "./document.js";
+import { parseMindmap } from "./document";
 export const mindmapFixture = parseMindmap({
 	id: "public-mindmap-capability",
 	title: "Public mindmap generation",

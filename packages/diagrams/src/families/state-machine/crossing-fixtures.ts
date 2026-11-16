@@ -1,13 +1,13 @@
 // Maintained State crossing fixtures are decoded once; invalid fixture data is a startup defect.
 import { Result } from "effect";
-import { parseStateMachineDiagram, stateMachineDiagramType } from "./document.js";
-import connectionRetry from "./fixtures/crossings/connection-retry.js";
-import connectionRetryDisconnect from "./fixtures/crossings/connection-retry-disconnect.js";
-import mediaPlayer from "./fixtures/crossings/media-player.js";
-import mediaPlayerEnded from "./fixtures/crossings/media-player-ended.js";
-import namedFinalRetry from "./fixtures/crossings/named-final-retry.js";
-import orderLifecycle from "./fixtures/crossings/order-lifecycle.js";
-import orderLifecycleEnded from "./fixtures/crossings/order-lifecycle-ended.js";
+import { parseStateMachineDiagram, stateMachineDiagramType } from "./document";
+import connectionRetry from "./fixtures/crossings/connection-retry";
+import connectionRetryDisconnect from "./fixtures/crossings/connection-retry-disconnect";
+import mediaPlayer from "./fixtures/crossings/media-player";
+import mediaPlayerEnded from "./fixtures/crossings/media-player-ended";
+import namedFinalRetry from "./fixtures/crossings/named-final-retry";
+import orderLifecycle from "./fixtures/crossings/order-lifecycle";
+import orderLifecycleEnded from "./fixtures/crossings/order-lifecycle-ended";
 
 function stateMachine(fixture: object) {
 	return parseStateMachineDiagram({ ...fixture, type: stateMachineDiagramType }).pipe(

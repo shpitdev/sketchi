@@ -1,5 +1,5 @@
 import { defineConfig } from "vitest/config";
-import diagrams from "./vitest.config.js";
+import diagrams from "./vitest.config";
 
 export default defineConfig({
 	...diagrams,

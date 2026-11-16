@@ -5,48 +5,48 @@ import {
 import { Cause, Effect, type FileSystem, Layer, Option } from "effect";
 import type { Stdio } from "effect/Stdio";
 
-import { DiagramBuilderLive } from "./builder.js";
-import { canvasCommand } from "./commands/canvas.js";
-import { copyCommand } from "./commands/copy.js";
-import { createCommand } from "./commands/create.js";
-import { docsCommand } from "./commands/docs.js";
-import { editCommand } from "./commands/edit.js";
-import { exportCommand } from "./commands/export.js";
-import { generateCommand } from "./commands/generate.js";
-import { iconCommand } from "./commands/icon.js";
-import { listCommand } from "./commands/list.js";
-import { patchCommand } from "./commands/patch.js";
-import { pullCommand } from "./commands/pull.js";
-import { restoreCommand } from "./commands/restore.js";
-import { reviseCommand } from "./commands/revise.js";
-import { rootCommand } from "./commands/root.js";
-import { shareCommand } from "./commands/share.js";
-import { showCommand } from "./commands/show.js";
-import { CliFilesystemError } from "./errors.js";
-import { LocalFileSystemLive } from "./filesystem.js";
-import { cliIconCatalog } from "./icon-catalog.js";
-import { DiagramPatcherLive } from "./patch.js";
-import { DiagramExporterLive } from "./render/exporter.js";
-import { CliPngRendererLive } from "./render/png-renderer.js";
-import { ExcalidrawShareLive, LinkOpenerLive, ShareTransportLive } from "./share/excalidraw.js";
-import { ShareCryptoLive } from "./share/protocol.js";
-import { DiagramStoreLive } from "./store/live.js";
-import { type StorageRoot, StorageRootLive } from "./store/service.js";
-import { Clipboard, ClipboardLive } from "./terminal/clipboard.js";
+import { DiagramBuilderLive } from "./builder";
+import { canvasCommand } from "./commands/canvas";
+import { copyCommand } from "./commands/copy";
+import { createCommand } from "./commands/create";
+import { docsCommand } from "./commands/docs";
+import { editCommand } from "./commands/edit";
+import { exportCommand } from "./commands/export";
+import { generateCommand } from "./commands/generate";
+import { iconCommand } from "./commands/icon";
+import { listCommand } from "./commands/list";
+import { patchCommand } from "./commands/patch";
+import { pullCommand } from "./commands/pull";
+import { restoreCommand } from "./commands/restore";
+import { reviseCommand } from "./commands/revise";
+import { rootCommand } from "./commands/root";
+import { shareCommand } from "./commands/share";
+import { showCommand } from "./commands/show";
+import { CliFilesystemError } from "./errors";
+import { LocalFileSystemLive } from "./filesystem";
+import { cliIconCatalog } from "./icon-catalog";
+import { DiagramPatcherLive } from "./patch";
+import { DiagramExporterLive } from "./render/exporter";
+import { CliPngRendererLive } from "./render/png-renderer";
+import { ExcalidrawShareLive, LinkOpenerLive, ShareTransportLive } from "./share/excalidraw";
+import { ShareCryptoLive } from "./share/protocol";
+import { DiagramStoreLive } from "./store/live";
+import { type StorageRoot, StorageRootLive } from "./store/service";
+import { Clipboard, ClipboardLive } from "./terminal/clipboard";
 import {
 	cliErrorExitCode,
 	Command,
 	requestedOutputFormat,
 	runEffectCommand,
-} from "./terminal/effect-cli.js";
-import { GenerateWizardLive } from "./terminal/generate-wizard.js";
-import { InputReaderLive } from "./terminal/input.js";
+} from "./terminal/effect-cli";
+import { GenerateWizardLive } from "./terminal/generate-wizard";
+import { InputReaderLive } from "./terminal/input";
 import {
 	CliCommandExit,
 	internalErrorText,
 	OutputWriter,
 	OutputWriterLive,
-} from "./terminal/output.js";
+} from "./terminal/output";
 
 export const sketchiCommand = rootCommand.pipe(
 	Command.withSubcommands([

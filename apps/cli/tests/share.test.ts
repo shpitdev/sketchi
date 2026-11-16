@@ -14,14 +14,14 @@ import {
 	ShareTransport,
 	ShareTransportLive,
 	makeLinkOpenerLayer,
-} from "../src/share/excalidraw.js";
+} from "../src/share/excalidraw";
 import {
 	decodeSharePayload,
 	encodeSharePayload,
 	formatShareLink,
 	parseShareLink,
 	ShareCryptoLive,
-} from "../src/share/protocol.js";
+} from "../src/share/protocol";
 
 const originalFetch = globalThis.fetch;
 

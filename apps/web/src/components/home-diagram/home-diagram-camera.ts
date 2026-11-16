@@ -1,4 +1,4 @@
-import { HOME_DIAGRAM } from "./home-diagram-data.js";
+import { HOME_DIAGRAM } from "./home-diagram-data";
 
 /** Excalidraw's view of the scene: scene point (x, y) draws at ((x + scrollX) * zoom, (y + scrollY) * zoom). */
 export interface Camera {

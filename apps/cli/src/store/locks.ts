@@ -2,8 +2,8 @@ import { join } from "node:path";
 
 import { Effect, Schedule } from "effect";
 
-import { encodeJson } from "../document.js";
-import type { CliFilesystemError, CliStorageError } from "../errors.js";
+import { encodeJson } from "../document";
+import type { CliFilesystemError, CliStorageError } from "../errors";
 import {
 	BACKUP_PREFIX,
 	LOCKS_DIRECTORY,
@@ -13,9 +13,9 @@ import {
 	recordPath,
 	storageError,
 	unsafeEntry,
-} from "./entries.js";
-import { processIsAlive, type makeRecovery } from "./recovery.js";
-import type { StoreContext } from "./service.js";
+} from "./entries";
+import { processIsAlive, type makeRecovery } from "./recovery";
+import type { StoreContext } from "./service";
 
 const LOCK_FREE_PREFIX = "free.";
 const LOCK_OWNER_PREFIX = "owner.";

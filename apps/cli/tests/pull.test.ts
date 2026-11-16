@@ -4,14 +4,14 @@ import { join, resolve } from "node:path";
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
-import { exitCodeForFailure } from "../src/errors.js";
-import { localFileSystemLive, builtDiagram } from "./fixtures.js";
-import { LocalFileSystem } from "../src/filesystem.js";
-import { CliPngRenderer, HeadlessPngRenderError } from "../src/render/png-renderer.js";
-import { pullIntoStore } from "../src/share/pull.js";
-import { ExcalidrawShare } from "../src/share/excalidraw.js";
-import { DiagramStore, makeStorageRootLayer } from "../src/store/service.js";
-import { DiagramStoreLive } from "../src/store/live.js";
+import { exitCodeForFailure } from "../src/errors";
+import { localFileSystemLive, builtDiagram } from "./fixtures";
+import { LocalFileSystem } from "../src/filesystem";
+import { CliPngRenderer, HeadlessPngRenderError } from "../src/render/png-renderer";
+import { pullIntoStore } from "../src/share/pull";
+import { ExcalidrawShare } from "../src/share/excalidraw";
+import { DiagramStore, makeStorageRootLayer } from "../src/store/service";
+import { DiagramStoreLive } from "../src/store/live";
 
 const testParent = resolve(process.cwd(), ".memory/cli-tests");
 const rendererProbeScene = builtDiagram().excalidraw;

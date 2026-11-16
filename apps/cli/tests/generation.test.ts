@@ -6,14 +6,14 @@ import { afterEach, assert, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Result } from "effect";
 import { TestClock } from "effect/testing";
 
-import { DiagramBuilder, DiagramBuilderLive } from "../src/builder.js";
-import type { BuiltDiagram, StoredDiagram } from "../src/contracts.js";
-import { decodeCanonicalDiagramDocument } from "../src/document.js";
-import { exitCodeForFailure } from "../src/errors.js";
-import { DEFAULT_GENERATE_ENDPOINT, generateDiagram } from "../src/generation.js";
-import { DiagramPatcher } from "../src/patch.js";
-import { DiagramStore } from "../src/store/service.js";
-import { flowchartInput, sequenceInput, swappableFetch } from "./fixtures.js";
+import { DiagramBuilder, DiagramBuilderLive } from "../src/builder";
+import type { BuiltDiagram, StoredDiagram } from "../src/contracts";
+import { decodeCanonicalDiagramDocument } from "../src/document";
+import { exitCodeForFailure } from "../src/errors";
+import { DEFAULT_GENERATE_ENDPOINT, generateDiagram } from "../src/generation";
+import { DiagramPatcher } from "../src/patch";
+import { DiagramStore } from "../src/store/service";
+import { flowchartInput, sequenceInput, swappableFetch } from "./fixtures";
 
 const builderLayer = DiagramBuilderLive.pipe(
 	Layer.provide(

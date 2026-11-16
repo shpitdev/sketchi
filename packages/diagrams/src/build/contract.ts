@@ -4,13 +4,8 @@ export {
 	EditFlowchartRequest,
 	EditFlowchartResultSchema,
 	type EditFlowchartResult,
-} from "./edit-flowchart-contract.js";
-export { formatContractSchemaError } from "./input.js";
-export {
-	BuildOptions,
-	CodeModeIssue,
-	CodeModeIssueCodeSchema,
-	CodeModeIssueRef,
-} from "./result.js";
-export { toCodeModeJsonSchema } from "./schema.js";
-export { SearchIconsRequest, SearchIconsResultSchema } from "./search-icons-contract.js";
+} from "./edit-flowchart-contract";
+export { formatContractSchemaError } from "./input";
+export { BuildOptions, CodeModeIssue, CodeModeIssueCodeSchema, CodeModeIssueRef } from "./result";
+export { toCodeModeJsonSchema } from "./schema";
+export { SearchIconsRequest, SearchIconsResultSchema } from "./search-icons-contract";

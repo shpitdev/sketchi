@@ -4,10 +4,10 @@ import {
 	flowchartNodeDetails,
 	resolveFlowchartReference,
 	type FlowchartDocument,
-} from "../families/flowchart/document.js";
+} from "../families/flowchart/document";
 import { Result, Schema } from "effect";
 
-import { isUnknownRecord } from "./unknown-record.js";
+import { isUnknownRecord } from "./unknown-record";
 
 /** Node shapes a style may set, as the patch step draws them. */
 export const DIAGRAM_STYLE_SHAPES = ["rectangle", "diamond", "ellipse", "circle"] as const;

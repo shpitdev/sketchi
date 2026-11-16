@@ -16,7 +16,7 @@ import {
 	zoneFixtures,
 } from "@sketchi/diagrams/families/flowchart/fixtures/zone-fixtures";
 
-import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index.js";
+import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index";
 
 const flowchartFixture = familyForType("flowchart").fixture;
 

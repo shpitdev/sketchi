@@ -1,7 +1,7 @@
 import { sanitizeSvg, SVG_INPUT_MAX_BYTES } from "@sketchi/icon-catalog";
 import { Effect, Result, Schema } from "effect";
 
-import { IconInputError } from "./errors.js";
+import { IconInputError } from "./errors";
 
 export const ICON_NAME_MAX_LENGTH = 48;
 /** Largest decoded raster accepted. */

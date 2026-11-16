@@ -5,7 +5,7 @@ import {
 	classDiagramType,
 	parseClassDiagram,
 	resolveClassShorthand,
-} from "./document.js";
+} from "./document";
 
 const build = (input: Record<string, unknown>): ClassDiagram =>
 	parseClassDiagram(resolveClassShorthand({ type: classDiagramType, ...input })).pipe(

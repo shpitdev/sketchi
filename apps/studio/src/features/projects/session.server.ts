@@ -10,13 +10,13 @@ import {
 	type StudioAuthStatus,
 	type StudioOwner,
 	type StudioPublicSession,
-} from "./contracts.js";
+} from "./contracts";
 import {
 	failureMessage,
 	StudioOwnershipError,
 	type StudioResourceKind,
 	StudioSessionError,
-} from "./errors.server.js";
+} from "./errors.server";
 
 const STUDIO_SESSION_COOKIE = "sketchi_studio_session";
 const SESSION_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;

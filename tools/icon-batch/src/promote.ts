@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { iconRecipeFitIssues, iconRecipeIssues } from "@sketchi/drawing";
 
-import { type MarkRecord } from "./store.js";
+import { type MarkRecord } from "./store";
 
 export interface Promotion {
 	readonly written: readonly string[];

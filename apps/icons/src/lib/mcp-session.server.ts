@@ -5,7 +5,7 @@ import {
 	MCP_SESSION_HEADER,
 	MCP_SESSION_IDLE_MS,
 } from "@sketchi/cloudflare/mcp-session";
-import { makeIconMcpHandler, type IconsMcpEnv } from "./mcp.server.js";
+import { makeIconMcpHandler, type IconsMcpEnv } from "./mcp.server";
 
 /** One object, one native session scope. Eviction invalidates its opaque session. */
 export class IconsMcpSession extends DurableObject<IconsMcpEnv> {

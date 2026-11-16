@@ -8,8 +8,8 @@
  * scene's text color, while brand colors stay fixed.
  */
 
-import { type IconRecipeSchema } from "./recipe-schema.js";
-import { excalifontInkBox, type InkBox } from "./geometry/excalifont-ink.js";
+import { type IconRecipeSchema } from "./recipe-schema";
+import { excalifontInkBox, type InkBox } from "./geometry/excalifont-ink";
 
 export const ICON_RECIPE_GRID = 24;
 

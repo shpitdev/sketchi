@@ -4,8 +4,8 @@ import type {
 	DiagramGenerationCandidate,
 	DiagramGenerationProviderId,
 	DiagramGenerationRequest,
-} from "./candidates.js";
-import type { DiagramGenerationError } from "./errors.js";
+} from "./candidates";
+import type { DiagramGenerationError } from "./errors";
 
 export class DiagramGenerationClient extends Context.Service<
 	DiagramGenerationClient,

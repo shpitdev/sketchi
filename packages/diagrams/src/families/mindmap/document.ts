@@ -1,6 +1,6 @@
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 import { Array, Effect, Result, Schema } from "effect";
-import { cleanToolString, slug } from "../../clean-text.js";
+import { cleanToolString, slug } from "../../clean-text";
 
 /** The document people and models author, and the CLI persists. Children are in reading order. */
 export interface MindmapTopic {

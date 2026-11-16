@@ -1,5 +1,5 @@
-import type { RuleSource } from "../../rule-source.js";
-import { GANTT_MAX_PHASES, GANTT_MAX_TASKS } from "./document.js";
+import type { RuleSource } from "../../rule-source";
+import { GANTT_MAX_PHASES, GANTT_MAX_TASKS } from "./document";
 
 /** How a request becomes a Gantt chart; see FLOWCHART_RULES. */
 export const GANTT_RULES = {

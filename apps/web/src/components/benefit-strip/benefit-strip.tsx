@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import { getAgentSetupEntry } from "../agent-setup-view/agent-setup-data.js";
+import { getAgentSetupEntry } from "../agent-setup-view/agent-setup-data";
 
 /** Agents whose setup pages ship a plugin or MCP config today. */
 const stripAgents = (["codex", "claude-code", "opencode"] as const).map(getAgentSetupEntry);

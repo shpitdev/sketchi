@@ -11,15 +11,15 @@ import {
 	type PortOrder,
 	type PositionedLayout,
 	type RouteOptions,
-} from "./layout-types.js";
-import { type GraphInput, type GraphEdge } from "./input.js";
+} from "./layout-types";
+import { type GraphInput, type GraphEdge } from "./input";
 import {
 	markerSize,
 	branches,
 	branchLabelMetrics,
 	EXPORT_PADDING,
 	createNodeShape,
-} from "./measure.js";
+} from "./measure";
 import {
 	isSelfLoop,
 	OPPOSITE_EDGE,
@@ -34,8 +34,8 @@ import {
 	LANE_ARRIVAL_SPACING,
 	ARRIVAL_SPACING,
 	connectionEdges,
-} from "./geometry.js";
-import { padBox, boxesOverlap, labelBox } from "./label-geometry.js";
+} from "./geometry";
+import { padBox, boxesOverlap, labelBox } from "./label-geometry";
 import {
 	groupChain,
 	groupKeepOuts,
@@ -46,7 +46,7 @@ import {
 	sharedGroup,
 	compositeShapes,
 	laneBlocks,
-} from "./containers.js";
+} from "./containers";
 import {
 	type CanvasShapeElement as NodeSceneElement,
 	AXIS_ALIGNED_EPSILON,
@@ -68,18 +68,18 @@ import {
 	COMPACT_ASPECT,
 	PLAIN_ARRANGEMENT,
 	positionLayout,
-} from "./placement.js";
-import { type GraphLayout, type RankedFlow, flowEdges, groupUnitId } from "./topology.js";
-import { exportRouteDefects, exportAspect, routingDefects, routesNoWorse } from "./readability.js";
-import { branchLabels } from "./labels.js";
+} from "./placement";
+import { type GraphLayout, type RankedFlow, flowEdges, groupUnitId } from "./topology";
+import { exportRouteDefects, exportAspect, routingDefects, routesNoWorse } from "./readability";
+import { branchLabels } from "./labels";
 import {
 	alongsideReach,
 	straightRuns,
 	keepsClearOf,
 	segmentAlongside,
 	drawnSize,
-} from "./route-geometry.js";
-import { type GraphRenderOptions, type GraphAnchor } from "./options.js";
+} from "./route-geometry";
+import { type GraphRenderOptions, type GraphAnchor } from "./options";
 import {
 	alignedPortOffsets,
 	portOffsetsForRoutes,
@@ -96,8 +96,8 @@ import {
 	stubReachForRoutes,
 	straightHandoff,
 	assignLaneContinuations,
-} from "./ports.js";
-import { routeAllEdges, resideArrivals, rerouteDefects } from "./routing.js";
+} from "./ports";
+import { routeAllEdges, resideArrivals, rerouteDefects } from "./routing";
 
 const PLAIN: RoutingPolish = { ports: false, reader: false, sides: false, repair: false };
 

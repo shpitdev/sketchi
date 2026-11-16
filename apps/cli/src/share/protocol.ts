@@ -5,8 +5,8 @@ import { Effect, Layer } from "effect";
 import { Aead, SecureRandom } from "effect/crypto";
 import { Deflate } from "pako";
 
-import { CliShareError } from "../errors.js";
-import { renderLimitFailure } from "../render/limits.js";
+import { CliShareError } from "../errors";
+import { renderLimitFailure } from "../render/limits";
 
 export const EXCALIDRAW_BASELINE_COMMIT = "e6ae6bf05755eb3845d9635953bd6477e948a8f6";
 export const EXCALIDRAW_STORE_BASELINE_COMMIT = "76de642d0e9961f26bf6c1fe1dbe1aeaac5c5778";

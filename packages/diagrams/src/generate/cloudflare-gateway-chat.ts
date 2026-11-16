@@ -9,8 +9,8 @@ import {
 	type DiagramGenerationProviderId,
 	type DiagramGenerationRequest,
 	responseErrorDiagnostic,
-} from "./candidates.js";
-import { DiagramGenerationClient, DiagramGenerationPolicy } from "./client.js";
+} from "./candidates";
+import { DiagramGenerationClient, DiagramGenerationPolicy } from "./client";
 import {
 	type CloudflareAiGateway,
 	CloudflareAiGatewayBinding,
@@ -26,15 +26,15 @@ import {
 	DiagramGenerationResponseError,
 	DiagramGenerationTransportError,
 	errorMessage,
-} from "./errors.js";
+} from "./errors";
 import {
 	buildDiagramGenerationMessages,
 	DEFAULT_MAX_OUTPUT_TOKENS,
 	DEFAULT_TEMPERATURE,
-} from "./messages.js";
+} from "./messages";
 
-import { DiagramFamilyNarrowing } from "./family-narrowing.js";
-import { runDiagramGenerationWithPolicy } from "./policy.js";
+import { DiagramFamilyNarrowing } from "./family-narrowing";
+import { runDiagramGenerationWithPolicy } from "./policy";
 
 // The gateway client never dials this. Only its path, the gateway endpoint, is sent.
 const GATEWAY_API_URL = "https://sketchi-gateway.invalid";

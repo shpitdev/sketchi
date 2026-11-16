@@ -2,9 +2,9 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
-import { getIconBySlug } from "../src/catalog.js";
-import { CONCEPT_ICONS } from "../src/concepts.js";
-import { transcribeLucideIcon, type LucideIconNode } from "../src/lucide-recipes.js";
+import { getIconBySlug } from "../src/catalog";
+import { CONCEPT_ICONS } from "../src/concepts";
+import { transcribeLucideIcon, type LucideIconNode } from "../src/lucide-recipes";
 
 // Every hand-drawn recipe keyed by slug: concept icons transcribed from Lucide
 // or drawn under recipes/concepts/, and brand marks drawn under recipes/.

@@ -17,8 +17,8 @@ import {
 	readTimelineMomentGaps,
 } from "@sketchi/diagrams/families/timeline/readout";
 
-import { type DiagramScenarioDifficulty } from "./scenarios.js";
-import { type ScenarioCheck } from "./evaluate.js";
+import { type DiagramScenarioDifficulty } from "./scenarios";
+import { type ScenarioCheck } from "./evaluate";
 
 export interface TimelineScenarioEvent {
 	readonly labels: readonly string[];

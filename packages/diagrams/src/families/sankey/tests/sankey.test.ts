@@ -3,22 +3,22 @@ import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
-import { buildSankey } from "../../../build/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
-import { applyDiagramPatch } from "../../../canvas/patch.js";
-import { buildResponse, type BuildRejection } from "../../../build/operation.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { buildSankey } from "../../../build/builds";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { applyDiagramPatch } from "../../../canvas/patch";
+import { buildResponse, type BuildRejection } from "../../../build/operation";
 import {
 	getSankeyValidationIssues,
 	SANKEY_MAX_NODES,
 	type SankeyDiagram,
 	sankeyFixture,
 	SankeyValidationIssueCodeSchema,
-} from "../document.js";
-import { sankeyStressFixtures } from "../fixtures.js";
-import { layoutSankeyDiagram } from "../layout.js";
-import { readSankeyScene, type SankeyLayoutIssue, sankeyLayoutIssues } from "../readout.js";
-import { renderSankeyDiagram } from "../render.js";
+} from "../document";
+import { sankeyStressFixtures } from "../fixtures";
+import { layoutSankeyDiagram } from "../layout";
+import { readSankeyScene, type SankeyLayoutIssue, sankeyLayoutIssues } from "../readout";
+import { renderSankeyDiagram } from "../render";
 
 const storage = makeMemoryArtifactStorage();
 function run<A, E extends BuildRejection<unknown>>(

@@ -1,13 +1,13 @@
-import { type CanvasShapeElement, type CanvasSpec } from "../scene.js";
-import { GROUP_OUTLINE_CLEARANCE } from "./group-regions.js";
+import { type CanvasShapeElement, type CanvasSpec } from "../scene";
+import { GROUP_OUTLINE_CLEARANCE } from "./group-regions";
 import {
 	AXIS_ALIGNED_EPSILON,
 	type AxisAlignedSegment,
 	segmentCrossesBoundsInterior,
 	segmentOverlapLength,
 	segmentsFromPoints,
-} from "./segments.js";
-import { wrapTextToWidth, wrappedLabelWidth } from "./text-metrics.js";
+} from "./segments";
+import { wrapTextToWidth, wrappedLabelWidth } from "./text-metrics";
 
 export interface LaneRegionIssue {
 	readonly code:

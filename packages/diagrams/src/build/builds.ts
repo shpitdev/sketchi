@@ -1,13 +1,13 @@
-import { type ArtifactBuildCapabilities, type BuildDelivery } from "./result.js";
-import { familyForType } from "../family.js";
+import { type ArtifactBuildCapabilities, type BuildDelivery } from "./result";
+import { familyForType } from "../family";
 
 import { Effect } from "effect";
 
-import { type CodeModeArtifactStorage } from "./artifacts.js";
-import { observeCodeModeBoundary, type ObservableCodeModeResult } from "./boundary.js";
-import { artifactBuildCapabilities } from "./export.js";
-import { BuildIconSource, catalogForRequest } from "./icons.js";
-import { CodeModeRuntimeEnvironment } from "./runtime.js";
+import { type CodeModeArtifactStorage } from "./artifacts";
+import { observeCodeModeBoundary, type ObservableCodeModeResult } from "./boundary";
+import { artifactBuildCapabilities } from "./export";
+import { BuildIconSource, catalogForRequest } from "./icons";
+import { CodeModeRuntimeEnvironment } from "./runtime";
 
 /** The host supplies one catalog and artifact boundary to both builds and edits. */
 interface HostedBuild<A, E, R> {

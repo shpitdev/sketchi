@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { WebSurfaceUrls } from "../../lib/surface-urls";
-import { SiteHeader } from "../site-header/index.js";
-import { SiteFooter } from "../site-footer/index.js";
+import { SiteHeader } from "../site-header/index";
+import { SiteFooter } from "../site-footer/index";
 
 export function SiteShell({
 	activePath,

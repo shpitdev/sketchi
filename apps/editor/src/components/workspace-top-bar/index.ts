@@ -1,1 +1,1 @@
-export * from "./workspace-top-bar.js";
+export * from "./workspace-top-bar";

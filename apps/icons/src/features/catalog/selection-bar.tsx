@@ -1,7 +1,7 @@
 import { Copy, Download, X } from "lucide-react";
 
-import { SELECTION_LIMIT } from "./selection.js";
-import type { SelectionAction } from "./use-icon-sources.js";
+import { SELECTION_LIMIT } from "./selection";
+import type { SelectionAction } from "./use-icon-sources";
 
 /**
  * Appears once anything is selected. The count covers the whole selection,

@@ -1,12 +1,12 @@
 import { Effect } from "effect";
 
-import { DiagramBuilder } from "../builder.js";
-import { DiagramStore } from "../store/service.js";
-import { Command, exclusiveInputSourceFlags, resolveInputSource } from "../terminal/effect-cli.js";
-import { readDocumentInput } from "../terminal/input.js";
-import { runReported } from "../terminal/output.js";
-import { storedData, summaryText } from "./present.js";
-import { rootCommand } from "./root.js";
+import { DiagramBuilder } from "../builder";
+import { DiagramStore } from "../store/service";
+import { Command, exclusiveInputSourceFlags, resolveInputSource } from "../terminal/effect-cli";
+import { readDocumentInput } from "../terminal/input";
+import { runReported } from "../terminal/output";
+import { storedData, summaryText } from "./present";
+import { rootCommand } from "./root";
 
 export const createCommand = Command.make(
 	"create",

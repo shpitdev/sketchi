@@ -5,7 +5,7 @@
  */
 import { Schema } from "effect";
 import { Decision } from "effect/ai";
-import type { DiagramTypeValue } from "../family.js";
+import type { DiagramTypeValue } from "../family";
 
 /** Pinned, not an alias, so a graded result stays reproducible. */
 export const FAMILY_NARROWING_MODEL = "jev-1.14.0";

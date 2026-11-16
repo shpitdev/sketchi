@@ -7,7 +7,7 @@ import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasSpec,
 } from "@sketchi/drawing";
-import { type Mindmap, parseMindmap, renderMindmap, mindmapLayoutIssues } from "../index.js";
+import { type Mindmap, parseMindmap, renderMindmap, mindmapLayoutIssues } from "../index";
 
 /** CI draws a handful of seeds; `MINDMAP_FUZZ_SEEDS=2000` runs the full local proof. */
 const SEEDS = Number(process.env["MINDMAP_FUZZ_SEEDS"] ?? 8);

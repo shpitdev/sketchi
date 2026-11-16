@@ -10,10 +10,10 @@ import type {
 	PatchedDiagramArtifacts,
 	PatchSource,
 	StoredDiagram,
-} from "../contracts.js";
-import type { CanonicalDiagramDocument } from "../document.js";
-import type { CliExportError, CliFilesystemError, CliStorageError } from "../errors.js";
-import type { LocalFileSystem } from "../filesystem.js";
+} from "../contracts";
+import type { CanonicalDiagramDocument } from "../document";
+import type { CliExportError, CliFilesystemError, CliStorageError } from "../errors";
+import type { LocalFileSystem } from "../filesystem";
 
 export class StorageRoot extends Context.Service<StorageRoot, { readonly path: string }>()(
 	"@sketchi/cli/StorageRoot",

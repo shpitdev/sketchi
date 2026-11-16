@@ -1,6 +1,6 @@
-import { PublishedBuildIssue } from "../../build/result.js";
+import { PublishedBuildIssue } from "../../build/result";
 import { Array } from "effect";
-import { defineBuild } from "../../build/operation.js";
+import { defineBuild } from "../../build/operation";
 import {
 	GanttDocument,
 	GanttDiagram,
@@ -10,8 +10,8 @@ import {
 	validateGanttDiagram,
 	counts,
 	ganttScheduleConflicts,
-} from "./document.js";
-import { renderGanttDiagram } from "./render.js";
+} from "./document";
+import { renderGanttDiagram } from "./render";
 
 export const ganttBuild = defineBuild({
 	publishedIssues: PublishedBuildIssue,

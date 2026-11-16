@@ -1,6 +1,6 @@
 import { Context, Effect } from "effect";
 
-import { StudioSourceArtifactError } from "./errors.server.js";
+import { StudioSourceArtifactError } from "./errors.server";
 
 export interface StudioSourceArtifact {
 	diagramId: string;

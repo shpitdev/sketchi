@@ -1,4 +1,4 @@
-import { type IconColor, isIconColor } from "./color-mode.js";
+import { type IconColor, isIconColor } from "./color-mode";
 
 export interface SketchiIconViewBox {
 	readonly height: number;

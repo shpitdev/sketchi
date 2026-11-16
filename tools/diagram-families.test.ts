@@ -18,8 +18,8 @@ import { getCanvasValidationIssues } from "@sketchi/drawing";
 import { Effect, Layer, Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { DiagramBuilder, DiagramBuilderLive } from "../apps/cli/src/builder.ts";
-import { parseJsonDocument } from "../apps/cli/src/document.ts";
+import { DiagramBuilder, DiagramBuilderLive } from "../apps/cli/src/builder";
+import { parseJsonDocument } from "../apps/cli/src/document";
 
 /** A family's fixture as a model answers it: a flowchart as its document, any other as its diagram. */
 function generationEnvelope(diagram: CanonicalDiagram): string {

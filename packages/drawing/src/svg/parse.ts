@@ -1,9 +1,9 @@
-import { fnv1a32 } from "../hash.js";
+import { fnv1a32 } from "../hash";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 
-import { flattenPrimitive, isNonRenderingPrimitive } from "./flatten.js";
-import { withoutClosingPoint } from "./geometry.js";
-import { parseLength, type SvgViewport } from "./length.js";
+import { flattenPrimitive, isNonRenderingPrimitive } from "./flatten";
+import { withoutClosingPoint } from "./geometry";
+import { parseLength, type SvgViewport } from "./length";
 import {
 	cascadedDimensions,
 	computeElementStyle,
@@ -16,14 +16,14 @@ import {
 	type PaintContext,
 	type SvgAttributes,
 	type SvgElementDescriptor,
-} from "./style.js";
+} from "./style";
 import {
 	IDENTITY_MATRIX,
 	multiplyMatrices,
 	parseNumberList,
 	parseTransform,
 	transformedStrokeScale,
-} from "./transform.js";
+} from "./transform";
 import {
 	type CanonicalShape,
 	type CanonicalSvgDocument,
@@ -37,7 +37,7 @@ import {
 	type SvgParseOptions,
 	type SvgParseResult,
 	type SvgPrimitiveName,
-} from "./types.js";
+} from "./types";
 
 interface SvgNode {
 	readonly attributes: SvgAttributes;

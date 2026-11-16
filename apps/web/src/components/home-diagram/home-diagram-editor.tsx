@@ -13,8 +13,8 @@ import {
 	cameraBetweenToolbars,
 	imageCamera,
 	toolbarInsets,
-} from "./home-diagram-camera.js";
-import { HOME_DIAGRAM } from "./home-diagram-data.js";
+} from "./home-diagram-camera";
+import { HOME_DIAGRAM } from "./home-diagram-data";
 
 export interface HomeDiagramEditorProps {
 	/** Excalidraw's editor, from editor's loader. */

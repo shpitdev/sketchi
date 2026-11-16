@@ -1,17 +1,17 @@
-import { buildResponse, type BuildRejection } from "../../../build/operation.js";
+import { buildResponse, type BuildRejection } from "../../../build/operation";
 import { describe, expect, it } from "vitest";
 import { Effect, Result } from "effect";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { buildChart } from "../../../build/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
-import { applyDiagramPatch } from "../../../canvas/patch.js";
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
+import { buildChart } from "../../../build/builds";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { applyDiagramPatch } from "../../../canvas/patch";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
 import {
 	CHART_MAX_CATEGORIES,
 	ChartValidationIssueCodeSchema,
 	parseChartDiagram,
 	type ChartValidationIssue,
-} from "../document.js";
+} from "../document";
 
 const storage = makeMemoryArtifactStorage();
 function run<A, E extends BuildRejection<unknown>>(

@@ -1,4 +1,4 @@
-import { canvasFailureStatus, canvasValidationIssues } from "./scene.js";
+import { canvasFailureStatus, canvasValidationIssues } from "./scene";
 import { Array, Effect, Result, Schema, SchemaIssue } from "effect";
 import {
 	CanvasValidationIssue,
@@ -16,7 +16,7 @@ import {
 	type QualityReport,
 	type CodeModeIssueCode,
 	type DiagramCounts,
-} from "./result.js";
+} from "./result";
 
 /** Expected build errors retain their typed cause until a CLI, HTTP or tool host asks for a body. */
 export interface BuildRejection<A> {
@@ -268,13 +268,13 @@ export function defineBuild<
 	const build: <CR>(
 		request: typeof Request.Type,
 		capabilities: ArtifactBuildCapabilities<CR>,
-		delivery?: Pick<import("./result.js").BuildDelivery, "provenance">,
+		delivery?: Pick<import("./result").BuildDelivery, "provenance">,
 	) => Effect.Effect<typeof Accepted.Type, FailureValue, R | CR> = Effect.fn(
 		`${policy.name}.build`,
 	)(function* <CR>(
 		request: typeof Request.Type,
 		capabilities: ArtifactBuildCapabilities<CR>,
-		delivery?: Pick<import("./result.js").BuildDelivery, "provenance">,
+		delivery?: Pick<import("./result").BuildDelivery, "provenance">,
 	) {
 		const buildId = yield* Effect.sync(() => capabilities.createId("build"));
 		const identity = {
