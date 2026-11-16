@@ -5,9 +5,9 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 import { localInspectorPort, localViteCacheDir } from "../../tools/local-dev-ports";
-import { excalidrawFonts } from "../../scripts/lib/excalidraw-fonts.mjs";
-import { clientServerBoundary } from "../../scripts/lib/client-server-boundary.mjs";
-import { workerProjectConfig } from "../../scripts/lib/worker-apps.mjs";
+import { excalidrawFonts } from "../../tools/ops/src/vite/excalidraw-fonts";
+import { clientServerBoundary } from "../../tools/ops/src/vite/client-server-boundary";
+import { workerProjectConfig } from "../../tools/ops/src/workers";
 
 const workerProject = workerProjectConfig("playground");
 

@@ -10,9 +10,9 @@
 			"inputs": [
 				"production",
 				"^production",
-				"{workspaceRoot}/scripts/lib/excalidraw-fonts.mjs",
-				"{workspaceRoot}/scripts/lib/client-server-boundary.mjs",
-				"{workspaceRoot}/scripts/lib/worker-apps.mjs",
+				"{workspaceRoot}/tools/ops/src/vite/excalidraw-fonts.ts",
+				"{workspaceRoot}/tools/ops/src/vite/client-server-boundary.ts",
+				"{workspaceRoot}/tools/ops/src/workers.ts",
 				"{workspaceRoot}/tools/local-dev-ports.ts"
 			],
 			"outputs": ["{workspaceRoot}/dist/apps/studio", "{projectRoot}/.wrangler/deploy/config.json"],

@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 import { localInspectorPort, localViteCacheDir } from "../../tools/local-dev-ports";
-import { workerProjectConfig } from "../../scripts/lib/worker-apps.mjs";
+import { workerProjectConfig } from "../../tools/ops/src/workers";
 
 const workerProject = workerProjectConfig("icons");
 
