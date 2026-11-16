@@ -1259,15 +1259,6 @@ const ZONED_LABEL_DEFECTS: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonly s
 	RL: [],
 };
 
-/**
- * Label defects zone fixtures already drew on main, by fixture and direction:
- * read bottom to top, the ERP's two labels leave its top side stacked. Never
- * more than these.
- */
-const KNOWN_ZONE_FIXTURE_DEFECTS: Readonly<Record<string, readonly string[]>> = {
-	"hybrid-cloud-labeled BT": ["edge:edge-2:label on edge:edge-3:label"],
-};
-
 const LANE_LABELS = [
 	"Customer",
 	"Sales",
@@ -1630,7 +1621,6 @@ export {
 	randomZonedFlowcharts,
 	ZONED_ROUTING,
 	ZONED_LABEL_DEFECTS,
-	KNOWN_ZONE_FIXTURE_DEFECTS,
 	randomLanedFlowcharts,
 	withoutLanes,
 	KNOWN_LANED_LABEL_DEFECTS,

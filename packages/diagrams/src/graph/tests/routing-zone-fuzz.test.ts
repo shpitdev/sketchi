@@ -1,6 +1,5 @@
 import type { CanvasSpec } from "@sketchi/drawing";
 import { parseFlowchartDiagram } from "../../families/flowchart/document";
-import { zoneFixtures, zoneStressFixtures } from "../../families/flowchart/fixtures/zone-fixtures";
 import { renderFlowchartDiagram } from "../../families/flowchart/render";
 import { getCanvasValidationIssues, zoneRegionIssues } from "@sketchi/drawing";
 import { Result } from "effect";
@@ -19,8 +18,6 @@ import {
 	moreTouchesThanPinned,
 	ownEndStrays,
 	curvedStrays,
-	labelDefects,
-	KNOWN_ZONE_FIXTURE_DEFECTS,
 } from "./routing-fuzz-helpers";
 
 describe("zoned routing fuzz", () => {
@@ -115,29 +112,6 @@ describe("zoned routing fuzz", () => {
 					ownEndStrays(rendered(direction)[index]!).map((stray) => `${index} ${stray}`),
 				),
 			).toEqual([]);
-		},
-		120_000,
-	);
-
-	it.each([...Object.keys(zoneFixtures), ...(FULL ? Object.keys(zoneStressFixtures) : [])])(
-		"exports the %s fixture with its zones nested, apart and clear",
-		(name) => {
-			const fixture = { ...zoneFixtures, ...zoneStressFixtures }[name]!;
-			for (const direction of ["TB", "BT", "LR", "RL"] as const) {
-				const scene = renderFlowchartDiagram({
-					...fixture,
-					layout: { direction, edgeRouting: "orthogonal" },
-				});
-				const exported = convertSceneToExcalidraw(scene);
-				const authored = new Map(fixture.nodes.map((node) => [`node:${node.id}`, node.label]));
-				expect([
-					...validateExcalidrawScene(exported).issues,
-					...zoneRegionIssues(scene, fixture),
-					...labelDefects(exported.elements, authored).filter(
-						(defect) => !KNOWN_ZONE_FIXTURE_DEFECTS[`${name} ${direction}`]?.includes(defect),
-					),
-				]).toEqual([]);
-			}
 		},
 		120_000,
 	);

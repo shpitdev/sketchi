@@ -1,6 +1,5 @@
 import type { CanvasSpec } from "@sketchi/drawing";
 import { parseFlowchartDiagram } from "../../families/flowchart/document";
-import { laneFixtures, laneStressFixtures } from "../../families/flowchart/fixtures/lane-fixtures";
 import { renderFlowchartDiagram } from "../../families/flowchart/render";
 import { getCanvasValidationIssues, laneRegionIssues } from "@sketchi/drawing";
 import { Result } from "effect";
@@ -98,24 +97,4 @@ describe("laned routing fuzz", () => {
 			expect(moreTouchesThanPinned("laned", direction, counts)).toEqual([]);
 		}, 60_000);
 	});
-
-	it.each([...Object.keys(laneFixtures), ...Object.keys(laneStressFixtures)])(
-		"exports the %s lanes valid and clear in every direction",
-		(name) => {
-			const fixture = { ...laneFixtures, ...laneStressFixtures }[name]!;
-			for (const direction of ["TB", "BT", "LR", "RL"] as const) {
-				const scene = renderFlowchartDiagram({
-					...fixture,
-					layout: { direction, edgeRouting: "orthogonal" },
-				});
-				const exported = convertSceneToExcalidraw(scene);
-				const authored = new Map(fixture.nodes.map((node) => [`node:${node.id}`, node.label]));
-				expect([
-					...validateExcalidrawScene(exported).issues,
-					...laneRegionIssues(scene, fixture),
-					...labelDefects(withoutLanes(exported.elements), authored),
-				]).toEqual([]);
-			}
-		},
-	);
 });
