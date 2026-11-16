@@ -2,7 +2,7 @@ import { type CanvasSpec } from "@sketchi/drawing";
 
 import { Context, Effect, Layer } from "effect";
 
-import { HeadlessPngRenderError } from "./render-diagnostics.js";
+import { HeadlessPngRenderError } from "./diagnostics.js";
 
 export interface PngRenderInput {
 	readonly scene?: CanvasSpec;
@@ -64,4 +64,4 @@ export const CliPngRendererLive = Layer.succeed(CliPngRenderer, {
 	normalizeExcalidraw,
 });
 
-export { HeadlessPngRenderError } from "./render-diagnostics.js";
+export { HeadlessPngRenderError } from "./diagnostics.js";

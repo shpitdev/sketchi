@@ -7,7 +7,7 @@ import { PNG } from "pngjs";
 
 import { DiagramBuilder, DiagramBuilderLive } from "../src/builder.js";
 import { cliIconCatalog } from "../src/icon-catalog.js";
-import { CliPngRenderer, CliPngRendererLive } from "../src/png-renderer.js";
+import { CliPngRenderer, CliPngRendererLive } from "../src/render/png-renderer.js";
 import { canonicalDocument, flowchartInput, mindmapInput, sequenceInput } from "./fixtures.js";
 
 const builderLayer = DiagramBuilderLive.pipe(

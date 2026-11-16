@@ -10,7 +10,7 @@ import { decodeCanonicalDiagramDocument } from "../src/document.js";
 import { exitCodeForFailure } from "../src/errors.js";
 import { DEFAULT_GENERATE_ENDPOINT, generateDiagram } from "../src/generation.js";
 import { DiagramPatcher } from "../src/patch.js";
-import { DiagramStore } from "../src/storage.js";
+import { DiagramStore } from "../src/store/service.js";
 import { flowchartInput, sequenceInput } from "./fixtures.js";
 
 const builderLayer = DiagramBuilderLive.pipe(

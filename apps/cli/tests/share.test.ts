@@ -4,13 +4,13 @@ import { afterEach, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber } from "effect";
 import { TestClock } from "effect/testing";
 
-import { ShareTransport, ShareTransportLive } from "../src/share.js";
+import { ShareTransport, ShareTransportLive } from "../src/share/excalidraw.js";
 import {
 	decodeSharePayload,
 	encodeSharePayload,
 	formatShareLink,
 	parseShareLink,
-} from "../src/share-protocol.js";
+} from "../src/share/protocol.js";
 
 const originalFetch = globalThis.fetch;
 

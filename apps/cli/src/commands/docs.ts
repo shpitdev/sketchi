@@ -1,0 +1,174 @@
+import { DIAGRAM_TYPES } from "@sketchi/diagrams/family";
+import { Effect } from "effect";
+
+import { DEFAULT_CANVAS_ENDPOINT, SKETCHI_CANVAS_ENDPOINT_ENV } from "../canvas.js";
+import { DEFAULT_GENERATE_ENDPOINT, SKETCHI_GENERATE_ENDPOINT_ENV } from "../generation.js";
+import {
+	MAX_RENDER_CANVAS_AREA,
+	MAX_RENDER_CANVAS_DIMENSION,
+	MAX_RENDER_ELEMENT_DIMENSION,
+	MAX_RENDER_OUTPUT_PIXELS,
+} from "../render/limits.js";
+import { Command } from "../terminal/effect-cli.js";
+import { reportSuccess } from "../terminal/output.js";
+import { rootCommand } from "./root.js";
+
+const AGENT_DOCS = `Sketchi CLI contracts for agents and automation.
+
+Command map:
+  Start with generate for prompt-to-PNG or canvas for an authored CanvasSpec. Use revise to change
+  a stored diagram with a request. Use list to find a record, show, copy, and export for every
+  local record. Edit changes a flowchart with {"edits":[...]} by id or label, or replaces any
+  canonical document; patch restyles mindmap and sequence records. Use create for accepted
+  canonical JSON.
+  Share and pull are explicit network
+  boundaries for Excalidraw links. icon draw turns a logo file into a hand-drawn Excalidraw icon.
+  Run sketchi COMMAND --help for every flag and example.
+
+Manual JSON workflow (strictly offline):
+  create a canonical document, edit or patch it, inspect or replace it, list local records, and
+  export stored artifacts.
+  Accepted input is exactly one complete JSON object shaped like an example below.
+
+Canonical flowchart example:
+  {"type":"flowchart","spec":{"id":"release-flow","title":"Release approval","nodes":{"start":"Change proposed","review":"Review evidence","end":"Release approved"},"edges":[["start","review"],["review","end"]]}}
+
+Hand-drawn icons:
+  sketchi icon draw FILE --name NAME sends one SVG, PNG, JPEG or WebP logo and its name to the public
+  Sketchi icon service (one unauthenticated HTTPS POST per logo) and writes NAME.excalidrawlib,
+  NAME.28.png, NAME.112.png and NAME.recipe.json into --dest. A folder draws every logo file in it
+  and adds one FOLDER.excalidrawlib pack; --publish adds each icon to the public community set at
+  icons.sketchi.app. JSON data lists icons (name, files, recognizable, rounds, published) and failed
+  logos; the command fails only when no logo was drawn. A short rate limit is waited out; a spent
+  daily budget fails with daily_limit (exit 10).
+
+Node logos:
+  A flowchart sets "logos":true to draw the logo of each product a node label names, and a node
+  may set "icon":"docker" (a product name or slug) to pick one. A sequence participant sets
+  "icon":{"slug":"docker"}. Slugs come from the Sketchi icon catalog (https://icons.sketchi.app)
+  and resolve offline. Unknown icons, wordmarks, and logos that do not fit are dropped with a
+  warning; they never fail a build.
+
+Canonical mindmap example:
+  {"type":"mindmap","spec":{"id":"launch-map","title":"Launch plan","root":{"label":"Launch","children":[{"label":"Product"},{"label":"Operations"}]}}}
+
+Canonical sequence example:
+  {"type":"sequence","spec":{"id":"checkout-sequence","title":"Checkout sequence","participants":[{"id":"browser","label":"Browser"},{"id":"api","label":"API"}],"messages":[{"id":"request","source":"browser","target":"api","label":"Submit checkout"}]}}
+
+Universal CanvasSpec example:
+  {"kind":"canvas","version":1,"diagramId":"release-board","title":"Release board","width":640,"height":360,"accentColor":"#2563eb","backgroundColor":"#ffffff","elements":[{"type":"node","id":"ready","nodeId":"ready","shape":"rectangle","x":40,"y":40,"width":240,"height":120,"label":"Ready to release"}],"layers":[],"layouts":[],"zOrder":["ready"]}
+
+Flowchart edit example (insert a step into an edge, color another):
+  sketchi edit release-flow --json '{"edits":[{"op":"insert","node":{"approve":"Approved?"},"between":["review","end"]},{"op":"set","nodes":{"end":{"color":"green"}}}]}'
+
+Explicit network commands (one credential-free HTTPS request each):
+  sketchi generate [--prompt TEXT] [--type ${DIAGRAM_TYPES.join("|")}]
+  sketchi revise DIAGRAM_ID --prompt TEXT [--type TYPE]
+  sketchi canvas --file PATH|- [--format png|excalidraw|scene] [--dest PATH|-]
+  sketchi share DIAGRAM_ID [--open]
+  sketchi pull DIAGRAM_ID --link URL|-
+  generate makes one unauthenticated HTTPS POST to the public Sketchi generate API at ${DEFAULT_GENERATE_ENDPOINT}
+  and needs no token, key, account, or login. The model call, validation, and quality gate
+  run server-side; the finished diagram and Excalidraw artifact come back and are committed
+  through the same local store as create. Without --type, the model selects a supported native type.
+  Override the endpoint for preview or local testing with
+  ${SKETCHI_GENERATE_ENDPOINT_ENV} or --endpoint URL.
+  revise sends a stored diagram's canonical document with the request to the same endpoint and
+  keeps the revised document, with the same id and family unless --type names another, as the
+  record's next revision; a flowchart comes back with the edits that made it. Patched, pulled and canvas records refuse it, as they refuse edit.
+  canvas submits the CanvasSpec object itself to ${DEFAULT_CANVAS_ENDPOINT}, validates the typed
+  response, stores the normalized scene and Excalidraw artifact, and exports locally. Override its
+  endpoint with ${SKETCHI_CANVAS_ENDPOINT_ENV} or --endpoint URL.
+
+Input and output contracts:
+  create/edit/patch/canvas require exactly one of --file PATH|- or --json VALUE. --file - reads one
+  noninteractive UTF-8 JSON document from stdin and exits with usage code 2 on a TTY.
+  --json is inline input only. --prompt is always direct and noninteractive. With no --prompt,
+  generate opens a short prompt/type/PNG-destination wizard only when stdin and stdout are human
+  TTYs, output is text, and CI is absent. JSON, pipes, redirected streams, and CI never prompt and
+  retain the missing --prompt usage error. Explicit --type and file --dest values preset and skip
+  those wizard questions. The wizard is PNG-only: explicit --format png may proceed; use --prompt
+  with --format scene|excalidraw or --dest -. It saves to <cwd>/<id>.png by default, can create
+  <cwd>/diagrams/<id>.png after generation succeeds, or accepts a custom file path.
+  Direct generate exports PNG to <generated-id>.png by default; --format scene|excalidraw selects
+  another artifact and --dest PATH|- overrides its destination. Use --output text|json for result
+  presentation on every command. Text generate output is the title and type, the saved path,
+  whether the image was copied, and the id. When stdout is not a terminal, as for an agent, it
+  adds a Hint row: display the saved PNG as an inline Markdown image. --output json carries the
+  full record; the generation model, provider, model calls, duration and output tokens; export
+  details including that hint; and clipboard.
+
+Clipboard:
+  After generate writes a PNG file it copies the image to the desktop clipboard: wl-copy when
+  WAYLAND_DISPLAY is set, else xclip when DISPLAY is set, osascript on macOS, PowerShell on
+  Windows. It never copies in CI, for --dest -, for scene or excalidraw, or with --no-copy, and it
+  stays quiet when the session has no desktop clipboard. SKETCHI_CLIPBOARD_COMMAND replaces that
+  detection with a command that reads the PNG on stdin, or turns copying off with "off". The tool's own daemon keeps the image
+  after Sketchi exits; Sketchi releases its streams and exits promptly. A clipboard failure
+  prints one line and never changes the exit code. JSON adds
+  "clipboard":{"copied":true} or {"copied":false,"reason":"..."}. sketchi copy [ID] copies any
+  stored diagram's PNG, rendered on demand, and fails with exit 8 when nothing can be copied.
+
+Finding diagrams:
+  generate records createdAt and the prompt in the local manifest. list shows the newest first;
+  list WORDS keeps diagrams whose title, id, or prompt contains every word; --type TYPE filters and
+  --limit N caps the result. Text shows 20 by default and says how many older ones it hid. JSON
+  list data is an array in the same newest-first order with every match unless --limit is given;
+  entries add createdAt, updatedAt (last change on disk), and prompt when known. Records made
+  before createdAt existed sort by updatedAt. Every DIAGRAM_ID argument accepts an exact id,
+  latest for the newest, or a unique id prefix; an unknown id fails with exit 5 and suggests
+  close ids, and an ambiguous prefix fails with ambiguous_diagram_id. show prints a summary;
+  --document adds the document, and show --output json always includes it.
+  export writes bytes with --dest PATH|- and always writes status to stderr. With --dest -,
+  stdout contains only artifact bytes. A successful PNG file export adds a generic inline-Markdown
+  display hint for calling agents.
+
+Share/pull safety limits:
+  links 4 KiB; encrypted bodies 2 MiB; inflated contents 16 MiB; 10,000 elements;
+  JSON depth 64; element dimensions ${String(MAX_RENDER_ELEMENT_DIMENSION)}; canvas dimensions
+  ${String(MAX_RENDER_CANVAS_DIMENSION)}; canvas area ${String(MAX_RENDER_CANVAS_AREA)} square units; final PNG
+  ${String(MAX_RENDER_OUTPUT_PIXELS)} pixels. Limits are checked before encryption or raster allocation.
+
+Offline boundary and storage:
+  create, patch, show, edit, list, copy, export, and restore use no model, remote agent, MCP server, login,
+  account, browser, credential, or network. share sends only locally encrypted ciphertext from
+  the selected record to Excalidraw storage; pull sends only the link id in its download request.
+  Records live at ~/.sketchi/diagrams/<id>/ with manifest.json, document.json, scene.json,
+  diagram.excalidraw, optional diagram.png, and revisions/. New revisions are full snapshots
+  under revisions/<revision>/; legacy document-only revisions/<revision>.json remain readable.
+  A pulled record is detached: diagram.excalidraw is authoritative while document.json and
+  scene.json remain non-authoritative provenance. A patched record makes scene.json authoritative
+  while retaining document.json as provenance. show/list expose these states; edit refuses both.
+  Formats are scene, excalidraw, and png. generate and canvas persist the local record before exporting
+  the requested artifact; a later destination failure leaves that record recoverable. If no PNG is
+  stored, export deterministically renders one on demand from the local scene and Excalidraw artifacts,
+  without a browser, network, or record write.
+
+Exit codes and errors:
+  0 success; 1 internal failure; 2 usage or interactive stdin; 3 invalid input/document;
+  4 build/export construction failure; 5 diagram not found; 6 conflict/busy;
+  7 filesystem/storage failure; 8 unavailable format, render, destination, or write failure;
+  10 generate/canvas network or endpoint failure; 11 generate/canvas timeout;
+  12 malformed remote output; 13 Excalidraw transport, timeout, HTTP, or API-shape failure.
+  Text errors start with "error: CODE". JSON errors use {"ok":false,"command":...,"error":...}.
+  Errors never include stacks.
+
+Revision recovery and next steps:
+  edit, pull, and restore archive the complete prior authority state before atomic replacement.
+  Use restore --revision N to recover through the CLI without consuming the selected snapshot.
+  Start with generate for a prompt, canvas for CanvasSpec, or create for accepted canonical JSON;
+  icon draw turns a logo file into an Excalidraw library item.
+  Every returned id supports show, copy, and export. Edit and patch are only for flowchart,
+  mindmap, and sequence records; create a new canvas to replace a Universal CanvasSpec.`;
+
+export const docsCommand = Command.make("docs", {}, () =>
+	Effect.gen(function* () {
+		const { output } = yield* rootCommand;
+		yield* reportSuccess("docs", output, { documentation: AGENT_DOCS }, AGENT_DOCS);
+	}),
+).pipe(
+	Command.withDescription(
+		"Print the complete CLI contracts for agents, automation, storage, formats, safety limits, and errors.",
+	),
+	Command.withShortDescription("Print complete agent and automation documentation."),
+);

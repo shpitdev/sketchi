@@ -2,7 +2,7 @@ import { inflateSync } from "node:zlib";
 
 import { Schema } from "effect";
 
-import { MAX_DECOMPRESSED_BYTES } from "./share-protocol.js";
+import { MAX_DECOMPRESSED_BYTES } from "../share/protocol.js";
 
 const InflatedPng = Schema.Struct({
 	buffer: Schema.Uint8Array,

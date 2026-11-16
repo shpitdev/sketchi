@@ -12,7 +12,8 @@ import { DEFAULT_GENERATE_ENDPOINT, reviseDiagram } from "../src/generation.js";
 import { exitCodeForFailure } from "../src/errors.js";
 import { LocalFileSystem } from "../src/filesystem.js";
 import { DiagramPatcher } from "../src/patch.js";
-import { DiagramStore, DiagramStoreLive, makeStorageRootLayer } from "../src/storage.js";
+import { DiagramStore, makeStorageRootLayer } from "../src/store/service.js";
+import { DiagramStoreLive } from "../src/store/live.js";
 import { builtDiagram, flowchartInput, localFileSystemLive } from "./fixtures.js";
 
 const codeModeLayer = Layer.mergeAll(

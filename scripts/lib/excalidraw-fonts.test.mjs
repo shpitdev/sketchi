@@ -69,7 +69,7 @@ const RENDERERS = new Set([EXCALIDRAW, "@sketchi/editor"]);
  */
 const RUNTIME_IMPORT_EXCEPTIONS = new Set([
 	"packages/editor/src/lib/load-excalidraw.ts",
-	"apps/cli/src/png-renderer-runtime.ts",
+	"apps/cli/src/render/png-renderer-runtime.ts",
 	// Node, at build time: Excalidraw's SVG export of the home diagram.
 	"apps/web/scripts/home-diagram.ts",
 ]);

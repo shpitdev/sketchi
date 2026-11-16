@@ -6,14 +6,14 @@ import { Resvg, initWasm, type ResvgRenderOptions } from "@resvg/resvg-wasm";
 import * as Linkedom from "linkedom";
 
 import { type PngRenderInput } from "./png-renderer.js";
-import { HeadlessPngRenderError } from "./render-diagnostics.js";
-import { withSelectorSafeImageIds } from "./render-image-ids.js";
+import { HeadlessPngRenderError } from "./diagnostics.js";
+import { withSelectorSafeImageIds } from "./image-ids.js";
 import {
 	adaptivePngExportScale,
 	PNG_EXPORT_PADDING,
 	renderFilesDiagnostic,
 	renderLimitDiagnostic,
-} from "./render-limits.js";
+} from "./limits.js";
 
 declare const __SKETCHI_EXCALIFONT_BASE64__: ReadonlyArray<string>;
 declare const __SKETCHI_RESVG_WASM_BASE64__: string;

@@ -2,10 +2,10 @@ import { CANCEL_SYMBOL, cancel, intro, isCancel, select, spinner, text } from "@
 import { Context, Effect, Exit, Layer, type Scope } from "effect";
 import isCI from "is-ci";
 
-import type { OutputFormat } from "./contracts.js";
-import { CliInteractiveError } from "./errors.js";
-import type { GenerationType } from "./generation.js";
-import { GENERATION_TYPE_OPTIONS } from "./generation-types.js";
+import type { OutputFormat } from "../contracts.js";
+import { CliInteractiveError } from "../errors.js";
+import type { GenerationType } from "../generation.js";
+import { GENERATION_TYPE_OPTIONS } from "../generation-types.js";
 
 export type WizardDestination =
 	| { readonly _tag: "CurrentDirectory" }
