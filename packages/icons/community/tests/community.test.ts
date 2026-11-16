@@ -104,9 +104,9 @@ describe("community icon API", () => {
 			const env = { COMMUNITY_ICONS: database, AI: moderationAi(answer).AI };
 			expect((await publish({ name: "Ring", recipe: RING }, env)).status).toBe(503);
 		}
-		expect((await publish({ name: "Ring", recipe: RING }, { COMMUNITY_ICONS: database })).status).toBe(
-			503,
-		);
+		expect(
+			(await publish({ name: "Ring", recipe: RING }, { COMMUNITY_ICONS: database })).status,
+		).toBe(503);
 		expect((await publish({ name: "Ring", recipe: RING }, { AI: moderationAi().AI })).status).toBe(
 			503,
 		);
@@ -123,7 +123,10 @@ describe("community icon API", () => {
 			[{ name: "Ring", recipe: { parts: [{ kind: "blob" }] } }, 400, "invalid_recipe"],
 			[{ name: "x".repeat(9000), recipe: RING }, 413, "invalid_request"],
 			[
-				{ name: "Tiny", recipe: { parts: [{ kind: "text", cx: 12, cy: 9, text: "tinyhttp", size: 8.5 }] } },
+				{
+					name: "Tiny",
+					recipe: { parts: [{ kind: "text", cx: 12, cy: 9, text: "tinyhttp", size: 8.5 }] },
+				},
 				422,
 				"recipe_clips",
 			],
@@ -169,10 +172,16 @@ describe("community icon API", () => {
 					get: <T>(key: string) => Promise.resolve(stored.get(key) as T | undefined),
 					put: <T>(key: string, value: T) => Promise.resolve(void stored.set(key, value)),
 				};
-				return { take: (limit: number, windowMs: number) => takeClientRequest(storage, limit, windowMs, 0) };
+				return {
+					take: (limit: number, windowMs: number) => takeClientRequest(storage, limit, windowMs, 0),
+				};
 			},
 		};
-		const env = { COMMUNITY_ICONS: await nativeDatabase(), AI: moderationAi().AI, COMMUNITY_CLIENT_LIMIT };
+		const env = {
+			COMMUNITY_ICONS: await nativeDatabase(),
+			AI: moderationAi().AI,
+			COMMUNITY_CLIENT_LIMIT,
+		};
 		const from = (address: string) =>
 			publish({ name: "Ring", recipe: RING }, env, { "CF-Connecting-IP": address });
 		for (let index = 0; index < 10; index += 1) {
@@ -217,9 +226,9 @@ describe("community icon API", () => {
 			);
 		expect((await patch(undefined, true)).status).toBe(401);
 		expect((await patch("owner-tokeN", true)).status).toBe(401);
-		expect(
-			(await patch("owner-token", true, { ...env, COMMUNITY_ADMIN_TOKEN: "" })).status,
-		).toBe(401);
+		expect((await patch("owner-token", true, { ...env, COMMUNITY_ADMIN_TOKEN: "" })).status).toBe(
+			401,
+		);
 		expect((await patch("owner-token", true)).status).toBe(200);
 		expect((await get("/api/community/ring-queue", env)).status).toBe(404);
 		expect(await (await get("/api/community", env)).json()).toMatchObject({ count: 0 });
@@ -258,9 +267,13 @@ describe("community icon store on native D1", () => {
 		const store = await openStore(database);
 		for (const [index, name] of ["Kafka topic", "Queue", "Database", "Kafka broker"].entries()) {
 			const recipe: IconRecipe = { parts: [{ kind: "rect", x: index, y: 4, width: 8, height: 8 }] };
-			await Effect.runPromise(store.insert({ name, recipe, hash: await communityIconHash(recipe) }));
+			await Effect.runPromise(
+				store.insert({ name, recipe, hash: await communityIconHash(recipe) }),
+			);
 		}
-		await database.prepare("UPDATE community_icons SET created_at='2026-11-08T12:00:00.000Z'").run();
+		await database
+			.prepare("UPDATE community_icons SET created_at='2026-11-08T12:00:00.000Z'")
+			.run();
 		const first = await Effect.runPromise(store.search({ limit: 2 }));
 		const second = await Effect.runPromise(
 			store.search({ limit: 2, ...(first.nextCursor ? { cursor: first.nextCursor } : {}) }),

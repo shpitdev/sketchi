@@ -596,7 +596,6 @@ describe("pull request states", () => {
 		return { states, refreshed: later.length > 0 };
 	}
 
-
 	it("reads GitHub after the page, once per interval, and shows what it read next time", async () => {
 		const env = await seeded();
 		const fetchMock = github({

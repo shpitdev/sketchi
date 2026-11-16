@@ -8,7 +8,11 @@ const square: IconRecipe = {
 	parts: [{ kind: "rect", x: 4, y: 4, width: 16, height: 16, fill: "#2496ed" }],
 };
 const icons = [
-	{ slug: "aip-document-intelligence-app", name: "AIP Document Intelligence", collection: "palantir" },
+	{
+		slug: "aip-document-intelligence-app",
+		name: "AIP Document Intelligence",
+		collection: "palantir",
+	},
 	{ slug: "aws", name: "AWS", collection: "cloud-vendors" },
 	{ slug: "gotham", name: "Gotham", collection: "palantir" },
 	{ slug: "quiver-app", name: "Quiver", collection: "palantir" },

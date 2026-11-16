@@ -25,7 +25,11 @@ describe("committed icon catalog", () => {
 	it("matches its sources: colors, look-alike hashes and common words", { timeout: 60_000 }, () => {
 		const staleColors = iconManifest.icons.flatMap((icon) => {
 			const { colorMode, onDark, onLight } = icon;
-			const committed = { colorMode, ...(onDark ? { onDark } : {}), ...(onLight ? { onLight } : {}) };
+			const committed = {
+				colorMode,
+				...(onDark ? { onDark } : {}),
+				...(onLight ? { onLight } : {}),
+			};
 			return JSON.stringify(measureIconColor(source(icon.slug), icon.slug)) ===
 				JSON.stringify(committed)
 				? []
