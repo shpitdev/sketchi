@@ -7,6 +7,7 @@ import { createCanvasDiagram, DEFAULT_CANVAS_ENDPOINT } from "../src/canvas.js";
 import { type BuiltDiagram, DiagramRecordManifest, type StoredDiagram } from "../src/contracts.js";
 import { exitCodeForFailure } from "../src/errors.js";
 import { DiagramStore } from "../src/store/service.js";
+import { swappableFetch } from "./fixtures.js";
 
 const canvasSpec = Schema.decodeUnknownSync(CreateCanvasRequest.fields.spec)({
 	kind: "canvas",
@@ -62,6 +63,10 @@ function stored(diagram: BuiltDiagram): StoredDiagram {
 }
 
 function capturingStoreLayer(created: BuiltDiagram[]) {
+	return Layer.merge(swappableFetch, capturingStore(created));
+}
+
+function capturingStore(created: BuiltDiagram[]) {
 	return Layer.succeed(DiagramStore, {
 		create: Effect.fn("sketchi.cli.canvas.testCreate")(function* (diagram) {
 			created.push(diagram);

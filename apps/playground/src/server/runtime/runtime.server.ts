@@ -18,7 +18,6 @@ import {
 	withTelemetryCorrelation,
 	withTelemetryExport,
 } from "@sketchi/observability";
-import type { CodeModeHttpRequestError } from "../../features/build/api.server";
 import { correlationIdHeader } from "./correlation.server";
 import { RequestBodyReadError } from "./request-body.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
@@ -91,7 +90,7 @@ export class PlaygroundRequestCallbacks extends Context.Service<
 	PlaygroundRequestCallbacks,
 	PlaygroundRequestCallbacksShape
 >()("@sketchi/playground/PlaygroundRequestCallbacks") {}
-type PlaygroundHttpError = CodeModeHttpRequestError | RequestBodyReadError;
+type PlaygroundHttpError = RequestBodyReadError;
 type PlaygroundRequestResult<A, E> =
 	| A
 	| (unknown extends E ? Response : E extends PlaygroundHttpError ? Response : never);
@@ -198,9 +197,6 @@ function runWithPlaygroundRuntime<A, E>(
 				),
 			);
 		const result = yield* effect.pipe(
-			Effect.catchIf(Predicate.isTagged("CodeModeHttpRequestError"), () =>
-				errorResponse("CodeModeHttpRequestError", 400, "The request could not be decoded."),
-			),
 			Effect.catchIf(Predicate.isTagged("RequestBodyReadError"), () =>
 				errorResponse("RequestBodyReadError", 400, "The request body could not be read."),
 			),

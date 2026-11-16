@@ -355,6 +355,10 @@
 			"types": "./dist/generate/cloudflare-gateway-chat.d.ts",
 			"default": "./dist/generate/cloudflare-gateway-chat.js"
 		},
+		"./generate/contract": {
+			"types": "./dist/generate/contract.d.ts",
+			"default": "./dist/generate/contract.js"
+		},
 		"./generate/coverage": {
 			"types": "./dist/generate/coverage.d.ts",
 			"default": "./dist/generate/coverage.js"
@@ -427,10 +431,6 @@
 			"types": "./dist/families/sequence/layout.d.ts",
 			"default": "./dist/families/sequence/layout.js"
 		},
-		"./families/flowchart/issues": {
-			"types": "./dist/families/flowchart/issues.d.ts",
-			"default": "./dist/families/flowchart/issues.js"
-		},
 		"./families/flowchart/fixtures": {
 			"types": "./dist/families/flowchart/fixtures/index.d.ts",
 			"default": "./dist/families/flowchart/fixtures/index.js"
@@ -442,6 +442,10 @@
 		"./graph/input": {
 			"types": "./dist/graph/input.d.ts",
 			"default": "./dist/graph/input.js"
+		},
+		"./http-api": {
+			"types": "./dist/http-api.d.ts",
+			"default": "./dist/http-api.js"
 		},
 		"./families/flowchart/build": {
 			"types": "./dist/families/flowchart/build.d.ts",

@@ -1,5 +1,6 @@
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
-import { Effect, FileSystem } from "effect";
+import { Effect, FileSystem, Layer } from "effect";
+import { FetchHttpClient } from "effect/http";
 
 import { makeLocalFileSystem } from "../src/filesystem.js";
 
@@ -8,6 +9,14 @@ import { decodeCanonicalDiagramDocument, type CanonicalDiagramDocument } from ".
 
 export const localFileSystemLive = Effect.runSync(
 	Effect.map(FileSystem.FileSystem, makeLocalFileSystem).pipe(Effect.provide(NodeFileSystem.layer)),
+);
+
+/**
+ * Network commands send through FetchHttpClient, whose default transport is the global fetch
+ * captured once. Tests swap `globalThis.fetch` per case, so they read it on every request.
+ */
+export const swappableFetch = Layer.succeed(FetchHttpClient.Fetch, (input, init) =>
+	globalThis.fetch(input, init),
 );
 
 export const flowchartInput = {

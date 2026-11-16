@@ -185,7 +185,12 @@ function family<
 		type,
 		spec: build.document,
 		request: build.request,
-		contracts: { input: build.input, output: build.result },
+		contracts: {
+			input: build.input,
+			output: build.result,
+			accepted: build.accepted,
+			rejected: build.rejected,
+		},
 		canvasRoles: definition.canvasRoles ?? NO_CANVAS_ROLES,
 		studioInput: build.toolInput,
 		counts: definition.canonical.counts,

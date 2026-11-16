@@ -1,10 +1,10 @@
 import { CommunityHttpApi, type CommunityPublished } from "@sketchi/community-icons/http-api";
-import { Duration, Effect, Option, Schedule, String } from "effect";
+import { Duration, Effect, Schedule, String } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
 
 import { CliIconError } from "./errors.js";
-import { readBoundedText } from "./response-body.js";
+import { boundedResponse } from "./response-body.js";
 
 export type PublishedIcon = Pick<typeof CommunityPublished.Type, "slug" | "url" | "created">;
 const decodePublished = HttpApiClient.decodeResponse(CommunityHttpApi, {
@@ -64,18 +64,11 @@ export const publishIcon = Effect.fn("sketchi.cli.icon.publish")(function* (
 				responseMode: "response-only",
 			})
 			.pipe(Effect.mapError(network));
-		// FetchHttpClient's decoder reads without a byte cap. Retain the CLI's existing
-		// bounded, cancellable reader before handing the bytes to the generated decoder.
-		const web = HttpClientResponse.toWeb(response);
-		if (Option.isNone(web)) return yield* Effect.fail(unreadable());
-		const text = yield* readBoundedText(web.value, 64 * 1024, unreadable, network);
+		const bounded = yield* boundedResponse(response, 64 * 1024, unreadable, network);
 		const rawWait = response.headers["retry-after"];
 		const wait = rawWait ? Number(rawWait) : undefined;
 		return {
-			response: HttpClientResponse.fromWeb(
-				response.request,
-				new Response(text, { status: response.status, headers: response.headers }),
-			),
+			response: bounded,
 			wait: wait !== undefined && Number.isFinite(wait) && wait >= 0 ? wait : undefined,
 		} satisfies Attempt;
 	}).pipe(
