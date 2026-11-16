@@ -218,6 +218,27 @@ describe("the gateway client", () => {
 		expect(calls).toBe(2);
 	});
 
+	it("retries an answer whose body breaks after the headers, as transport", async () => {
+		let calls = 0;
+		const layer = clientLayer(
+			async () => {
+				calls += 1;
+				if (calls > 1) return completion(answer);
+				return new Response(
+					new ReadableStream<Uint8Array>({
+						pull(controller) {
+							controller.error(new Error("body broke"));
+						},
+					}),
+				);
+			},
+			{ maxRetries: 2, maxRepairAttempts: 2 },
+		);
+		const candidate = await Effect.runPromise(generate(layer));
+		expect(candidate.diagram?.type).toBe("flowchart");
+		expect(calls).toBe(2);
+	});
+
 	it.each([
 		["empty content", () => completion("")],
 		["not JSON", () => new Response("<html>")],

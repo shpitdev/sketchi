@@ -120,7 +120,10 @@ export function makeGatewayHttpClient(options: GatewayHttpClientOptions): HttpCl
 				catch: transportError,
 			});
 			options.onResponse?.(response);
-			if (options.responseBody === "stream") return HttpClientResponse.fromWeb(request, response);
+			// A null body, as with a 204, has nothing to read and cannot be rebuilt with one.
+			if (options.responseBody === "stream" || response.body === null) {
+				return HttpClientResponse.fromWeb(request, response);
+			}
 			const body = yield* Effect.tryPromise({
 				try: () => response.arrayBuffer(),
 				catch: transportError,
