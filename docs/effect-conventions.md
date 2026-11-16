@@ -45,17 +45,12 @@ settings. A domain request-field transform retains the existing JSON output sche
 with `generateText`, so the author's existing tolerant repair still owns invalid
 replies.
 
-The Google judge uses the public `@google/genai/node` GenerateContent SDK with
-`google-auth-library` PassThroughClient, keeping the existing low thinking/media
-controls and stored-key gateway. Client construction is lazy and cached within the
-layer; it performs no inference or auth discovery during composition. Each attempt
-supplies its own public fetch callback, re-entering only its captured Effect request
-context and scope through HttpClient. Scope ownership extends through SDK body
-consumption. A per-attempt Ref retains HTTP status/log ID because SDK JSON parsing
-can fail before ApiError records the status; malformed successful JSON remains a
-no-pick and malformed HTTP failures keep their retry classification. SDK attempts1
-leaves retries/deadlines with Effect. The SDK's two missing-key warnings per client
-construction remain visible; no dummy key or global logger workaround is used.
+The icon judge uses `@effect/ai-openai` on the Responses API with
+`generateObject`, low image detail, low reasoning effort and an output-token cap.
+Like the author, each attempt has its own gateway transport that forwards the
+Effect HTTP abort signal and reads the whole body inside that attempt. A reply
+that is not a logo number on a successful response is a no-pick, not a failed
+call; HTTP failures keep the author's retry classification.
 
 ## Contracts, failures and tests
 

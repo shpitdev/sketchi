@@ -3,6 +3,7 @@ import { type IconRecipe } from "@sketchi/drawing";
 import {
 	AUTHOR_MAX_TOKENS,
 	drawIcon,
+	JUDGE_MAX_OUTPUT_TOKENS,
 	ICON_DRAW_MAX_ROUNDS,
 	iconAuthorFor,
 	type IconAuthorModel,
@@ -29,7 +30,7 @@ import { NodeIconImaging } from "./imaging.js";
 export type BatchAuthor = IconAuthorModel | "source";
 
 /** Studio's judge (`DEFAULT_JUDGE_MODEL` in apps/playground/src/server/icons/draw.server.ts). */
-export const JUDGE_MODEL = "google/gemini-3.8-flash";
+export const JUDGE_MODEL = "openai/gpt-6-sol";
 
 /** USD per million tokens, to estimate a draw's cost before the gateway's logs price it. */
 const PRICES: Readonly<
@@ -38,8 +39,8 @@ const PRICES: Readonly<
 	"claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
 	"claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
 };
-/** Gemini Flash, rounded up: the judge's share of a draw is small. */
-const JUDGE_PRICE = { input: 0.5, output: 3, cacheRead: 0.05, cacheWrite: 0 };
+/** GPT-6 Sol, as the gateway's logs priced it (cache reads assumed at a tenth): the judge's share of a draw is small. */
+const JUDGE_PRICE = { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 0 };
 
 function authorPrice(model: string) {
 	return (
@@ -64,10 +65,9 @@ const AUTHOR_FIXED_INPUT_TOKENS = 6_000;
 const IMAGE_INPUT_TOKENS = 1_600;
 /** A turn's request or review text. */
 const TURN_TEXT_TOKENS = 1_000;
-/** The judge's calls per draw (one revision is judged again), the images it sees, and its reply. */
+/** The judge's calls per draw (one revision is judged again) and the images it sees; it replies within its output limit. */
 const JUDGE_CALLS = 2;
 const JUDGE_IMAGES = 6;
-const JUDGE_OUTPUT_TOKENS = 2_000;
 
 /**
  * The most one draw can cost with this author: every author call the engine
@@ -98,7 +98,7 @@ export function attemptCeilingUsd(author: BatchAuthor): number {
 	const judgeUsd =
 		JUDGE_CALLS *
 		((JUDGE_IMAGES * IMAGE_INPUT_TOKENS + TURN_TEXT_TOKENS) * JUDGE_PRICE.input +
-			JUDGE_OUTPUT_TOKENS * JUDGE_PRICE.output);
+			JUDGE_MAX_OUTPUT_TOKENS * JUDGE_PRICE.output);
 	return (authorUsd + judgeUsd) / 1_000_000;
 }
 

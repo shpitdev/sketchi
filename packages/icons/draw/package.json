@@ -12,12 +12,11 @@
 	},
 	"dependencies": {
 		"@effect/ai-anthropic": "catalog:",
-		"@google/genai": "catalog:",
+		"@effect/ai-openai": "catalog:",
 		"@sketchi/drawing": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/observability": "workspace:*",
 		"effect": "catalog:",
-		"google-auth-library": "catalog:",
 		"@sketchi/cloudflare": "workspace:*"
 	},
 	"devDependencies": {
