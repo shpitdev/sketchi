@@ -293,6 +293,10 @@ tester.run("extensionless-import-expressions", extensionlessImportExpressions, {
 			name: "extensionless relative modules, packages and non-code files",
 			code: 'const a = import("./a"); type B = typeof import("../b/index"); const c = import("pkg/file.js"); const d = import("../../scripts/lib/run.mjs"); const e = import("./data.json");',
 		},
+		{
+			name: "templates with substitutions are not statically known",
+			code: "const a = import(`./${name}.js`);",
+		},
 	],
 	invalid: [
 		{
@@ -304,6 +308,11 @@ tester.run("extensionless-import-expressions", extensionlessImportExpressions, {
 			name: "import type",
 			code: 'type B = typeof import("../b.ts"); let c: import("./c.tsx").C;',
 			errors: [extension("../b.ts"), extension("./c.tsx")],
+		},
+		{
+			name: "import() of a template without substitutions",
+			code: "const a = import(`./a.js`);",
+			errors: [extension("./a.js")],
 		},
 	],
 });
