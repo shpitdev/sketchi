@@ -1,5 +1,6 @@
 import { sequenceBuild } from "@sketchi/diagrams/families/sequence/build";
 import {
+	flowchartBuild,
 	FLOWCHART_REQUEST_MAX_LENGTH,
 	type BuildFlowchartResult,
 	type BuildFlowchartToolInput,
@@ -112,6 +113,7 @@ export function makeStudioFlowchartToolExecutor<E, R>(
 	const logos = options.logos ?? [];
 	const request = options.request?.trim().slice(0, FLOWCHART_REQUEST_MAX_LENGTH);
 	return makeStudioBuildToolExecutor<StudioBuildFlowchartInput, BuildFlowchartResult, E, R>({
+		decode: flowchartBuild.decode,
 		build: (input) => buildFlowchart(request ? { ...(input as object), request } : input),
 		rejected: (issue) => ({ ok: false, status: "quality_failed", issues: [issue] }),
 		ground: (input) => groundSpecIcons(input, logos),
@@ -137,6 +139,7 @@ export function makeStudioSequenceToolExecutor<E, R>(
 		E,
 		R
 	>({
+		decode: sequenceBuild.decode,
 		build: buildSequenceDiagram,
 		rejected: (issue) => ({ ok: false, status: "quality_failed", issues: [issue] }),
 		ground: (input) => {

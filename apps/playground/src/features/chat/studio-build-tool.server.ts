@@ -2,6 +2,7 @@ import { type FamilyBuildOperation } from "@sketchi/diagrams/family";
 import "@tanstack/react-start/server-only";
 
 import { type BuildOptions, type CodeModeIssue } from "@sketchi/diagrams/build/result";
+import { type BuildRejection } from "@sketchi/diagrams/build/operation";
 import { normalizeIconSlug } from "@sketchi/diagrams/build/code-mode/icons";
 import { MAX_DIAGRAM_BUILD_ATTEMPTS } from "@sketchi/diagrams/build/policy";
 import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";
@@ -25,9 +26,9 @@ interface StudioBuildResult {
 	readonly issues: readonly CodeModeIssue[];
 }
 
-export interface StudioBuildToolExecutor<Input, Result, E = never, R = never> {
+export interface StudioBuildToolExecutor<Result, E = never, R = never> {
 	readonly attempts: Effect.Effect<number>;
-	readonly execute: (input: Input) => Effect.Effect<Result, E, R>;
+	readonly execute: (input: unknown) => Effect.Effect<Result, E, R>;
 }
 
 type StudioBuildOperation = FamilyBuildOperation;
@@ -290,6 +291,8 @@ export function makeStudioBuildToolExecutor<
 	E,
 	R,
 >(options: {
+	/** Canonical preparation and validation, inside the turn's budget and outcome. */
+	readonly decode: (input: unknown) => Effect.Effect<Input, BuildRejection<Result>>;
 	readonly build: (input: unknown) => Effect.Effect<Result, E, R>;
 	/** This tool's rejected result carrying one issue. */
 	readonly rejected: (issue: CodeModeIssue) => Result;
@@ -310,12 +313,12 @@ export function makeStudioBuildToolExecutor<
 		readonly closed: (result: Result) => Result;
 	};
 	readonly turn?: StudioBuildTurn;
-}): Effect.Effect<StudioBuildToolExecutor<Input, Result, E, R>> {
+}): Effect.Effect<StudioBuildToolExecutor<Result, E, R>> {
 	return Effect.gen(function* () {
 		const turn = options.turn ?? (yield* makeStudioBuildTurn());
 		const { semaphore, state } = turn;
 
-		const execute = Effect.fn(`playground.chat.${options.operation}.execute`)((input: Input) =>
+		const execute = Effect.fn(`playground.chat.${options.operation}.execute`)((input: unknown) =>
 			semaphore.withPermit(
 				Effect.gen(function* () {
 					const current = yield* Ref.get(state);
@@ -350,15 +353,22 @@ export function makeStudioBuildToolExecutor<
 						...value,
 						attempts: value.attempts + 1,
 					}));
-					const grounded = options.ground?.(input) ?? { input, issues: [] };
-					const built = yield* options.build({
-						...grounded.input,
-						options: STUDIO_ARTIFACT_OPTIONS,
-					});
-					const checked: Result =
-						grounded.issues.length > 0
-							? { ...built, issues: [...grounded.issues, ...built.issues] }
-							: built;
+					const checked = yield* options.decode(input).pipe(
+						Effect.matchEffect({
+							onFailure: (error) => Effect.succeed(error.toResult()),
+							onSuccess: (prepared) =>
+								Effect.gen(function* () {
+									const grounded = options.ground?.(prepared) ?? { input: prepared, issues: [] };
+									const built = yield* options.build({
+										...grounded.input,
+										options: STUDIO_ARTIFACT_OPTIONS,
+									});
+									return grounded.issues.length > 0
+										? { ...built, issues: [...grounded.issues, ...built.issues] }
+										: built;
+								}),
+						}),
+					);
 					const { reopen } = options;
 					if (checked.ok) {
 						const misses = reopen?.misses(checked) === true;

@@ -1,8 +1,15 @@
 import { Deferred, Effect, Schema } from "effect";
-import { MAX_AGENT_STEPS } from "@sketchi/diagrams/build/policy";
+import { MAX_AGENT_STEPS, MAX_DIAGRAM_BUILD_ATTEMPTS } from "@sketchi/diagrams/build/policy";
 import { STUDIO_RAN_OUT_REPLY } from "./studio-reply.server";
-import { it, expect } from "@effect/vitest";
-import { families } from "@sketchi/diagrams/family";
+import { it, expect, vi } from "@effect/vitest";
+import { AgUiSchema } from "effect/ai";
+import { families, familyForType } from "@sketchi/diagrams/family";
+import {
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+} from "@sketchi/diagrams/build/code-mode/artifacts";
+import { attemptLimitIssue, turnAlreadyAcceptedIssue } from "./studio-build-tool.server";
+import { STUDIO_COVERAGE_HINT } from "./studio-build-policy.server";
 import { toCodeModeJsonSchema } from "@sketchi/diagrams/build/code-mode/contract";
 import type { CloudflareAiGateway } from "@sketchi/cloudflare/ai-gateway";
 import { handleStudioAgentRequest } from "./agent.server";
@@ -122,12 +129,17 @@ const terminal = (reason?: "max_output_tokens" | "content_filter") => ({
 		usage: { input_tokens: 1, output_tokens: 4096, total_tokens: 4097 },
 	},
 });
-const toolEvents = (args: string, round: number, argumentsDone = true) => {
+const toolEvents = (
+	args: string,
+	round: number,
+	argumentsDone = true,
+	name = "build_flowchart",
+) => {
 	const item = {
 		type: "function_call",
 		id: `item-${round}`,
 		call_id: `call-${round}`,
-		name: "build_flowchart",
+		name,
 		arguments: args,
 		status: "incomplete",
 	};
@@ -160,33 +172,252 @@ const wireResponse = (events: unknown[]) =>
 	new Response(events.map(event).join(""), {
 		headers: { "content-type": "text/event-stream" },
 	});
-async function runWire(respond: (round: number) => Response) {
+async function runWire(respond: (round: number) => Response, content = "Draw a flowchart") {
 	const calls: GatewayData[] = [];
+	const storage = makeMemoryArtifactStorage();
+	const write = vi.fn(storage.write);
 	const request = new Request("https://studio.test/api/studio/chat", {
 		method: "POST",
 		body: JSON.stringify({
 			threadId: "studio",
 			runId: "wire",
-			messages: [{ id: "user", role: "user", content: "Draw a flowchart" }],
+			messages: [{ id: "user", role: "user", content }],
 		}),
 	});
-	const response = await runPlaygroundEffect(handleStudioAgentRequest(request), {
-		request,
-		platform: { waitUntilPromise: () => undefined },
-		env: {
-			AI: {
-				gateway: () => ({
-					getUrl: async () => "",
-					run: async (data) => {
-						calls.push(data);
-						return respond(calls.length);
-					},
-				}),
+	const response = await runPlaygroundEffect(
+		handleStudioAgentRequest(request).pipe(
+			Effect.provideService(CodeModeArtifactStorage, { ...storage, write }),
+		),
+		{
+			request,
+			platform: { waitUntilPromise: () => undefined },
+			env: {
+				AI: {
+					gateway: () => ({
+						getUrl: async () => "",
+						run: async (data) => {
+							calls.push(data);
+							return respond(calls.length);
+						},
+					}),
+				},
 			},
 		},
-	});
-	return { body: await response.text(), calls };
+	);
+	return { body: await response.text(), calls, write };
 }
+
+function buildResults<A>(body: string, schema: Schema.Codec<A, unknown>) {
+	return body
+		.split("\n")
+		.filter((line) => line.startsWith("data:"))
+		.flatMap((line) => {
+			const event = Schema.decodeUnknownSync(Schema.fromJsonString(AgUiSchema.Event))(
+				line.slice(5),
+			);
+			return event.type === "TOOL_CALL_RESULT"
+				? [Schema.decodeUnknownSync(Schema.fromJsonString(schema))(event.content)]
+				: [];
+		});
+}
+
+// The independent review's prepared inputs: neither passes the raw tool schema.
+const orgChartShorthand = {
+	spec: {
+		title: "Engineering",
+		employees: [
+			{ id: "lead", name: "Engineering Lead" },
+			{ id: "dev", name: "Developer", manager: "lead" },
+		],
+	},
+	options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+};
+const erShorthand = {
+	spec: {
+		title: "Customer orders",
+		entities: [
+			{ id: "customers", fields: ["id uuid PK"] },
+			{ id: "orders", fields: ["id uuid PK", "customer_id uuid FK"] },
+		],
+		relationships: [{ source: "customers.id", target: "orders.customer_id", cardinality: "1:N" }],
+	},
+};
+it.each([
+	{ family: familyForType("org-chart"), input: orgChartShorthand },
+	{ family: familyForType("er"), input: erShorthand },
+])("prepares $family.type shorthand inside the one-save turn guard", async ({ family, input }) => {
+	expect(Schema.is(family.studioInput)(input)).toBe(false);
+	const result = await runWire((round) =>
+		wireResponse([
+			...(round <= 4 ? toolEvents(JSON.stringify(input), round, true, family.docs.toolName) : []),
+			terminal(),
+		]),
+	);
+	const results = buildResults(
+		result.body,
+		Schema.Union([
+			familyForType("org-chart").contracts.output,
+			familyForType("er").contracts.output,
+		]),
+	);
+	expect(result.body).not.toContain('"type":"RUN_ERROR"');
+	expect(results).toHaveLength(4);
+	const first = results[0];
+	expect(first?.ok).toBe(true);
+	if (!first?.ok) throw new Error("Prepared shorthand should build.");
+	expect(results).toEqual([first, first, first, first]);
+	expect(result.write).toHaveBeenCalledTimes(1);
+	expect(first.artifact.formats).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ format: "scene", inline: expect.anything() }),
+			expect.objectContaining({ format: "excalidraw" }),
+		]),
+	);
+});
+
+it("shares invalid-input attempts across families and caps later prepared shorthand", async () => {
+	const result = await runWire((round) =>
+		wireResponse([
+			...(round <= MAX_DIAGRAM_BUILD_ATTEMPTS
+				? toolEvents(
+						'{"spec":{"title":"Missing fields"}}',
+						round,
+						true,
+						round === 2 ? "build_sequence_diagram" : "build_flowchart",
+					)
+				: round === MAX_DIAGRAM_BUILD_ATTEMPTS + 1
+					? toolEvents(
+							JSON.stringify(orgChartShorthand),
+							round,
+							true,
+							familyForType("org-chart").docs.toolName,
+						)
+					: []),
+			terminal(),
+		]),
+	);
+	const results = buildResults(result.body, familyForType("org-chart").contracts.output);
+	expect(results).toHaveLength(MAX_DIAGRAM_BUILD_ATTEMPTS + 1);
+	expect(results.slice(0, MAX_DIAGRAM_BUILD_ATTEMPTS).map((result) => result.status)).toEqual(
+		Array(MAX_DIAGRAM_BUILD_ATTEMPTS).fill("invalid_input"),
+	);
+	expect(results.at(-1)).toEqual({
+		ok: false,
+		status: "quality_failed",
+		issues: [attemptLimitIssue],
+	});
+	expect(result.write).not.toHaveBeenCalled();
+	expect(result.body).toContain("I couldn't save a diagram");
+});
+
+it("blocks another family's prepared build after one artifact is saved", async () => {
+	const result = await runWire((round) =>
+		wireResponse([
+			...(round === 1
+				? toolEvents(JSON.stringify({ spec }), round)
+				: round === 2
+					? toolEvents(
+							JSON.stringify(orgChartShorthand),
+							round,
+							true,
+							familyForType("org-chart").docs.toolName,
+						)
+					: []),
+			terminal(),
+		]),
+	);
+	const results = buildResults(
+		result.body,
+		Schema.Union([
+			familyForType("flowchart").contracts.output,
+			familyForType("org-chart").contracts.output,
+		]),
+	);
+	expect(results[0]?.ok).toBe(true);
+	expect(results[1]).toEqual({
+		ok: false,
+		status: "quality_failed",
+		issues: [turnAlreadyAcceptedIssue],
+	});
+	expect(result.write).toHaveBeenCalledTimes(1);
+});
+
+it("suppresses a false saved reply after canonical input rejection without storing an artifact", async () => {
+	const item = {
+		type: "message",
+		id: "text-1",
+		role: "assistant",
+		status: "completed",
+		content: [],
+	};
+	const claim = "I saved your diagram successfully.";
+	const result = await runWire((round) =>
+		wireResponse([
+			...(round === 1
+				? toolEvents('{"spec":{"title":"Missing nodes"}}', round)
+				: [
+						{ type: "response.output_item.added", output_index: 0, item },
+						{
+							type: "response.output_text.delta",
+							item_id: item.id,
+							output_index: 0,
+							content_index: 0,
+							delta: claim,
+						},
+						{ type: "response.output_item.done", output_index: 0, item },
+					]),
+			terminal(),
+		]),
+	);
+	const results = buildResults(result.body, familyForType("flowchart").contracts.output);
+	expect(results).toHaveLength(1);
+	expect(results[0]).toMatchObject({ ok: false, status: "invalid_input" });
+	expect(results[0]).not.toHaveProperty("buildId");
+	expect(result.write).not.toHaveBeenCalled();
+	expect(result.body).not.toContain(claim);
+	expect(result.body).toContain("I couldn't save a diagram");
+	expect(result.body).toContain('"type":"RUN_FINISHED"');
+});
+
+it("grounds canonical prepared input and applies the user's coverage and Studio artifact options", async () => {
+	const input = {
+		spec: {
+			...spec,
+			request: "Draw a flowchart",
+			nodes: { ...spec.nodes, start: { label: "Open", icon: "aws" } },
+		},
+		options: { artifactFormats: ["scene"], inlineArtifacts: [] },
+	};
+	const result = await runWire(
+		(round) =>
+			wireResponse([...(round === 1 ? toolEvents(JSON.stringify(input), round) : []), terminal()]),
+		'Draw a flowchart ending at "Release shipped".',
+	);
+	const [built] = buildResults(result.body, familyForType("flowchart").contracts.output);
+	expect(built?.ok).toBe(true);
+	if (!built?.ok) throw new Error("Prepared flowchart should build.");
+	expect(built.normalizedSpec.nodes.start).not.toHaveProperty("icon");
+	expect(built.issues).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: "unknown_icon",
+				ref: { kind: "node", id: "start", path: "nodes.start.icon" },
+			}),
+			expect.objectContaining({
+				code: "quoted_text_missing",
+				stage: "coverage",
+				hint: STUDIO_COVERAGE_HINT,
+			}),
+		]),
+	);
+	expect(built.artifact.formats).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ format: "scene", inline: expect.anything() }),
+			expect.objectContaining({ format: "excalidraw" }),
+		]),
+	);
+	expect(result.write).toHaveBeenCalledTimes(1);
+});
 it.each([
 	[{ title: "Missing nodes" }, "spec.nodes"],
 	[{ ...spec, direction: "diagonal" }, "spec.direction"],
@@ -205,6 +436,7 @@ it.each([
 	expect(repair).toContain(path);
 	expect(repair).toMatch(/Repair|schema/);
 	expect(JSON.stringify(result.calls[2]?.query)).toContain("accepted");
+	expect(result.write).toHaveBeenCalledTimes(1);
 });
 it("bounds repeated invalid tool arguments by the native Chat step limit", async () => {
 	const result = await runWire((round) =>
@@ -213,6 +445,16 @@ it("bounds repeated invalid tool arguments by the native Chat step limit", async
 	expect(result.calls).toHaveLength(MAX_AGENT_STEPS);
 	expect(result.body).not.toContain('"type":"RUN_ERROR"');
 	expect(result.body.match(/"type":"TOOL_CALL_RESULT"/g)).toHaveLength(MAX_AGENT_STEPS);
+	const results = buildResults(result.body, familyForType("flowchart").contracts.output);
+	expect(results.filter((result) => result.status === "invalid_input")).toHaveLength(
+		MAX_DIAGRAM_BUILD_ATTEMPTS,
+	);
+	expect(
+		results
+			.slice(MAX_DIAGRAM_BUILD_ATTEMPTS)
+			.every((result) => result.issues[0]?.message === attemptLimitIssue.message),
+	).toBe(true);
+	expect(result.write).not.toHaveBeenCalled();
 });
 const partial = '{"spec":{"title":"Review","nodes":{"a":"Open';
 it.each([true, false])(
