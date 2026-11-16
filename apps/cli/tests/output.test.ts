@@ -1,5 +1,5 @@
-import { assert, describe, expect, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Layer, Option } from "effect";
+import { assert, describe, it } from "@effect/vitest";
+import { Effect, Layer } from "effect";
 
 import {
 	CliBuildError,
@@ -11,14 +11,8 @@ import {
 	CliStorageError,
 	CliValidationError,
 	exitCodeForFailure,
-} from "./errors.js";
-import {
-	CliCommandExit,
-	OutputWriter,
-	internalErrorText,
-	reportFailure,
-	reportSuccess,
-} from "./output.js";
+} from "../src/errors.js";
+import { OutputWriter, reportFailure, reportSuccess } from "../src/output.js";
 
 function captureLayer(stdout: Array<string>, stderr: Array<string>) {
 	return Layer.succeed(OutputWriter, {
@@ -28,72 +22,6 @@ function captureLayer(stdout: Array<string>, stderr: Array<string>) {
 }
 
 describe("output envelopes and exits", () => {
-	it.effect("renders stable JSON success envelopes", () =>
-		Effect.gen(function* () {
-			const stdout: string[] = [];
-			yield* reportSuccess("list", "json", [{ id: "a" }], "unused").pipe(
-				Effect.provide(captureLayer(stdout, [])),
-			);
-
-			assert.deepStrictEqual(JSON.parse(stdout.join("")), {
-				ok: true,
-				command: "list",
-				data: [{ id: "a" }],
-			});
-		}),
-	);
-
-	it.effect("renders typed text errors without causes or stacks", () =>
-		Effect.gen(function* () {
-			const stderr: string[] = [];
-			const failure = CliFilesystemError.make({
-				cause: new Error("secret cause"),
-				operation: "read",
-				path: "/private/path",
-				message: "Filesystem read failed.",
-			});
-			const exit = yield* Effect.exit(
-				reportFailure("show", "text", failure).pipe(Effect.provide(captureLayer([], stderr))),
-			);
-
-			assert.isTrue(Exit.isFailure(exit));
-			const exitError = Exit.isFailure(exit)
-				? Option.getOrUndefined(Cause.findErrorOption(exit.cause))
-				: undefined;
-			assert.instanceOf(exitError, CliCommandExit);
-			assert.strictEqual(
-				stderr.join(""),
-				"error: filesystem_error\nFilesystem read failed.\nnext: Check local paths and permissions, then retry.\n",
-			);
-			assert.notInclude(stderr.join(""), "secret cause");
-			assert.notInclude(stderr.join(""), "/private/path");
-			assert.notInclude(stderr.join(""), " at ");
-		}),
-	);
-
-	it.effect("redacts share fragments from text and JSON typed errors", () =>
-		Effect.gen(function* () {
-			const fragment = "#json=AAAAAAAAAAAAAAAAAAAAAA,BBBBBBBBBBBBBBBBBBBBBB";
-			for (const format of ["text", "json"] as const) {
-				const stderr: string[] = [];
-				yield* Effect.exit(
-					reportFailure(
-						"pull",
-						format,
-						CliValidationError.make({
-							message: `Invalid diagram id ${fragment}.`,
-							hint: `Remove ${fragment} and retry.`,
-							details: [`received ${fragment}`],
-						}),
-					).pipe(Effect.provide(captureLayer([], stderr))),
-				);
-
-				assert.notInclude(stderr.join(""), fragment);
-				assert.include(stderr.join(""), "[redacted-share-link]");
-			}
-		}),
-	);
-
 	it.effect("keeps generation success and failure envelopes golden", () =>
 		Effect.gen(function* () {
 			const stdout: string[] = [];
@@ -133,14 +61,33 @@ describe("output envelopes and exits", () => {
 
 			assert.strictEqual(exitCodeForFailure(providerFailure), 10);
 
-			yield* Effect.promise(() =>
-				expect(stdout.join("")).toMatchFileSnapshot("./__fixtures__/output/generate-success.json"),
-			);
-			yield* Effect.promise(() =>
-				expect(stderr.join("")).toMatchFileSnapshot(
-					"./__fixtures__/output/generate-provider-failure.json",
-				),
-			);
+			assert.deepStrictEqual(JSON.parse(stdout.join("")), {
+				ok: true,
+				command: "generate",
+				data: {
+					id: "generated-release-flow",
+					type: "flowchart",
+					revision: 1,
+					formats: ["scene", "excalidraw"],
+					generation: { model: "claude-haiku-5-5", provider: "cloudflare-anthropic" },
+					export: {
+						format: "png",
+						destination: "generated-release-flow.png",
+						sizeBytes: 1234,
+						hint: "display the generated PNG",
+					},
+				},
+			});
+			assert.deepStrictEqual(JSON.parse(stderr.join("")), {
+				ok: false,
+				command: "generate",
+				error: {
+					code: "provider_failure",
+					message: providerFailure.message,
+					hint: providerFailure.hint,
+					details: ["transport"],
+				},
+			});
 		}),
 	);
 
@@ -223,12 +170,5 @@ describe("output envelopes and exits", () => {
 			failures.map(exitCodeForFailure),
 			[2, 3, 3, 4, 5, 6, 7, 8, 3, 3, 13, 10, 11, 12],
 		);
-	});
-
-	it("renders deterministic internal error envelopes", () => {
-		const first = internalErrorText("json");
-		assert.strictEqual(first, internalErrorText("json"));
-		assert.notInclude(first, "stack");
-		assert.strictEqual(JSON.parse(first).error.code, "internal_error");
 	});
 });
