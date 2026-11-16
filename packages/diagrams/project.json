@@ -381,7 +381,6 @@
 				"{projectRoot}/src/graph/**/*",
 				"{projectRoot}/src/families/flowchart/**/*",
 				"{workspaceRoot}/packages/editor/public/fonts/**/*",
-				"{workspaceRoot}/scripts/ci-local.mjs",
 				"{workspaceRoot}/.npmrc",
 				"!{projectRoot}/src/graph/tests/text-fit-fuzz.test.ts"
 			],
@@ -409,13 +408,7 @@
 			"options": {
 				"command": "ER_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/er/er-fuzz.test.ts"
 			},
-			"inputs": [
-				"diagramTestShared",
-				"testEnvironment",
-				"^production",
-				"{projectRoot}/src/families/er/**/*",
-				"{projectRoot}/src/graph/**/*"
-			],
+			"inputs": ["default", "^production", "testEnvironment"],
 			"dependsOn": ["^build"],
 			"cache": true,
 			"outputs": []
@@ -425,13 +418,7 @@
 			"options": {
 				"command": "CLASS_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/class/class-fuzz.test.ts"
 			},
-			"inputs": [
-				"diagramTestShared",
-				"testEnvironment",
-				"^production",
-				"{projectRoot}/src/families/class/**/*",
-				"{projectRoot}/src/graph/**/*"
-			],
+			"inputs": ["default", "^production", "testEnvironment"],
 			"dependsOn": ["^build"],
 			"cache": true,
 			"outputs": []
