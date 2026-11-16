@@ -587,7 +587,8 @@
               "packages/diagrams/src/families/org-chart/build.ts",
               "packages/diagrams/src/families/wireframe/document.ts",
               "packages/diagrams/src/families/wireframe/build.ts",
-              "packages/diagrams/src/families/er/build.ts"
+              "packages/diagrams/src/families/er/build.ts",
+              "packages/diagrams/src/families/class/build.ts"
             ],
             "options": {
               "diagnosticSeverity": {
