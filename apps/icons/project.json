@@ -10,7 +10,7 @@
 			"inputs": [
 				"production",
 				"^production",
-				"{workspaceRoot}/scripts/lib/worker-apps.mjs",
+				"{workspaceRoot}/tools/ops/src/workers.ts",
 				"{workspaceRoot}/tools/local-dev-ports.ts"
 			],
 			"dependsOn": ["sync-catalog-assets"],

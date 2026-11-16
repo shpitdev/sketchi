@@ -2,7 +2,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-import { excalidrawFonts } from "../../scripts/lib/excalidraw-fonts.mjs";
+import { excalidrawFonts } from "../../tools/ops/src/vite/excalidraw-fonts";
 import { browserbase } from "../../tools/testing/browserbase";
 
 const source = (path: string) => new URL(path, import.meta.url).pathname;
