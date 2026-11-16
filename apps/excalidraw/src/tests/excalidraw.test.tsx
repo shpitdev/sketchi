@@ -84,8 +84,6 @@ const handoff: SvgHandoff = {
 		"https://pr-91-sketchi-icons.dimethyl.workers.dev/output/upload-ready/svg/testing/sample.svg",
 };
 const supportedSvg = '<svg viewBox="0 0 20 20"><path fill="#f00" d="M0 0H20V20H0Z"/></svg>';
-const blockedSvg =
-	'<svg viewBox="0 0 20 20"><filter id="f"><feGaussianBlur stdDeviation="2"/></filter><rect width="20" height="20" filter="url(#f)"/></svg>';
 
 function renderWorkspace(
 	fetch: typeof globalThis.fetch,
