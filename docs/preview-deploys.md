@@ -22,6 +22,10 @@ are not branch-isolated environments. We use Previews, not version aliases.
 Workers Builds supports Previews too, but this repo retains GitHub Actions and Nx
 as its build system.
 
+Studio Stop disposition (2026-11-16): closed as a Preview-platform symptom, not a code regression.
+
+Worker Previews do not deliver client disconnect to the Worker, so Stop/cancellation cannot be verified on a Preview.
+
 ## Data isolation
 
 Each app declares a `previews` block in its checked-in Wrangler config. Production
@@ -153,6 +157,11 @@ does not deploy production. A failed deployment leaves the last deployed
 version active until an operator dispatches again. Production deploys pass
 `--no-x-provision`; Workers may bind existing resources, but these deploys do
 not create or discover storage. Domain attachment remains an explicit action.
+
+Studio first-production-deploy checklist (2026-11-16): production deployment still
+requires the user's decision.
+
+- [ ] After the first production deploy of Studio, press Stop once on a long prompt and read its gateway log. If the call does not end within a few seconds, roll Studio back.
 
 Those deploys keep `workers_dev` enabled so the app can be verified from
 Cloudflare-owned `workers.dev` URLs before any DNS or registrar cutover.
