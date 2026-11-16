@@ -4,8 +4,8 @@ import { Context, Effect, Layer, Schema } from "effect";
 import type { LanguageModel } from "effect/ai";
 import { HttpClient, HttpClientError, HttpClientResponse } from "effect/http";
 import { DIAGRAM_AGENT_TEMPERATURE, MAX_AGENT_OUTPUT_TOKENS } from "@sketchi/diagrams/build/policy";
-import { aiEnvironment } from "../bindings/ai-env.server";
-import { PlaygroundBindings, PlaygroundRequestMetadata } from "../runtime/context.server";
+import { aiEnvironment } from "../../server/bindings/ai-env.server";
+import { PlaygroundBindings, PlaygroundRequestMetadata } from "../../server/runtime/context.server";
 import { preserveOutputLimit } from "./response-stream.server";
 
 export class StudioAiModelError extends Schema.TaggedError<

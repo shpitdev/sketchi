@@ -1,10 +1,10 @@
 import { type CanvasSpec } from "@sketchi/drawing";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
-import { useStudioChat } from "@/features/playground/chat-client";
+import { useStudioChat } from "@/features/chat/chat-client";
 
 import { DrawingEditor } from "@sketchi/editor";
 import { createFileRoute } from "@tanstack/react-router";
-import { type ChatMessage } from "@/features/playground/chat-message";
+import { type ChatMessage } from "@/features/chat/chat-message";
 import { MessageSquare, PanelsTopLeft, Square } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -25,13 +25,13 @@ import {
 	PlaygroundStarters,
 	assistantAsksQuestion,
 	type ReadyPlaygroundArtifact,
-} from "@/features/playground/surface";
+} from "@/features/chat/surface";
 import {
 	deriveBuildState,
 	isDiagramToolPart,
 	type StudioBuildResult,
-} from "@/features/playground/build-result";
-import { DiagramToolCard } from "@/features/playground/diagram-tool-card";
+} from "@/features/chat/build-result";
+import { DiagramToolCard } from "@/features/chat/diagram-tool-card";
 import { cn } from "@sketchi/ui/lib/utils";
 
 export const Route = createFileRoute("/")({

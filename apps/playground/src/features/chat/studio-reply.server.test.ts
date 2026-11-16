@@ -1,6 +1,6 @@
-import { applyChatEvent, emptyChat } from "../../features/playground/chat-client";
-import { chatMessageViews } from "../../features/playground/chat-message";
-import { deriveBuildState } from "../../features/playground/build-result";
+import { applyChatEvent, emptyChat } from "./chat-client";
+import { chatMessageViews } from "./chat-message";
+import { deriveBuildState } from "./build-result";
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Stream, Schema } from "effect";
 import { AgUi, IdGenerator, Chat, LanguageModel, Response, Tool, Toolkit } from "effect/ai";

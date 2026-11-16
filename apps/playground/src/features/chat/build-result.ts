@@ -8,7 +8,7 @@ import {
 } from "@sketchi/diagrams/families/flowchart/build";
 
 import { Result, Schema } from "effect";
-import { type ChatMessage } from "@/features/playground/chat-message";
+import { type ChatMessage } from "@/features/chat/chat-message";
 import { type ReadyPlaygroundArtifact } from "./surface";
 
 type MessagePart = ChatMessage["parts"][number];

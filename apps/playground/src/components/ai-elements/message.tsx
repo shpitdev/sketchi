@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@sketchi/ui/lib/utils";
-import type { ChatMessage } from "@/features/playground/chat-message";
+import type { ChatMessage } from "@/features/chat/chat-message";
 import type { ComponentProps, HTMLAttributes } from "react";
 import { memo } from "react";
 import { Streamdown } from "streamdown";

@@ -7,11 +7,11 @@ import {
 	MAX_CHAT_MESSAGES,
 	MAX_CHAT_TOTAL_CHARACTERS,
 	savedLogoSlugs,
-} from "../../features/playground/studio-chat-request";
-import { chatMessageViews, messageText } from "../../features/playground/chat-message";
-import { PlaygroundAiModel } from "../ai/model.server";
-import { logosNamedIn, logosWithSlugs } from "../../features/build/icon-catalog.server";
-import { readBoundedJson } from "../runtime/request-body.server";
+} from "./studio-chat-request";
+import { chatMessageViews, messageText } from "./chat-message";
+import { PlaygroundAiModel } from "./model.server";
+import { logosNamedIn, logosWithSlugs } from "../build/icon-catalog.server";
+import { readBoundedJson } from "../../server/runtime/request-body.server";
 import { makeStudioFamilyTools } from "./studio-family-tools.server";
 import {
 	makeStudioBuildTurn,

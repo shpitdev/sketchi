@@ -4,7 +4,7 @@ import { Tool, Toolkit } from "effect/ai";
 
 import type { CloudflareAiGateway } from "@sketchi/cloudflare/ai-gateway";
 
-import { PlaygroundBindings, PlaygroundRequestMetadata } from "../runtime/context.server";
+import { PlaygroundBindings, PlaygroundRequestMetadata } from "../../server/runtime/context.server";
 import { PlaygroundAiModel, PlaygroundAiModelLive } from "./model.server";
 
 type GatewayRun = Parameters<CloudflareAiGateway["run"]>;

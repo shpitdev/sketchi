@@ -1,68 +1,71 @@
+import { buildResponse } from "@sketchi/diagrams/build/operation";
 import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
 } from "@sketchi/diagrams/build/code-mode/artifacts";
 import {
-	buildTimeline,
+	buildMindmap,
 	CodeModeRuntimeEnvironment,
 } from "@sketchi/diagrams/build/code-mode/runtime";
-import { buildResponse } from "@sketchi/diagrams/build/operation";
 import { familyForType } from "@sketchi/diagrams/family";
-import type { ChatMessage } from "../../features/playground/chat-message";
+import type { ChatMessage } from "./chat-message";
 import { Effect } from "effect";
 import { expect, it } from "vitest";
-import { deriveBuildState } from "../../features/playground/build-result";
+import { deriveBuildState } from "./build-result";
 import { makeStudioFamilyExecutor } from "./studio-family-tools.server";
 
-it("repairs a timeline through the Studio host and displays its real accepted scene", async () => {
+it("builds a mindmap through the Studio host and displays its accepted scene", async () => {
 	const storage = makeMemoryArtifactStorage();
 	const executor = await Effect.runPromise(
-		makeStudioFamilyExecutor(familyForType("timeline"), (input) =>
-			buildResponse(buildTimeline(input)).pipe(
+		makeStudioFamilyExecutor(familyForType("mindmap"), (input) =>
+			buildResponse(buildMindmap(input)).pipe(
 				Effect.provideService(CodeModeArtifactStorage, storage),
 				Effect.provideService(CodeModeRuntimeEnvironment, {
-					createId: (prefix) => `${prefix}_studio_timeline`,
+					createId: (prefix) => `${prefix}_studio_mindmap`,
 				}),
 			),
 		),
 	);
-	const invalid = await Effect.runPromise(
-		executor.execute({
-			spec: {
-				title: "Release",
-				events: [{ id: "beta", label: "Public beta", date: "2026-02-30" }],
-			},
-		}),
-	);
-	expect(invalid).toMatchObject({ ok: false, status: "invalid_timeline" });
 	const spec = {
-		title: "Release",
-		events: [
-			{ id: "beta", label: "Public beta", date: "2026-09-15" },
-			{ id: "ship", label: "Ship", date: "2026-10-01" },
-		],
+		title: "Launch",
+		layout: { direction: "LR" as const },
+		root: {
+			label: "Launch",
+			children: [
+				{ label: "Marketing", children: [{ label: "Blog post" }, { label: "Webinar" }] },
+				{ label: "Engineering", children: [{ label: "Beta" }] },
+			],
+		},
 	};
 	const drawing: ChatMessage = {
 		id: "drawing",
 		role: "assistant",
 		parts: [
 			{
-				type: "tool-build_timeline",
-				toolCallId: "timeline",
+				type: "tool-build_mindmap",
+				toolCallId: "mindmap",
 				state: "input-available",
 				input: { spec },
 			},
 		],
 	};
-	expect(deriveBuildState([drawing], true).ghostLabels).toEqual(["Public beta", "Ship"]);
+	// Topics show in the order the user gave them while the tree draws.
+	expect(deriveBuildState([drawing], true).ghostLabels).toEqual([
+		"Launch",
+		"Marketing",
+		"Blog post",
+		"Webinar",
+		"Engineering",
+		"Beta",
+	]);
 	const accepted = await Effect.runPromise(executor.execute({ spec }));
 	expect(accepted.ok).toBe(true);
 	const message: ChatMessage = {
 		...drawing,
 		parts: [
 			{
-				type: "tool-build_timeline",
-				toolCallId: "timeline",
+				type: "tool-build_mindmap",
+				toolCallId: "mindmap",
 				state: "output-available",
 				input: { spec },
 				output: accepted,
@@ -70,12 +73,10 @@ it("repairs a timeline through the Studio host and displays its real accepted sc
 		],
 	};
 	const state = deriveBuildState([message], false);
-	// The accepted scene shows humanized dates, never the raw ISO input.
 	const texts = (state.scene?.elements ?? []).flatMap((element) =>
 		element.type === "text" ? [element.text] : [],
 	);
-	expect(texts).toContain("Sep 15, 2026");
-	expect(texts.some((text) => text.includes("2026-09-15"))).toBe(false);
+	expect(texts).toEqual(expect.arrayContaining(["Marketing", "Blog post", "Beta"]));
 	expect(state.artifact?.editUrl).toContain("/artifacts/");
 	expect(state.acceptedResult?.ok).toBe(true);
 });

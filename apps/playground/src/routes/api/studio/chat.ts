@@ -10,7 +10,7 @@ export const Route = createFileRoute("/api/studio/chat")({
 					{ runPlaygroundEffect },
 				] = await Promise.all([
 					import("@/server/bindings/cloudflare-bindings.server"),
-					import("@/server/chat/agent.server"),
+					import("@/features/chat/agent.server"),
 					import("@/server/runtime/runtime.server"),
 				]);
 				const boundary = getPlaygroundRequestBoundary(request);

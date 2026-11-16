@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type BuildFlowchartResult } from "@sketchi/diagrams/families/flowchart/build";
-import type { ChatMessage } from "@/features/playground/chat-message";
+import type { ChatMessage } from "@/features/chat/chat-message";
 import {
 	buildResultOf,
 	deriveBuildState,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { buildResponse } from "@sketchi/diagrams/build/operation";
-import { toAgUiMessages, type ChatMessage } from "../../features/playground/chat-message";
+import { toAgUiMessages, type ChatMessage } from "./chat-message";
 import { AiError, LanguageModel, Response as AiResponse } from "effect/ai";
 import { Deferred, Effect, Stream } from "effect";
 
@@ -14,13 +14,10 @@ import {
 	CodeModeRuntimeEnvironment,
 } from "@sketchi/diagrams/build/code-mode/runtime";
 
-import { PlaygroundAiModel } from "../ai/model.server";
+import { PlaygroundAiModel } from "./model.server";
 
-import {
-	MAX_CHAT_TOTAL_CHARACTERS,
-	studioChatRequestMessages,
-} from "../../features/playground/studio-chat-request";
-import { runPlaygroundEffect } from "../runtime/runtime.server";
+import { MAX_CHAT_TOTAL_CHARACTERS, studioChatRequestMessages } from "./studio-chat-request";
+import { runPlaygroundEffect } from "../../server/runtime/runtime.server";
 import { handleStudioAgentRequest } from "./agent.server";
 
 const runInput = (messages: unknown) => ({ threadId: "studio", runId: "run-1", messages });

@@ -22,7 +22,7 @@ import type { CodeModeHttpRequestError } from "../../features/build/api.server";
 import { correlationIdHeader } from "./correlation.server";
 import { RequestBodyReadError } from "./request-body.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
-import { PlaygroundAiModelLive } from "../ai/model.server";
+import { PlaygroundAiModelLive } from "../../features/chat/model.server";
 import {
 	StudioBuildHostLive,
 	StudioBuildRequestLive,

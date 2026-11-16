@@ -56,7 +56,7 @@
 		},
 		{
 			// Starter prompts render a Suggestion button as a two-line card.
-			"files": ["apps/playground/src/features/playground/surface.tsx"],
+			"files": ["apps/playground/src/features/chat/surface.tsx"],
 			"rules": {
 				"shadcn/no-restyle": ["error", { "allow": ["layout", "studio__starter"] }]
 			}

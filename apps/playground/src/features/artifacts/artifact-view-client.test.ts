@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadArtifactReview } from "./artifact-view-client";
-import { DEPLOY_PIPELINE_SCENE } from "../playground/deploy-pipeline-sample";
+import { DEPLOY_PIPELINE_SCENE } from "../chat/deploy-pipeline-sample";
 
 const load = (id: string, signal?: AbortSignal) =>
 	Effect.runPromise(

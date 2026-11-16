@@ -1,4 +1,4 @@
-import type { ChatMessage } from "@/features/playground/chat-message";
+import type { ChatMessage } from "@/features/chat/chat-message";
 import { describe, expect, it } from "vitest";
 
 import {
