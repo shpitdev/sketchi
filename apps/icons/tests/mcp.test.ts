@@ -3,6 +3,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Context, Effect, Layer } from "effect";
 import { McpClient, McpProtocol } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
+import { serveStatelessMcp } from "@sketchi/cloudflare/mcp-http";
 import { handleIconMcpRequest } from "../src/features/mcp/mcp.server";
 
 type Assets = (url: URL) => Promise<Response>;
@@ -101,5 +102,48 @@ describe("icons MCP tools", () => {
 				content: [{ text: expect.stringContaining("503") }],
 			});
 		}).pipe(Effect.scoped),
+	);
+
+	it.effect(
+		"releases each request's handler once, whether its body ends, is cancelled or fails",
+		() =>
+			Effect.gen(function* () {
+				const initialize = () =>
+					new Request("https://icons.test/mcp", {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: '{"jsonrpc":"2.0","id":1,"method":"initialize"}',
+					});
+				const serve = (body: UnderlyingDefaultSource<Uint8Array>) =>
+					Effect.gen(function* () {
+						let disposed = 0;
+						const pending: Promise<unknown>[] = [];
+						const response = yield* serveStatelessMcp(
+							initialize(),
+							() => ({
+								fetch: async () => new Response(new ReadableStream(body)),
+								dispose: async () => {
+									disposed += 1;
+								},
+							}),
+							(promise) => pending.push(promise),
+						);
+						return { response, disposed: () => Promise.all(pending).then(() => disposed) };
+					});
+				const ended = yield* serve({ start: (controller) => controller.close() });
+				yield* Effect.promise(() => ended.response.text());
+				expect(yield* Effect.promise(ended.disposed)).toBe(1);
+				const cancelled = yield* serve({ pull: () => new Promise(() => {}) });
+				yield* Effect.promise(() => cancelled.response.body!.cancel());
+				expect(yield* Effect.promise(cancelled.disposed)).toBe(1);
+				const failed = yield* serve({ pull: (controller) => controller.error(new Error("lost")) });
+				yield* Effect.promise(() =>
+					failed.response.text().then(
+						() => "read",
+						() => "failed",
+					),
+				).pipe(Effect.map((outcome) => expect(outcome).toBe("failed")));
+				expect(yield* Effect.promise(failed.disposed)).toBe(1);
+			}),
 	);
 });
