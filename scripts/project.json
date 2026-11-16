@@ -1,0 +1,99 @@
+{
+	"name": "local-checks",
+	"$schema": "../node_modules/nx/schemas/project-schema.json",
+	"projectType": "library",
+	"tags": ["scope:tool"],
+	"targets": {
+		"check-lint": {
+			"executor": "nx:run-commands",
+			"cache": true,
+			"inputs": ["workspaceFiles"],
+			"outputs": [],
+			"options": {
+				"command": "effect-tsgo oxlint"
+			},
+			"dependsOn": [
+				{
+					"projects": ["tag:scope:package"],
+					"target": "build"
+				}
+			]
+		},
+		"check-format": {
+			"executor": "nx:run-commands",
+			"cache": true,
+			"inputs": ["workspaceFiles"],
+			"outputs": [],
+			"options": {
+				"command": "oxfmt --check"
+			}
+		},
+		"check-tools": {
+			"executor": "nx:run-commands",
+			"cache": true,
+			"inputs": ["workspaceFiles", "testEnvironment"],
+			"outputs": [],
+			"options": {
+				"command": "pnpm run test:tools"
+			},
+			"dependsOn": [
+				{
+					"projects": ["tag:scope:package"],
+					"target": "build"
+				}
+			]
+		},
+		"check-process": {
+			"executor": "nx:run-commands",
+			"cache": true,
+			"inputs": [
+				"workspaceFiles",
+				{
+					"env": "PATH"
+				},
+				{
+					"runtime": "mise --version"
+				},
+				{
+					"runtime": "git ls-files"
+				}
+			],
+			"outputs": [],
+			"options": {
+				"command": "pnpm run test:deploy-scripts"
+			}
+		},
+		"check-references": {
+			"executor": "nx:run-commands",
+			"cache": true,
+			"inputs": ["workspaceFiles"],
+			"outputs": [],
+			"options": {
+				"command": "effect-tsgo tsc@7.0.2 -b --pretty false"
+			},
+			"dependsOn": [
+				{
+					"projects": ["*"],
+					"target": "build"
+				}
+			]
+		},
+		"check-workflows": {
+			"executor": "nx:run-commands",
+			"cache": true,
+			"inputs": [
+				"{workspaceRoot}/.github/**/*",
+				{
+					"runtime": "actionlint --version"
+				},
+				{
+					"env": "PATH"
+				}
+			],
+			"outputs": [],
+			"options": {
+				"command": "actionlint"
+			}
+		}
+	}
+}

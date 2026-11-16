@@ -33,7 +33,7 @@ The renderer owns every position:
 
 ## Proof
 
-`pnpm nx run drawing:sankey-fuzz` draws 1,200 seeded random flows (two-column budgets, funnels with shared or per-stage drop-offs, layered flows with skipped columns, splitting trees and merges, values across five orders of magnitude, long and non-Latin labels). Every export is valid; on each side of every bar the bands sum to its height; no band leaves its gap or crosses another bar; no label overlaps; a label on its own bands has paper behind it that hides no other band, and a value away from its band's ends keeps 4 px from every other band; every width follows its value at one scale, apart from the 3 px floor; and crossings never weigh more than the authored order's. CI draws 10.
+`pnpm nx run diagrams:sankey-fuzz` draws 1,200 seeded random flows (two-column budgets, funnels with shared or per-stage drop-offs, layered flows with skipped columns, splitting trees and merges, values across five orders of magnitude, long and non-Latin labels). Every export is valid; on each side of every bar the bands sum to its height; no band leaves its gap or crosses another bar; no label overlaps; a label on its own bands has paper behind it that hides no other band, and a value away from its band's ends keeps 4 px from every other band; every width follows its value at one scale, apart from the 3 px floor; and crossings never weigh more than the authored order's. CI draws 10.
 
 ## Scenarios
 

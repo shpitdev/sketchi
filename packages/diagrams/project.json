@@ -39,26 +39,66 @@
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "MINDMAP_FUZZ_SEEDS=2000 vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/mindmap/mindmap-fuzz.test.ts"
-			}
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/mindmap/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
 		},
 		"gantt-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "GANTT_FUZZ_SEEDS=300 vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/gantt/render.test.ts -t \"seeded fuzz\""
-			}
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/gantt/**/*",
+				"{projectRoot}/src/graph/**/*",
+				"{projectRoot}/src/families/timeline/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
 		},
 		"chart-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "CHART_FUZZ_SEEDS=300 vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/chart/render.test.ts -t \"seeded fuzz\""
-			}
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/chart/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
 		},
 		"venn-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "VENN_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/venn/venn-fuzz.test.ts"
 			},
-			"inputs": ["default", "^production", "testEnvironment"]
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/venn/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
 		},
 		"test-chart": {
 			"executor": "nx:run-commands",
@@ -321,6 +361,186 @@
 				"{projectRoot}/src/families/state-machine/**/*",
 				"{projectRoot}/src/families/timeline/**/*"
 			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"verify-tests": {
+			"executor": "nx:noop",
+			"dependsOn": ["test", "test-*"]
+		},
+		"routing-sample": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.routing.config.ts packages/diagrams/src/graph/tests/routing"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"^production",
+				"testEnvironment",
+				"{projectRoot}/src/graph/**/*",
+				"{projectRoot}/src/families/flowchart/**/*",
+				"{workspaceRoot}/packages/editor/public/fonts/**/*",
+				"{workspaceRoot}/scripts/ci-local.mjs",
+				"{workspaceRoot}/.npmrc",
+				"!{projectRoot}/src/graph/tests/text-fit-fuzz.test.ts"
+			],
+			"cache": true,
+			"outputs": [],
+			"dependsOn": ["^build"]
+		},
+		"routing-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "ROUTING_FUZZ=full vitest run --config packages/diagrams/vitest.routing.config.ts"
+			},
+			"inputs": [
+				"default",
+				"^production",
+				"testEnvironment",
+				"{workspaceRoot}/packages/editor/public/fonts/**/*"
+			],
+			"cache": true,
+			"outputs": [],
+			"dependsOn": ["^build"]
+		},
+		"er-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "ER_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/er/er-fuzz.test.ts"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/er/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"class-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "CLASS_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/class/class-fuzz.test.ts"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/class/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"sequence-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "SEQUENCE_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/sequence/sequence-fuzz.test.ts"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/sequence/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"org-chart-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "ORG_CHART_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/org-chart/org-chart-fuzz.test.ts"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/org-chart/**/*",
+				"{projectRoot}/src/graph/**/*",
+				"{projectRoot}/src/families/gantt/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"journey-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "JOURNEY_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/journey/journey-fuzz.test.ts"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/journey/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"sankey-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "SANKEY_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/sankey/sankey-fuzz.test.ts"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/sankey/**/*",
+				"{projectRoot}/src/graph/**/*",
+				"{projectRoot}/src/families/chart/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"wireframe-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "WIREFRAME_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/wireframe/wireframe-fuzz.test.ts"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/wireframe/**/*",
+				"{projectRoot}/src/graph/**/*",
+				"{projectRoot}/src/families/org-chart/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"quadrant-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "QUADRANT_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/quadrant/quadrant-fuzz.test.ts"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/quadrant/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-text-fit": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.routing.config.ts packages/diagrams/src/graph/tests/text-fit-fuzz.test.ts"
+			},
+			"inputs": ["default", "^production", "testEnvironment"],
 			"dependsOn": ["^build"],
 			"cache": true,
 			"outputs": []
