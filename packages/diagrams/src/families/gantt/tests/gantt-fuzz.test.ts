@@ -17,7 +17,7 @@ import {
 	type GanttDiagram,
 } from "../document.js";
 
-import { readGanttScene } from "../readout.js";
+import { readGanttScene, type GanttReadout } from "../readout.js";
 import {
 	GANTT_MIN_BAR_WIDTH,
 	JOIN_BUDGET,
@@ -73,33 +73,38 @@ function enters(box: Box, from: { x: number; y: number }, to: { x: number; y: nu
 				Math.min(from.y, to.y) < box.bottom - 0.5;
 }
 
-/** Every layout invariant a Gantt chart promises, checked on its scene alone. */
-function expectReadableGantt(
+type GanttLayout = ReturnType<typeof layoutGanttDiagram>;
+
+interface GanttChecks {
+	/** Routes keep apart from one another and from their own ends' edges, not only off each other's lines. */
+	readonly distinct?: boolean;
+	/** A successor in the next row that waits on that row alone, and starts once it ends, has a forward route. */
+	readonly forward?: boolean;
+}
+
+/** Every layout promise a Gantt chart makes, read from its scene and routing work. Each problem starts with its kind. */
+function ganttProblems(
 	diagram: GanttDiagram,
-	{ distinct = true }: { readonly distinct?: boolean } = {},
-): CanvasSpec {
-	const { scene, work } = layoutGanttDiagram(diagram);
-	const context = diagram.id;
-	expect(getCanvasValidationIssues(scene), context).toEqual([]);
-	expect(validateExcalidrawScene(convertSceneToExcalidraw(scene)).issues, context).toEqual([]);
+	{ scene, work }: GanttLayout,
+	{ distinct = true, forward = false }: GanttChecks = {},
+): string[] {
+	const problems: string[] = [];
 	// Routing work is bounded however crowded the plan: per layout, each dependency is placed,
 	// tried in at most two more arrival plans, and rerouted at most twice, within the chart's and
 	// the repairs' search budgets (each may overrun by one route's last search) and the budgets for
 	// weighing kinks and joining another route's last run. A chart whose first layout doesn't read
 	// clean is laid out the earlier way too, and once more clear of every mark where that way runs
 	// too close to one; one whose routes still meet is laid out at most twice more.
-	const dependencyCount = diagram.tasks.reduce(
-		(sum, task) => sum + (task.dependsOn?.length ?? 0),
-		0,
-	);
-	expect(work.layouts, `${context} layouts`).toBeLessThanOrEqual(5);
-	expect(work.placements, `${context} placements`).toBeLessThanOrEqual(
-		5 * dependencyCount * work.layouts,
-	);
-	expect(work.expansions, `${context} search steps`).toBeLessThanOrEqual(
+	const dependencies = diagram.tasks.reduce((sum, task) => sum + (task.dependsOn?.length ?? 0), 0);
+	if (work.layouts > 5) problems.push(`layouts: ${work.layouts}`);
+	if (work.placements > 5 * dependencies * work.layouts)
+		problems.push(`placements: ${work.placements}`);
+	if (
+		work.expansions >
 		(ROUTE_CHART_BUDGET + REPAIR_BUDGET + 2 * ROUTE_BUDGET + ROUTE_KINK_BUDGET + JOIN_BUDGET) *
-			work.layouts,
-	);
+			work.layouts
+	)
+		problems.push(`search-steps: ${work.expansions}`);
 	const readout = readGanttScene(scene);
 	// Ticks are nice and cover the plan; bars sit on their dates.
 	const schedules = diagram.tasks.map((task) => ({ task, schedule: ganttTaskSchedule(task)! }));
@@ -107,24 +112,26 @@ function expectReadableGantt(
 	const last = Math.max(
 		...schedules.map(({ schedule }) => Math.max(schedule.end, schedule.start + 1)),
 	);
-	expect(readout.gridlines[0]!.day, context).toBeLessThanOrEqual(first);
-	expect(readout.gridlines.at(-1)!.day, context).toBeGreaterThanOrEqual(last);
+	const firstLine = readout.gridlines[0];
+	const lastLine = readout.gridlines.at(-1);
+	if (!firstLine || !lastLine || firstLine.day > first || lastLine.day < last)
+		problems.push(`ticks-cover: ${readout.gridlines.length} gridlines`);
 	for (const { day, x } of readout.gridlines)
-		expect(x, `${context} gridline ${formatGanttDay(day)}`).toBeCloseTo(
-			readout.gridlines[0]!.x + (day - readout.gridlines[0]!.day) * readout.pxPerDay,
-			1,
-		);
+		if (Math.abs(x - (firstLine!.x + (day - firstLine!.day) * readout.pxPerDay)) > 0.05)
+			problems.push(`gridline-off-scale: ${formatGanttDay(day)}`);
 	for (const { task, schedule } of schedules) {
-		const mark = readout.marks.get(task.id)!;
-		expect(mark.milestone, `${context} ${task.id}`).toBe(schedule.milestone);
-		expect(mark.start, `${context} ${task.id} start`).toBeCloseTo(schedule.start, 1);
+		const mark = readout.marks.get(task.id);
+		if (!mark) {
+			problems.push(`mark-missing: ${task.id}`);
+			continue;
+		}
+		if (mark.milestone !== schedule.milestone) problems.push(`mark-kind: ${task.id}`);
+		if (Math.abs(mark.start - schedule.start) > 0.05) problems.push(`bar-start: ${task.id}`);
 		// Bars narrower than the minimum draw at the minimum.
-		expect(mark.end, `${context} ${task.id} end`).toBeCloseTo(
-			schedule.milestone
-				? schedule.end
-				: Math.max(schedule.end, schedule.start + GANTT_MIN_BAR_WIDTH / readout.pxPerDay),
-			1,
-		);
+		const end = schedule.milestone
+			? schedule.end
+			: Math.max(schedule.end, schedule.start + GANTT_MIN_BAR_WIDTH / readout.pxPerDay);
+		if (Math.abs(mark.end - end) > 0.05) problems.push(`bar-end: ${task.id}`);
 	}
 	// Text is whole, never overlaps other text or a mark, and stays in the scene.
 	const texts = scene.elements.flatMap((element) =>
@@ -134,35 +141,32 @@ function expectReadableGantt(
 		...mark,
 		id: `gantt:task:${mark.id}`,
 	}));
-	// Problems gather into one assertion per check, so big plans stay quick to verify.
-	const textProblems: string[] = [];
 	texts.forEach((text, index) => {
 		for (const other of texts.slice(index + 1))
-			if (overlaps(text, other)) textProblems.push(`${text.id} overlaps ${other.id}`);
+			if (overlaps(text, other)) problems.push(`text-overlap: ${text.id} overlaps ${other.id}`);
 		for (const mark of marks)
-			if (overlaps(text, mark)) textProblems.push(`${text.id} overlaps ${mark.id}`);
+			if (overlaps(text, mark)) problems.push(`text-covers-mark: ${text.id} covers ${mark.id}`);
 		if (text.left < 0 || text.top < 0 || text.right > scene.width || text.bottom > scene.height)
-			textProblems.push(`${text.id} clipped`);
+			problems.push(`text-clipped: ${text.id}`);
 	});
-	expect(textProblems, context).toEqual([]);
 	for (const task of diagram.tasks) {
 		const label = scene.elements.find((element) => element.id === `gantt:label:${task.id}`);
-		expect(label?.type === "text" && label.text.replace(/\n/gu, " "), context).toBe(task.label);
+		if (label?.type !== "text" || label.text.replace(/\n/gu, " ") !== task.label)
+			problems.push(`label-text: ${task.id}`);
 	}
 	// Every dependency is drawn: orthogonal, from its predecessor into its successor, clear of
 	// every other mark and every text.
 	const arrows = scene.elements.filter((element) => element.type === "arrow");
-	const dependencies = diagram.tasks.reduce((sum, task) => sum + (task.dependsOn?.length ?? 0), 0);
-	expect(arrows, context).toHaveLength(dependencies);
-	const crossings: string[] = [];
+	if (arrows.length !== dependencies)
+		problems.push(`arrow-count: ${arrows.length} of ${dependencies}`);
 	for (const arrow of arrows) {
 		const ends = new Set([arrow.sourceNodeId, arrow.targetNodeId]);
 		arrow.points.slice(1).forEach((to, index) => {
 			const from = arrow.points[index]!;
 			if (Math.abs(from.x - to.x) >= 0.01 && Math.abs(from.y - to.y) >= 0.01)
-				crossings.push(`${arrow.id} is not orthogonal`);
+				problems.push(`not-orthogonal: ${arrow.id}`);
 			for (const box of [...marks.filter((mark) => !ends.has(mark.id)), ...texts])
-				if (enters(box, from, to)) crossings.push(`${arrow.id} crosses ${box.id}`);
+				if (enters(box, from, to)) problems.push(`arrow-crosses: ${arrow.id} crosses ${box.id}`);
 		});
 	}
 	// No rule crosses text.
@@ -171,12 +175,23 @@ function expectReadableGantt(
 			continue;
 		for (const text of texts)
 			if (enters(text, element.points[0], element.points[1]))
-				crossings.push(`${element.id} crosses ${text.id}`);
+				problems.push(`rule-crosses-text: ${element.id} crosses ${text.id}`);
 	}
-	expect(crossings, context).toEqual([]);
-	expect(clearanceProblems(arrows, marks), context).toEqual([]);
-	expect(distinctProblems(scene, distinct), context).toEqual([]);
-	return scene;
+	problems.push(...clearanceProblems(arrows, marks), ...distinctProblems(scene, distinct));
+	if (forward) problems.push(...backwardProblems(readout));
+	return problems;
+}
+
+/** Lays a plan out and expects every promise it makes kept, the generic canvas and export checks included. */
+function expectReadableGantt(diagram: GanttDiagram, checks: GanttChecks = {}): CanvasSpec {
+	const layout = layoutGanttDiagram(diagram);
+	expect(getCanvasValidationIssues(layout.scene), diagram.id).toEqual([]);
+	expect(
+		validateExcalidrawScene(convertSceneToExcalidraw(layout.scene)).issues,
+		diagram.id,
+	).toEqual([]);
+	expect(ganttProblems(diagram, layout, checks), diagram.id).toEqual([]);
+	return layout.scene;
 }
 
 /** Runs keep at least this far beside the ends of the bars and diamonds they pass, and this far above and below them. */
@@ -210,7 +225,7 @@ function clearanceProblems(
 					? Math.max(mark.left - from.x, from.x - mark.right)
 					: Math.max(mark.top - from.y, from.y - mark.bottom);
 				if (gap < (vertical ? MARK_SIDE_GAP : MARK_GAP) - 0.02)
-					problems.push(`${arrow.id} runs ${gap.toFixed(1)} px from ${mark.id}`);
+					problems.push(`clearance: ${arrow.id} runs ${gap.toFixed(1)} px from ${mark.id}`);
 			}
 		});
 	}
@@ -310,7 +325,7 @@ function distinctProblems(scene: CanvasSpec, strict: boolean): string[] {
 					Math.max(run.from.y, run.to.y) > head.top &&
 					Math.min(run.from.y, run.to.y) < head.bottom
 				)
-					problems.push(`${other.id} runs through the head of ${arrow.id}`);
+					problems.push(`crosses-head: ${other.id} runs through the head of ${arrow.id}`);
 				runs.forEach((own, index) => {
 					const leaving = arrow.sourceNodeId === other.sourceNodeId && index === 0 && at === 0;
 					const arriving =
@@ -318,7 +333,7 @@ function distinctProblems(scene: CanvasSpec, strict: boolean): string[] {
 						((index === runs.length - 1 && at === otherRuns.length - 1) ||
 							(joint && index >= stemStart(runs) && at >= stemStart(otherRuns)));
 					if (!leaving && !arriving && sideBySide(own, run, strict ? 2 : 0.01) > 1)
-						problems.push(`${arrow.id} runs along ${other.id}`);
+						problems.push(`runs-along: ${arrow.id} runs along ${other.id}`);
 				});
 			});
 		}
@@ -326,7 +341,8 @@ function distinctProblems(scene: CanvasSpec, strict: boolean): string[] {
 		if (strict)
 			for (const run of runs.slice(1, -1))
 				for (const id of [arrow.sourceNodeId, arrow.targetNodeId]) {
-					const node = nodes.get(id)!;
+					const node = nodes.get(id);
+					if (!node) continue;
 					const edges: Run[] = [
 						{ from: { x: node.x, y: node.y }, to: { x: node.x + node.width, y: node.y } },
 						{
@@ -340,25 +356,40 @@ function distinctProblems(scene: CanvasSpec, strict: boolean): string[] {
 						},
 					];
 					if (edges.some((edge) => sideBySide(run, edge, 1) > 1))
-						problems.push(`${arrow.id} runs along the edge of ${id}`);
+						problems.push(`runs-along-edge: ${arrow.id} runs along the edge of ${id}`);
 				}
 	}
 	return problems;
 }
 
 /**
- * Whether a route doubles back: some run goes left of both its predecessor's start and the
+ * A successor in the next row that waits on that row alone, and starts once it ends, always has a
+ * forward route, unless that row is a sliver whose other dependencies take the room its exit
+ * needs. A route doubles back when some run goes left of both its predecessor's start and the
  * corridor just before its successor's start.
  */
-function runsBack(scene: CanvasSpec, arrowId: string): boolean {
-	const readout = readGanttScene(scene);
-	const dependency = readout.dependencies.find(
-		(entry) => `gantt:dependency:${entry.from}:${entry.to}` === arrowId,
-	)!;
-	const from = readout.marks.get(dependency.from)!;
-	const to = readout.marks.get(dependency.to)!;
-	const limit = Math.min(from.left, to.left - 40);
-	return dependency.points.some((point) => point.x < limit - 0.5);
+function backwardProblems(readout: GanttReadout): string[] {
+	const rows = [...readout.marks.values()].toSorted((a, b) => a.top - b.top);
+	return readout.dependencies.flatMap(({ from, to, points }) => {
+		const before = readout.marks.get(from);
+		const after = readout.marks.get(to);
+		if (!before || !after) return [];
+		const alone = readout.dependencies.filter((dependency) => dependency.to === to).length === 1;
+		const sliver =
+			before.right - before.left < SLIVER_WIDTH &&
+			readout.dependencies.filter(
+				(dependency) => dependency.to === from || dependency.from === from,
+			).length >= SLIVER_ROUTES;
+		if (
+			!alone ||
+			sliver ||
+			rows.indexOf(after) !== rows.indexOf(before) + 1 ||
+			after.left < before.right
+		)
+			return [];
+		const limit = Math.min(before.left, after.left - 40);
+		return points.some((point) => point.x < limit - 0.5) ? [`runs-back: ${from}->${to}`] : [];
+	});
 }
 
 /**
@@ -468,37 +499,223 @@ describe("Gantt layout", () => {
 		"keeps every dependency distinct and forward across a seeded fuzz of scheduled plans",
 		{ timeout: FUZZ_TIMEOUT },
 		() => {
-			for (let seed = 1; seed <= FUZZ_SEEDS; seed += 1) {
-				const scene = expectReadableGantt(scheduledGantt(seed));
-				// A successor in the next row that waits on that row alone, and starts once it ends, always
-				// has a forward route, unless that row is a sliver whose other dependencies take the room
-				// its exit needs.
-				const readout = readGanttScene(scene);
-				const rows = [...readout.marks.values()].toSorted((a, b) => a.top - b.top);
-				for (const { from, to } of readout.dependencies) {
-					const before = readout.marks.get(from)!;
-					const after = readout.marks.get(to)!;
-					const alone =
-						readout.dependencies.filter((dependency) => dependency.to === to).length === 1;
-					const sliver =
-						before.right - before.left < SLIVER_WIDTH &&
-						readout.dependencies.filter(
-							(dependency) => dependency.to === from || dependency.from === from,
-						).length >= SLIVER_ROUTES;
-					if (
-						alone &&
-						!sliver &&
-						rows.indexOf(after) === rows.indexOf(before) + 1 &&
-						after.left >= before.right
-					)
-						expect(
-							runsBack(scene, `gantt:dependency:${from}:${to}`),
-							`scheduled-${seed} ${from}->${to}`,
-						).toBe(false);
-				}
-			}
+			for (let seed = 1; seed <= FUZZ_SEEDS; seed += 1)
+				expectReadableGantt(scheduledGantt(seed), { forward: true });
 		},
 	);
+});
+
+type SceneEdit = (element: SceneElement) => SceneElement | undefined;
+type NodeElement = Extract<SceneElement, { type: "node" }>;
+type LineElement = Extract<SceneElement, { type: "line" }>;
+
+/** The layout with each matching element replaced, or removed where the edit returns undefined. */
+function edit(layout: GanttLayout, id: string, change: SceneEdit): GanttLayout {
+	const matches = (element: SceneElement) =>
+		element.id === id || (element.type === "node" && element.nodeId === id);
+	if (!layout.scene.elements.some(matches)) throw new Error(`no element ${id}`);
+	return {
+		...layout,
+		scene: {
+			...layout.scene,
+			elements: layout.scene.elements.flatMap((element) => {
+				if (!matches(element)) return [element];
+				const changed = change(element);
+				return changed ? [changed] : [];
+			}),
+		},
+	};
+}
+
+function find<T extends SceneElement["type"]>(layout: GanttLayout, id: string, type: T) {
+	const element = layout.scene.elements.find(
+		(entry) => entry.id === id || (entry.type === "node" && entry.nodeId === id),
+	);
+	if (element?.type !== type) throw new Error(`no ${type} ${id}`);
+	return element as Extract<SceneElement, { type: T }>;
+}
+
+const remove: SceneEdit = () => undefined;
+const moveTo =
+	(x: number, y: number): SceneEdit =>
+	(element) =>
+		({ ...element, x, y }) as SceneElement;
+const reshape =
+	(change: (node: NodeElement) => Partial<NodeElement>): SceneEdit =>
+	(element) =>
+		({ ...element, ...change(element as NodeElement) }) as SceneElement;
+const route =
+	(...points: ScenePoint[]): SceneEdit =>
+	(element) =>
+		({ ...element, points }) as SceneElement;
+
+/** Bar or diamond by task id. */
+const mark = (layout: GanttLayout, id: string) => {
+	const node = find(layout, `gantt:task:${id}`, "node");
+	return {
+		...node,
+		right: node.x + node.width,
+		bottom: node.y + node.height,
+		middle: node.y + node.height / 2,
+	};
+};
+const arrow = (layout: GanttLayout, from: string, to: string) =>
+	find(layout, `gantt:dependency:${from}:${to}`, "arrow");
+const gridlines = (layout: GanttLayout) =>
+	layout.scene.elements.filter((element) => /^gantt:grid:[\d-]+$/u.test(element.id));
+const lastGridline = (layout: GanttLayout) => gridlines(layout).at(-1)!.id;
+const dayWidth = (layout: GanttLayout) => readGanttScene(layout.scene).pxPerDay;
+
+const brokenPlan = plan(
+	[
+		{ id: "a", label: "Design", start: "2026-01-05", duration: 5 },
+		{ id: "b", label: "Build", start: "2026-01-12", duration: 10, dependsOn: ["a"] },
+		{ id: "c", label: "Review", start: "2026-01-12", duration: 4, dependsOn: ["a"] },
+		{ id: "m", label: "Launch", start: "2026-01-26", milestone: true, dependsOn: ["b", "c"] },
+	],
+	{ today: "2026-01-14" },
+);
+
+/** One deliberately broken layout per problem kind the Gantt oracle reports. */
+const broken: Record<string, (layout: GanttLayout) => GanttLayout> = {
+	layouts: (layout) => ({ ...layout, work: { ...layout.work, layouts: 6 } }),
+	placements: (layout) => ({ ...layout, work: { ...layout.work, placements: 1_000 } }),
+	"search-steps": (layout) => ({ ...layout, work: { ...layout.work, expansions: 1e9 } }),
+	"ticks-cover": (layout) => edit(layout, lastGridline(layout), remove),
+	"gridline-off-scale": (layout) =>
+		edit(layout, gridlines(layout)[1]!.id, (line) => {
+			const [from, to] = (line as LineElement).points;
+			return {
+				...line,
+				points: [
+					{ ...from, x: from.x + 30 },
+					{ ...to, x: to.x + 30 },
+				],
+			} as SceneElement;
+		}),
+	"mark-missing": (layout) => edit(layout, "gantt:task:c", remove),
+	"mark-kind": (layout) =>
+		edit(
+			layout,
+			"gantt:task:b",
+			reshape(() => ({ shape: "diamond" })),
+		),
+	"bar-start": (layout) =>
+		edit(
+			layout,
+			"gantt:task:b",
+			reshape((node) => ({
+				x: node.x + 2 * dayWidth(layout),
+				width: node.width - 2 * dayWidth(layout),
+			})),
+		),
+	"bar-end": (layout) =>
+		edit(
+			layout,
+			"gantt:task:b",
+			reshape((node) => ({ width: node.width + 2 * dayWidth(layout) })),
+		),
+	"text-overlap": (layout) => {
+		const { x, y } = find(layout, "gantt:label:b", "text");
+		return edit(layout, "gantt:label:c", moveTo(x, y));
+	},
+	"text-covers-mark": (layout) => {
+		const bar = mark(layout, "b");
+		return edit(layout, "gantt:label:a", moveTo((bar.x + bar.right) / 2, bar.middle));
+	},
+	"text-clipped": (layout) => {
+		const { y } = find(layout, "gantt:label:a", "text");
+		return edit(layout, "gantt:label:a", moveTo(-40, y));
+	},
+	"label-text": (layout) =>
+		edit(layout, "gantt:label:a", (element) => ({ ...element, text: "Desig" }) as SceneElement),
+	"arrow-count": (layout) => edit(layout, arrow(layout, "a", "c").id, remove),
+	"not-orthogonal": (layout) => {
+		const { points } = arrow(layout, "a", "b");
+		return edit(layout, arrow(layout, "a", "b").id, route(points[0], points.at(-1)!));
+	},
+	"arrow-crosses": (layout) => {
+		const bar = mark(layout, "c");
+		return edit(
+			layout,
+			arrow(layout, "a", "b").id,
+			route({ x: bar.x - 10, y: bar.middle }, { x: bar.right + 10, y: bar.middle }),
+		);
+	},
+	"rule-crosses-text": (layout) => {
+		const label = find(layout, "gantt:label:b", "text");
+		const today = layout.scene.elements.find(
+			(element) => element.type === "line" && /^gantt:today(?::|$)/u.test(element.id),
+		)!;
+		return edit(
+			layout,
+			today.id,
+			route({ x: label.x, y: label.y - 40 }, { x: label.x, y: label.y + 40 }),
+		);
+	},
+	clearance: (layout) => {
+		const bar = mark(layout, "c");
+		return edit(
+			layout,
+			arrow(layout, "a", "b").id,
+			route({ x: bar.x - 10, y: bar.y - 2 }, { x: bar.right + 10, y: bar.y - 2 }),
+		);
+	},
+	"crosses-head": (layout) => {
+		const end = arrow(layout, "a", "b").points.at(-1)!;
+		return edit(
+			layout,
+			arrow(layout, "c", "m").id,
+			route({ x: end.x - 6, y: end.y - 30 }, { x: end.x - 6, y: end.y + 30 }),
+		);
+	},
+	"runs-along": (layout) => {
+		const { points } = arrow(layout, "a", "b");
+		return edit(
+			layout,
+			arrow(layout, "c", "m").id,
+			route(...points.map((point) => ({ x: point.x, y: point.y + 1 }))),
+		);
+	},
+	"runs-along-edge": (layout) => {
+		const bar = mark(layout, "b");
+		return edit(
+			layout,
+			arrow(layout, "a", "b").id,
+			route(
+				{ x: bar.x, y: bar.y - 20 },
+				{ x: bar.x, y: bar.y },
+				{ x: bar.x + 30, y: bar.y },
+				{ x: bar.x + 30, y: bar.y + 5 },
+			),
+		);
+	},
+	"runs-back": (layout) => {
+		const [from, to] = [mark(layout, "a"), mark(layout, "b")];
+		return edit(
+			layout,
+			arrow(layout, "a", "b").id,
+			route(
+				{ x: from.right, y: from.middle },
+				{ x: from.x - 20, y: from.middle },
+				{ x: from.x - 20, y: to.middle },
+				{ x: to.x, y: to.middle },
+			),
+		);
+	},
+};
+
+describe("Gantt oracle", () => {
+	it.each(Object.entries(broken))("reports %s on a broken layout", (kind, breakLayout) => {
+		const layout = layoutGanttDiagram(brokenPlan);
+		const checks = { forward: true };
+		expect(ganttProblems(brokenPlan, layout, checks)).toEqual([]);
+		expect(
+			ganttProblems(brokenPlan, breakLayout(layout), checks).map(
+				(problem) => problem.split(":")[0],
+			),
+		).toContain(kind);
+	});
 });
 
 function random(seed: number): () => number {

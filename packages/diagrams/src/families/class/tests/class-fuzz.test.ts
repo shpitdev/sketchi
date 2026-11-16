@@ -213,9 +213,8 @@ const ATTRIBUTION_MARGIN = 8;
 /** A multiplicity or role sits beside its end when its middle stands this near the end's tip. */
 const END_LABEL_REACH = 110;
 
-/** Everything the export validator, the canvas validator or the layout guards would flag. */
-function defects(diagram: ClassDiagram): string[] {
-	const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
+/** Every layout promise a class diagram makes, read from its scene alone. Each problem starts with its kind. */
+function classProblems(scene: CanvasSpec): string[] {
 	const exported = convertSceneToExcalidraw(scene);
 	const boxes = scene.elements.flatMap((element) =>
 		element.type === "node" && element.kind === "class" ? [element] : [],
@@ -231,7 +230,7 @@ function defects(diagram: ClassDiagram): string[] {
 					box.y < other.y + other.height &&
 					other.y < box.y + box.height,
 			)
-			.map((other) => `${box.id} overlaps ${other.id}`),
+			.map((other) => `boxes-overlap: ${box.id} overlaps ${other.id}`),
 	);
 	const diagonal = arrows.flatMap((arrow) =>
 		arrow.points.some(
@@ -240,7 +239,7 @@ function defects(diagram: ClassDiagram): string[] {
 				Math.abs(point.x - arrow.points[index - 1]!.x) > 0.01 &&
 				Math.abs(point.y - arrow.points[index - 1]!.y) > 0.01,
 		)
-			? [`${arrow.id} runs diagonally`]
+			? [`diagonal: ${arrow.id}`]
 			: [],
 	);
 	// Every end has a port of its own.
@@ -250,7 +249,7 @@ function defects(diagram: ClassDiagram): string[] {
 	]);
 	const shared = ports
 		.filter((port, index) => ports.indexOf(port) !== index)
-		.map((port) => `${port} shared`);
+		.map((port) => `port-shared: ${port}`);
 	// No side packs its ports closer than a port step's worth: crowded boxes grow instead.
 	const sides = new Map<string, number[]>();
 	for (const arrow of arrows)
@@ -267,7 +266,7 @@ function defects(diagram: ClassDiagram): string[] {
 	const packed = [...sides].flatMap(([side, along]) => {
 		const sorted = along.toSorted((a, b) => a - b);
 		return sorted.slice(1).some((value, index) => value - sorted[index]! < PORT_CLEARANCE)
-			? [`${side} packs its ports`]
+			? [`ports-packed: ${side}`]
 			: [];
 	});
 	// Class text never wraps: each compartment holds its widest member, the band its name.
@@ -275,7 +274,7 @@ function defects(diagram: ClassDiagram): string[] {
 		element.type === "text" &&
 		/^(?:text:|label:[^:]+:name$)/u.test(element.id) &&
 		element.text !== element.originalText
-			? [`${element.id} wraps`]
+			? [`text-wraps: ${element.id}`]
 			: [],
 	);
 	// Every free label stands clear of boxes, lines and other labels.
@@ -308,7 +307,7 @@ function defects(diagram: ClassDiagram): string[] {
 					label.top < box.y + box.height &&
 					box.y < label.bottom,
 			)
-			.map((box) => `${label.id} on ${box.id}`),
+			.map((box) => `label-on-box: ${label.id} on ${box.id}`),
 		...segments
 			.filter((segment) =>
 				segment.orientation === "horizontal"
@@ -321,7 +320,7 @@ function defects(diagram: ClassDiagram): string[] {
 						segment.max > label.top &&
 						segment.min < label.bottom,
 			)
-			.map(() => `${label.id} on a line`),
+			.map(() => `label-on-line: ${label.id}`),
 		...labels
 			.slice(index + 1)
 			.filter(
@@ -331,7 +330,7 @@ function defects(diagram: ClassDiagram): string[] {
 					label.top < other.bottom &&
 					other.top < label.bottom,
 			)
-			.map((other) => `${label.id} on ${other.id}`),
+			.map((other) => `label-on-label: ${label.id} on ${other.id}`),
 	]);
 	// Every free label reads as its own line's: every other line stands clearly further off.
 	const routes = new Map(arrows.map((arrow) => [arrow.edgeId, segmentsFromPoints(arrow.points)]));
@@ -353,7 +352,9 @@ function defects(diagram: ClassDiagram): string[] {
 			.map(([id, runs]) => [id, Math.min(...runs.map((run) => gap(label, run)))] as const)
 			.reduce((best, next) => (next[1] < best[1] ? next : best), ["", Infinity] as const);
 		return nearest < Math.max(ATTRIBUTION_RATIO * own, own + ATTRIBUTION_MARGIN)
-			? [`${label.id} ${own.toFixed(0)} px from its line, ${nearest.toFixed(0)} px from ${other}`]
+			? [
+					`label-misattributed: ${label.id} ${own.toFixed(0)} px from its line, ${nearest.toFixed(0)} px from ${other}`,
+				]
 			: [];
 	});
 	// Every multiplicity and role reads as its own end's: beside that end's tip, and the
@@ -376,7 +377,9 @@ function defects(diagram: ClassDiagram): string[] {
 		);
 		return center > END_LABEL_REACH ||
 			other < Math.max(ATTRIBUTION_RATIO * own, own + ATTRIBUTION_MARGIN)
-			? [`${label.id} ${own.toFixed(0)} px from its end, ${other.toFixed(0)} px from the other`]
+			? [
+					`end-label-misplaced: ${label.id} ${own.toFixed(0)} px from its end, ${other.toFixed(0)} px from the other`,
+				]
 			: [];
 	});
 	// No two lines run side by side closer than a reader can tell apart.
@@ -396,11 +399,9 @@ function defects(diagram: ClassDiagram): string[] {
 						Math.max(right.segment.min, left.segment.min) >
 						0,
 			)
-			.map((right) => `${left.arrow} runs beside ${right.arrow}`),
+			.map((right) => `lines-hug: ${left.arrow} runs beside ${right.arrow}`),
 	);
 	return [
-		...getCanvasValidationIssues(scene).map((issue) => issue.message),
-		...validateExcalidrawScene(exported).issues.map((issue) => issue.message),
 		...overlapping,
 		...diagonal,
 		...shared,
@@ -412,6 +413,176 @@ function defects(diagram: ClassDiagram): string[] {
 		...hugging,
 	];
 }
+
+type SceneElement = CanvasSpec["elements"][number];
+type SceneEdit = (element: SceneElement) => SceneElement;
+
+/** The scene with the element of this id replaced. */
+function edit(scene: CanvasSpec, id: string, change: SceneEdit): CanvasSpec {
+	if (!scene.elements.some((element) => element.id === id)) throw new Error(`no element ${id}`);
+	return {
+		...scene,
+		elements: scene.elements.map((element) => (element.id === id ? change(element) : element)),
+	};
+}
+
+const moveTo =
+	(x: number, y: number): SceneEdit =>
+	(element) =>
+		({ ...element, x, y }) as SceneElement;
+const route =
+	(...points: { x: number; y: number }[]): SceneEdit =>
+	(element) =>
+		({ ...element, points }) as SceneElement;
+
+/** A line's first and last point. */
+const ends = (arrow: { readonly points: readonly { x: number; y: number }[] }) =>
+	[arrow.points[0]!, arrow.points.at(-1)!] as const;
+
+function find<T extends SceneElement["type"]>(scene: CanvasSpec, id: string, type: T) {
+	const element = scene.elements.find((entry) => entry.id === id);
+	if (element?.type !== type) throw new Error(`no ${type} ${id}`);
+	return element as Extract<SceneElement, { type: T }>;
+}
+
+const shop = parseClassDiagram(
+	resolveClassShorthand({
+		id: "shop",
+		title: "Shop",
+		type: "class",
+		classes: [
+			{ id: "Customer", attributes: ["- name: String"] },
+			{ id: "Order", attributes: ["- total: double"], methods: ["+ pay(): void"] },
+			{ id: "Item", attributes: ["- price: double"] },
+			{ id: "Payment", kind: "interface", methods: ["+ charge(): bool"] },
+		],
+		relationships: [
+			{
+				id: "places",
+				kind: "association",
+				from: "Customer",
+				to: "Order",
+				label: "places",
+				fromMultiplicity: "1",
+				toMultiplicity: "0..*",
+			},
+			{
+				id: "holds",
+				kind: "composition",
+				from: "Order",
+				to: "Item",
+				toMultiplicity: "1..*",
+				toRole: "items",
+			},
+			{ id: "uses", kind: "dependency", from: "Order", to: "Payment" },
+		],
+	}),
+).pipe(Result.getOrThrow);
+
+/** One deliberately broken scene per problem kind the class oracle reports. */
+const broken: Record<string, (scene: CanvasSpec) => CanvasSpec> = {
+	"boxes-overlap": (scene) => {
+		const order = find(scene, "node:Order", "node");
+		return edit(scene, "node:Item", moveTo(order.x + 20, order.y + 20));
+	},
+	diagonal: (scene) => {
+		const [from, to] = ends(find(scene, "edge:uses", "arrow"));
+		return edit(scene, "edge:uses", route(from, { x: to.x + 20, y: to.y }));
+	},
+	"port-shared": (scene) => {
+		const start = find(scene, "edge:holds", "arrow").points[0];
+		const payment = find(scene, "node:Payment", "node");
+		const aside = payment.x + payment.width + 40;
+		return edit(
+			scene,
+			"edge:uses",
+			route(
+				start,
+				{ x: aside, y: start.y },
+				{ x: aside, y: payment.y + 20 },
+				{
+					x: payment.x + payment.width,
+					y: payment.y + 20,
+				},
+			),
+		);
+	},
+	"ports-packed": (scene) => {
+		const start = find(scene, "edge:holds", "arrow").points[0];
+		const payment = find(scene, "node:Payment", "node");
+		const aside = payment.x + payment.width + 40;
+		return edit(
+			scene,
+			"edge:uses",
+			route(
+				{ x: start.x, y: start.y + 10 },
+				{ x: aside, y: start.y + 10 },
+				{
+					x: aside,
+					y: payment.y + 20,
+				},
+				{ x: payment.x + payment.width, y: payment.y + 20 },
+			),
+		);
+	},
+	// The export rewraps text bound to a line to the line label's width.
+	"text-wraps": (scene) =>
+		edit(
+			scene,
+			"text:Order:attributes",
+			(element) =>
+				({
+					...element,
+					containerId: "edge:holds",
+					text: "- totalIncludingTaxesShippingAndEveryDiscountApplied: double",
+				}) as SceneElement,
+		),
+	"label-on-box": (scene) => {
+		const customer = find(scene, "node:Customer", "node");
+		return edit(
+			scene,
+			"relationship:places:name",
+			moveTo(customer.x + customer.width / 2, customer.y + customer.height / 2),
+		);
+	},
+	"label-on-line": (scene) => {
+		const [from, to] = ends(find(scene, "edge:places", "arrow"));
+		return edit(scene, "relationship:places:name", moveTo((from.x + to.x) / 2, from.y));
+	},
+	"label-on-label": (scene) => {
+		const { x, y } = find(scene, "relationship:places:to:multiplicity", "text");
+		return edit(scene, "relationship:places:name", moveTo(x, y));
+	},
+	"label-misattributed": (scene) => {
+		const [from, to] = ends(find(scene, "edge:uses", "arrow"));
+		return edit(scene, "relationship:places:name", moveTo(from.x + 30, (from.y + to.y) / 2));
+	},
+	"end-label-misplaced": (scene) => {
+		const [from] = find(scene, "edge:holds", "arrow").points;
+		const { y } = find(scene, "relationship:holds:to:role", "text");
+		return edit(scene, "relationship:holds:to:role", moveTo(from.x + 28, y));
+	},
+	"lines-hug": (scene) => {
+		const [from, to] = ends(find(scene, "edge:holds", "arrow"));
+		const payment = find(scene, "node:Payment", "node");
+		const x = (from.x + to.x) / 2 + 20;
+		return edit(
+			scene,
+			"edge:uses",
+			route({ x: from.x + 10, y: from.y + 6 }, { x, y: from.y + 6 }, { x, y: payment.y }),
+		);
+	},
+};
+
+describe("class oracle", () => {
+	it.each(Object.entries(broken))("reports %s on a broken scene", (kind, breakScene) => {
+		const scene = renderDiagram(shop).pipe(Result.getOrThrow);
+		expect(classProblems(scene)).toEqual([]);
+		expect(classProblems(breakScene(scene)).map((problem) => problem.split(":")[0])).toContain(
+			kind,
+		);
+	});
+});
 
 /**
  * Crossings and reader-scale findings ("crossings/findings") each random model
@@ -431,9 +602,16 @@ describe("class diagram routing fuzz", () => {
 	);
 
 	it("exports every random model valid, orthogonal, unwrapped, with ports apart and labels clear", () => {
-		const failures = models.flatMap((model, index) =>
-			defects(model).map((defect) => `${index}: ${defect}`),
-		);
+		const failures = models.flatMap((model, index) => {
+			const scene = renderDiagram(model).pipe(Result.getOrThrow);
+			return [
+				...getCanvasValidationIssues(scene).map((issue) => issue.message),
+				...validateExcalidrawScene(convertSceneToExcalidraw(scene)).issues.map(
+					(issue) => issue.message,
+				),
+				...classProblems(scene),
+			].map((problem) => `${index}: ${problem}`);
+		});
 		expect(failures).toEqual([]);
 	});
 
