@@ -311,9 +311,15 @@ const extensionlessImportExpressions = defineRule({
 	},
 	create(context: Context) {
 		const check = (source: Node) => {
-			if (source.type !== "Literal" || typeof source.value !== "string") return;
-			if (!relativeCodeModule.test(source.value)) return;
-			context.report({ node: source, messageId: "extension", data: { specifier: source.value } });
+			// A template without substitutions is as static as a string literal.
+			const specifier =
+				source.type === "Literal" && typeof source.value === "string"
+					? source.value
+					: source.type === "TemplateLiteral" && source.expressions.length === 0
+						? source.quasis[0]?.value.cooked
+						: undefined;
+			if (!specifier || !relativeCodeModule.test(specifier)) return;
+			context.report({ node: source, messageId: "extension", data: { specifier } });
 		};
 		return {
 			ImportExpression(node) {
