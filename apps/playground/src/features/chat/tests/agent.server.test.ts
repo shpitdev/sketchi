@@ -399,7 +399,7 @@ it("explains exhaustion after the second truncated output-limit call", async () 
 	expect(result.body).not.toContain('"type":"TOOL_CALL_RESULT"');
 });
 it.each(["request", "response body"])(
-	"cancels the gateway stream through %s while awaiting the terminal reason (local cancellation only; deployed Stop is an open defect)",
+	"cancels the gateway stream through %s while awaiting the terminal reason (local cancellation only; deployed Stop is a Preview platform limitation)",
 	async (boundary) => {
 		const read = Deferred.makeUnsafe<void>();
 		const cancelled = Deferred.makeUnsafe<void>();

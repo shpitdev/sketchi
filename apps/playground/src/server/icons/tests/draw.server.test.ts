@@ -2,11 +2,12 @@ import type { CloudflareAiGatewayProvider } from "@sketchi/cloudflare/ai-gateway
 import { takeClientRequest } from "@sketchi/community-icons";
 import { lookAlikeMarks } from "@sketchi/icon-catalog/look-alikes";
 import type { IconImagingJob } from "@sketchi/icon-draw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { StudioEnv } from "../../bindings/studio-env.server";
 import type { CodeModePngRendererNamespace } from "../../../features/render/browser-renderer.server";
 import { runPlaygroundEffect } from "../../runtime/runtime.server";
+import { IconDrawBudget } from "../budget-object.server";
 import { handleDrawIconRequest } from "../draw.server";
 
 const SVG = `<svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" fill="#e01e5a"/></svg>`;
@@ -158,35 +159,55 @@ describe("drawing is bounded per client and per day", () => {
 		expect(calls.gateway).toEqual([]);
 	});
 
-	it("refuses every client once the day's budget is spent, until midnight UTC", async () => {
+	it("refuses every client once the real daily budget is spent, reopens at midnight UTC and never on a clock step back", async () => {
 		const calls: Calls = { gateway: [], jobs: [], assets: [] };
-		const admitted: number[] = [];
-		let used = 0;
-		const env: StudioEnv = {
-			...fakeEnv(calls, recipeReplies()),
-			SKETCHI_ICON_DAILY_DRAWS: "1",
-			ICON_DRAW_BUDGET: {
-				getByName: () => ({
-					admit: (cap) => {
-						admitted.push(cap);
-						if (used >= cap) return Promise.resolve({ admitted: false, used });
-						used += 1;
-						return Promise.resolve({ admitted: true, used });
+		// The production budget object over Durable Object-shaped storage.
+		const stored = new Map<string, unknown>();
+		const budget = new IconDrawBudget(
+			{
+				storage: {
+					list: ({ prefix = "" }: { prefix?: string } = {}) =>
+						Promise.resolve(new Map([...stored].filter(([key]) => key.startsWith(prefix)))),
+					put: (key: string, value: unknown) => {
+						stored.set(key, value);
+						return Promise.resolve();
 					},
-				}),
+					delete: (keys: string[]) => {
+						for (const key of keys) stored.delete(key);
+						return Promise.resolve(keys.length);
+					},
+				},
 			},
+			{},
+		);
+		const env: StudioEnv = {
+			...fakeEnv(calls, [...recipeReplies(), ...recipeReplies()]),
+			SKETCHI_ICON_DAILY_DRAWS: "1",
+			ICON_DRAW_BUDGET: { getByName: () => budget },
 		};
-		// A request the input checks refuse never counts against the budget.
-		expect((await withRequest(env, { name: "Acme", svg: "<svg" })).status).toBe(400);
-		expect(admitted).toEqual([]);
-		expect((await withRequest(env, { name: "Acme", svg: SVG })).status).toBe(200);
-		const refused = await withRequest(env, { name: "Acme", svg: SVG }, "198.51.100.2");
-		expect(refused.status).toBe(429);
-		expect(await refused.json()).toMatchObject({ issues: [{ code: "daily_limit" }] });
-		const retryAfter = Number(refused.headers.get("retry-after"));
-		expect(retryAfter).toBeGreaterThan(0);
-		expect(retryAfter).toBeLessThanOrEqual(24 * 60 * 60);
-		expect(admitted).toEqual([1, 1]);
+		const at = (iso: string) => vi.setSystemTime(new Date(iso));
+		vi.useFakeTimers({ toFake: ["Date"] });
+		try {
+			at("2026-11-09T23:59:00Z");
+			// A request the input checks refuse never counts against the budget.
+			expect((await withRequest(env, { name: "Acme", svg: "<svg" })).status).toBe(400);
+			expect((await withRequest(env, { name: "Acme", svg: SVG })).status).toBe(200);
+			const refused = await withRequest(env, { name: "Acme", svg: SVG }, "198.51.100.2");
+			expect(refused.status).toBe(429);
+			expect(await refused.json()).toMatchObject({ issues: [{ code: "daily_limit" }] });
+			expect(refused.headers.get("retry-after")).toBe("60");
+
+			at("2026-11-10T00:00:05Z");
+			expect((await withRequest(env, { name: "Acme", svg: SVG })).status).toBe(200);
+			// A clock that steps back into the previous day must not reopen it.
+			at("2026-11-09T23:59:58Z");
+			expect((await withRequest(env, { name: "Acme", svg: SVG })).status).toBe(429);
+			at("2026-11-10T00:00:09Z");
+			expect((await withRequest(env, { name: "Acme", svg: SVG })).status).toBe(429);
+			expect([...stored]).toEqual([["draws:2026-11-10", 1]]);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("does not draw when the budget cannot be counted", async () => {
