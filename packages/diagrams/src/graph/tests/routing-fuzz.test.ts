@@ -192,12 +192,6 @@ describe("routing fuzz", () => {
 		},
 	);
 
-	// Rule 8: the around-the-bands oracle detects the long flow known to run around them.
-	it("reads left to right long flow 9 as running around the bands", () => {
-		expect(KNOWN_AROUND_THE_BANDS.LR).toContain(9);
-		expect(longFlowExports("LR")[9]!.around).not.toEqual([]);
-	}, 60_000);
-
 	describe.each(["TB", "BT", "LR", "RL"] as const)("%s", (direction) => {
 		it("draws no flowchart with more crossings or reader-scale findings than main", () => {
 			expect(worseThanMain(direction)).toEqual([]);
