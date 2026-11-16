@@ -38,7 +38,7 @@
 		"mindmap-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "MINDMAP_FUZZ_SEEDS=2000 vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/mindmap/mindmap-fuzz.test.ts"
+				"command": "MINDMAP_FUZZ_SEEDS=2000 vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/mindmap/tests/mindmap-fuzz.test.ts"
 			},
 			"inputs": [
 				"diagramTestShared",
@@ -87,7 +87,7 @@
 		"venn-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "VENN_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/venn/venn-fuzz.test.ts"
+				"command": "VENN_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/venn/tests/venn-fuzz.test.ts"
 			},
 			"inputs": [
 				"diagramTestShared",
@@ -441,7 +441,7 @@
 		"org-chart-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "ORG_CHART_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/org-chart/org-chart-fuzz.test.ts"
+				"command": "ORG_CHART_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/org-chart/tests/org-chart-fuzz.test.ts"
 			},
 			"inputs": [
 				"diagramTestShared",
@@ -458,7 +458,7 @@
 		"journey-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "JOURNEY_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/journey/journey-fuzz.test.ts"
+				"command": "JOURNEY_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/journey/tests/journey-fuzz.test.ts"
 			},
 			"inputs": [
 				"diagramTestShared",
