@@ -11,9 +11,9 @@
 			"types": "./dist/mcp-content.d.ts",
 			"default": "./dist/mcp-content.js"
 		},
-		"./mcp-session": {
-			"types": "./dist/mcp-session.d.ts",
-			"default": "./dist/mcp-session.js"
+		"./mcp-http": {
+			"types": "./dist/mcp-http.d.ts",
+			"default": "./dist/mcp-http.js"
 		}
 	},
 	"dependencies": {

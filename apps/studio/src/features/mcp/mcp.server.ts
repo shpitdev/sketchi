@@ -1,7 +1,7 @@
 import "@tanstack/react-start/server-only";
 
 import { mcpToolContent } from "@sketchi/cloudflare/mcp-content";
-import { routeMcpSession } from "@sketchi/cloudflare/mcp-session";
+import { type McpWebHandler, serveStatelessMcp } from "@sketchi/cloudflare/mcp-http";
 import { ArtifactStorage, BuildRuntimeEnvironment } from "@sketchi/diagrams/build";
 import {
 	makeWorkersTelemetryLayer,
@@ -63,15 +63,18 @@ export const StudioMcpRegistrations = McpServer.toolkit(SketchiToolkit).pipe(
 	Layer.provide(content),
 );
 
-/** Pure assembly in a session-owned Durable Object, with request dependencies supplied by HTTP. */
-export function makeStudioMcpHandler(origin: string | null) {
+/** One request's native server; bindings, correlation and export come from that request. */
+function makeStudioMcpHandler(
+	origin: string | null,
+	env: StudioEnv,
+	waitUntil: (promise: Promise<unknown>) => void,
+): McpWebHandler {
 	const app = McpServer.layerHttp({
 		name: "sketchi-code-mode",
 		version: SKETCHI_CODE_MODE_VERSION,
 		path: "/mcp",
 		protocols: [McpProtocol.v2025_11_25, McpProtocol.v2025_06_18, McpProtocol.v2025_03_26],
 		allowedOrigins: origin === null ? [] : [origin],
-		allowSessionTermination: true,
 		registrations: StudioMcpRegistrations,
 	}).pipe(
 		Layer.provide(HttpServer.layerServices),
@@ -117,7 +120,7 @@ export function makeStudioMcpHandler(origin: string | null) {
 	});
 	return {
 		dispose: runtime.dispose,
-		fetch(request: Request, env: StudioEnv, waitUntil: (promise: Promise<unknown>) => void) {
+		fetch(request, { replay }) {
 			const url = new URL(request.url);
 			return runtime.handler(
 				request,
@@ -133,17 +136,26 @@ export function makeStudioMcpHandler(origin: string | null) {
 						traceId:
 							correlationIdHeader(request, "x-sketchi-trace-id") ?? SecureRandom.uuidV4Unsafe(),
 					}),
-					Context.add(StudioMcpExport, { pipeline: env.TELEMETRY_SPANS, waitUntil }),
+					Context.add(StudioMcpExport, {
+						pipeline: replay ? undefined : env.TELEMETRY_SPANS,
+						waitUntil,
+					}),
 				),
 			);
 		},
 	};
 }
 
-export const handleSketchiMcpRequest = (request: Request, env: StudioEnv) => {
-	if (!env.STUDIO_MCP_SESSION)
-		return Promise.resolve(new Response("MCP session binding is unavailable.", { status: 503 }));
-	return Effect.runPromise(routeMcpSession(request, env.STUDIO_MCP_SESSION), {
-		signal: request.signal,
-	});
-};
+export const handleSketchiMcpRequest = (
+	request: Request,
+	env: StudioEnv,
+	waitUntil: (promise: Promise<unknown>) => void,
+) =>
+	Effect.runPromise(
+		serveStatelessMcp(
+			request,
+			() => makeStudioMcpHandler(request.headers.get("origin"), env, waitUntil),
+			waitUntil,
+		),
+		{ signal: request.signal },
+	);

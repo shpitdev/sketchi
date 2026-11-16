@@ -1,8 +1,8 @@
 export const ICONS_CORS_HEADERS: Readonly<Record<string, string>> = {
-	"Access-Control-Allow-Headers": "Content-Type, MCP-Protocol-Version, MCP-Session-Id",
+	"Access-Control-Allow-Headers": "Content-Type, MCP-Protocol-Version",
 	"Access-Control-Allow-Methods": "DELETE, GET, HEAD, OPTIONS, POST",
 	"Access-Control-Allow-Origin": "*",
-	"Access-Control-Expose-Headers": "Content-Length, Content-Type, MCP-Session-Id",
+	"Access-Control-Expose-Headers": "Content-Length, Content-Type",
 	"Access-Control-Max-Age": "86400",
 	"Cross-Origin-Resource-Policy": "cross-origin",
 };

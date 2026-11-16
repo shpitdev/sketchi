@@ -27,7 +27,6 @@
 	// Holds warm Browser Run pages for Code Mode PNG export between requests.
 	"durable_objects": {
 		"bindings": [
-			{ "name": "STUDIO_MCP_SESSION", "class_name": "StudioMcpSession" },
 			{
 				"name": "CODEMODE_PNG_RENDERER",
 				"class_name": "CodeModePngRenderer"
@@ -56,8 +55,7 @@
 		{
 			"tag": "v3",
 			"new_sqlite_classes": ["ClientRateLimit"]
-		},
-		{ "tag": "mcp-v1", "new_sqlite_classes": ["StudioMcpSession"] }
+		}
 	],
 	"observability": {
 		"enabled": true,
@@ -121,7 +119,6 @@
 		],
 		"durable_objects": {
 			"bindings": [
-				{ "name": "STUDIO_MCP_SESSION", "class_name": "StudioMcpSession" },
 				{
 					"name": "CODEMODE_PNG_RENDERER",
 					"class_name": "CodeModePngRenderer"

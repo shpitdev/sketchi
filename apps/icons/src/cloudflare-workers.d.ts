@@ -1,12 +1,10 @@
 declare module "cloudflare:workers" {
-  import type { McpSessionNamespace } from "@sketchi/cloudflare/mcp-session";
   import type { IconAssetsBinding } from "./features/catalog/catalog.server";
   import type { CommunityEnv } from "@sketchi/community-icons";
   import type { TelemetryPipeline } from "@sketchi/observability";
 
   export const env: CommunityEnv & {
     ASSETS: IconAssetsBinding;
-    ICONS_MCP_SESSION: McpSessionNamespace;
     TELEMETRY_SPANS?: TelemetryPipeline;
     SKETCHI_APP_SURFACE?: string;
     EXCALIDRAW_LIBRARY_SUBMIT?: string;

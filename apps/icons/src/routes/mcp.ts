@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 async function handle(request: Request): Promise<Response> {
-	const [{ handleIconMcpRequest }, { env }] = await Promise.all([
+	const [{ handleIconMcpRequest }, { env, waitUntil }] = await Promise.all([
 		import("../features/mcp/mcp.server"),
 		import("cloudflare:workers"),
 	]);
-	return handleIconMcpRequest(request, env);
+	return handleIconMcpRequest(request, env, waitUntil);
 }
 
 export const Route = createFileRoute("/mcp")({

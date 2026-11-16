@@ -1,31 +1,49 @@
 // @vitest-environment node
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
-import { McpProtocol, McpServer, McpTest } from "effect/ai";
-import { IconSource } from "../src/features/catalog/catalog.server";
-import type { IconSourceLoader } from "../src/features/catalog/catalog.server";
-import { IconMcpRegistrations } from "../src/features/mcp/mcp.server";
+import { Context, Effect, Layer } from "effect";
+import { McpClient, McpProtocol } from "effect/ai";
+import { FetchHttpClient } from "effect/http";
+import { handleIconMcpRequest } from "../src/features/mcp/mcp.server";
 
-const clientFor = (origin: string, sourceLoader: IconSourceLoader) =>
-	McpTest.makeClient(
-		IconMcpRegistrations.pipe(
+type Assets = (url: URL) => Promise<Response>;
+
+/** An unchanged 2025-11-25 client of the Worker's /mcp boundary at `origin`. */
+const clientFor = (origin: string, assets: Assets) =>
+	Layer.build(
+		McpClient.layerHttp({
+			name: "icons-policy",
+			version: "1",
+			protocol: McpProtocol.v2025_11_25,
+			url: `${origin}/mcp`,
+		}).pipe(
+			Layer.provide(FetchHttpClient.layer),
 			Layer.provide(
-				McpServer.middleware<{ provides: IconSource }>()((effect) =>
-					Effect.provideService(effect, IconSource, { origin, sourceLoader }),
-				).layer,
+				Layer.succeed(FetchHttpClient.Fetch, ((input, init) =>
+					handleIconMcpRequest(
+						new Request(input, init),
+						{ ASSETS: { fetch: (url) => assets(new URL(url instanceof Request ? url.url : url)) } },
+						() => {},
+					)) as typeof fetch),
 			),
 		),
-		{ name: "icons-policy", version: "1", protocols: [McpProtocol.v2025_11_25] },
+	).pipe(
+		Effect.map(Context.get(McpClient.McpClient)),
+		Effect.map((client) => ({
+			listTools: client.listTools,
+			callTool: ({ name, arguments: args }: { name: string; arguments: Record<string, unknown> }) =>
+				Effect.flatMap(client.listTools(), (tools) =>
+					client.callTool({ tool: tools.find((tool) => tool.name === name)!, arguments: args }),
+				),
+		})),
 	);
+const svg: Assets = async (url) => new Response(`<svg data-origin="${url.origin}" />`);
 
 describe("icons MCP tools", () => {
 	it.effect("ranks aliases, trims real inputs and delivers raw SVG with isolated source URLs", () =>
 		Effect.gen(function* () {
-			const load: IconSourceLoader = async (request) =>
-				`<svg data-origin="${new URL(request.url).origin}" />`;
-			const one = yield* clientFor("https://one.test", load);
-			const two = yield* clientFor("https://two.test", load);
-			expect((yield* one.listTools()).tools.map((tool) => tool.name).sort()).toEqual([
+			const one = yield* clientFor("https://one.test", svg);
+			const two = yield* clientFor("https://two.test", svg);
+			expect((yield* one.listTools()).map((tool) => tool.name).sort()).toEqual([
 				"get_icon",
 				"search_icons",
 			]);
@@ -55,14 +73,15 @@ describe("icons MCP tools", () => {
 					svgUrl: `${origin}/api/icons/kubernetes.svg`,
 				});
 			}
-		}),
+		}).pipe(Effect.scoped),
 	);
 
 	it.effect("keeps actionable input, missing-icon and source failure details", () =>
 		Effect.gen(function* () {
-			const client = yield* clientFor("https://icons.test", async () => {
-				throw new Error("Source returned HTTP 503.");
-			});
+			const client = yield* clientFor(
+				"https://icons.test",
+				async () => new Response(null, { status: 503 }),
+			);
 			const invalid = yield* client.callTool({ name: "search_icons", arguments: { limit: 101 } });
 			expect(invalid).toMatchObject({
 				isError: true,
@@ -81,6 +100,6 @@ describe("icons MCP tools", () => {
 				isError: true,
 				content: [{ text: expect.stringContaining("503") }],
 			});
-		}),
+		}).pipe(Effect.scoped),
 	);
 });
