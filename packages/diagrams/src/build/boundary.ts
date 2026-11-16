@@ -7,8 +7,8 @@ import {
 } from "@sketchi/observability";
 import { Clock, Effect, Metric, Result } from "effect";
 
-import { type CodeModeArtifactStorage } from "./artifacts";
-import { type CodeModeRuntimeEnvironment } from "./runtime";
+import { type ArtifactStorage } from "./artifacts";
+import { type BuildRuntimeEnvironment } from "./runtime";
 
 const codeModeRequests = Metric.counter("sketchi_codemode_requests", {
 	description: "Code Mode boundary requests by terminal outcome",
@@ -121,14 +121,12 @@ export function observeCodeModeBoundary<
 export type CodeModeWorkflowEffect<A> = Effect.Effect<
 	A,
 	never,
-	CodeModeArtifactStorage | CodeModeRuntimeEnvironment
+	ArtifactStorage | BuildRuntimeEnvironment
 >;
 
 export function boundary<A extends ObservableCodeModeResult, E, B extends ObservableCodeModeResult>(
 	operation: string,
-	workflow: (
-		input: unknown,
-	) => Effect.Effect<A, E, CodeModeArtifactStorage | CodeModeRuntimeEnvironment>,
+	workflow: (input: unknown) => Effect.Effect<A, E, ArtifactStorage | BuildRuntimeEnvironment>,
 	onFailure: (error: E) => B,
 ): (input: unknown) => CodeModeWorkflowEffect<A | B> {
 	return Effect.fn(`codeMode.${operation}`)((input: unknown) =>

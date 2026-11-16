@@ -1,7 +1,4 @@
-import {
-	CodeModeArtifactStorageMemory,
-	makeCodeModeRuntimeEnvironmentLayer,
-} from "@sketchi/diagrams/build";
+import { ArtifactStorageMemory, makeBuildRuntimeEnvironmentLayer } from "@sketchi/diagrams/build";
 import nativeIcons from "@sketchi/icon-catalog/native-icons";
 import { assert, layer } from "@effect/vitest";
 import { Effect, Layer } from "effect";
@@ -15,8 +12,8 @@ import { canonicalDocument, flowchartInput, mindmapInput, sequenceInput } from "
 const builderLayer = DiagramBuilderLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
-			CodeModeArtifactStorageMemory,
-			makeCodeModeRuntimeEnvironmentLayer({
+			ArtifactStorageMemory,
+			makeBuildRuntimeEnvironmentLayer({
 				createId: (prefix) => `${prefix}_png_test`,
 				icons: cliIconCatalog,
 			}),

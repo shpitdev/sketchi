@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 
-import type { CodeModeArtifactRenderer } from "@sketchi/diagrams/build";
+import type { ArtifactRenderer } from "@sketchi/diagrams/build";
 import { recordMetric, TelemetryCorrelation } from "@sketchi/observability";
 import { Clock, Context, Effect, Layer, Metric, Option, Schema } from "effect";
 
@@ -63,9 +63,9 @@ export interface CloudflareBrowserRunRendererOptions {
 	assetOrigin?: string;
 }
 
-export interface CloudflareBrowserRunArtifactRenderer extends CodeModeArtifactRenderer {
+export interface CloudflareBrowserRunArtifactRenderer extends ArtifactRenderer {
 	readonly renderPng: (
-		input: Parameters<CodeModeArtifactRenderer["renderPng"]>[0],
+		input: Parameters<ArtifactRenderer["renderPng"]>[0],
 	) => Effect.Effect<ArrayBuffer | Uint8Array, BrowserRenderingFailure | BrowserRenderingTimeout>;
 }
 

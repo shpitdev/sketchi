@@ -2,16 +2,16 @@ import { type CanvasSpec } from "@sketchi/drawing";
 import { type ArtifactFormat } from "@sketchi/drawing/artifacts";
 import { Context, Effect, Layer, Schema } from "effect";
 
-import { type CodeModeCommunityIcons, type CodeModeIconCatalog } from "./icons";
+import { type BuildCommunityIcons, type BuildIconCatalog } from "./icons";
 
-/** What a host supplies to every Code Mode operation: ids, icons, rendering and artifact URLs. */
-export interface CodeModeRuntimeOptions {
+/** What a host supplies to every build operation: ids, icons, rendering and artifact URLs. */
+export interface BuildRuntimeOptions {
 	createId?: (prefix: string) => string;
 	/** Node-logo catalog; without one, every node icon is dropped with a warning. */
-	icons?: CodeModeIconCatalog;
+	icons?: BuildIconCatalog;
 	/** Published community icons, which a request names by `community/<slug>`. */
-	communityIcons?: CodeModeCommunityIcons;
-	renderer?: CodeModeArtifactRenderer;
+	communityIcons?: BuildCommunityIcons;
+	renderer?: ArtifactRenderer;
 	/** Internal per-call policy for optional default PNGs; explicit exports remain strict. */
 	defaultPng?: {
 		deadlineMillis: number;
@@ -27,17 +27,17 @@ export interface CodeModeRuntimeOptions {
 	artifactUrl?: (input: { artifactId: string; format: ArtifactFormat }) => string;
 }
 
-export class CodeModeRuntimeEnvironment extends Context.Service<
-	CodeModeRuntimeEnvironment,
-	Required<Pick<CodeModeRuntimeOptions, "createId">> &
+export class BuildRuntimeEnvironment extends Context.Service<
+	BuildRuntimeEnvironment,
+	Required<Pick<BuildRuntimeOptions, "createId">> &
 		Pick<
-			CodeModeRuntimeOptions,
+			BuildRuntimeOptions,
 			"artifactUrl" | "communityIcons" | "icons" | "renderer" | "defaultPng" | "fillNamedLogos"
 		>
->()("@sketchi/diagram-agent/CodeModeRuntimeEnvironment") {}
+>()("@sketchi/diagrams/BuildRuntimeEnvironment") {}
 
-export function makeCodeModeRuntimeEnvironmentLayer(options: CodeModeRuntimeOptions = {}) {
-	return Layer.succeed(CodeModeRuntimeEnvironment, {
+export function makeBuildRuntimeEnvironmentLayer(options: BuildRuntimeOptions = {}) {
+	return Layer.succeed(BuildRuntimeEnvironment, {
 		createId: options.createId ?? defaultCreateId,
 		...(options.icons ? { icons: options.icons } : {}),
 		...(options.communityIcons ? { communityIcons: options.communityIcons } : {}),
@@ -52,17 +52,17 @@ function defaultCreateId(prefix: string): string {
 	return `${prefix}_${globalThis.crypto.randomUUID()}`;
 }
 
-export class CodeModeArtifactRenderFailed extends Schema.TaggedError<
-	CodeModeArtifactRenderFailed,
+export class ArtifactRenderFailed extends Schema.TaggedError<
+	ArtifactRenderFailed,
 	{ readonly brand: unique symbol }
->()("CodeModeArtifactRenderFailed", { cause: Schema.Defect(), message: Schema.String }) {}
+>()("ArtifactRenderFailed", { cause: Schema.Defect(), message: Schema.String }) {}
 
 /** Implementations may retain their own tagged renderer failures. */
-type TaggedArtifactRenderFailure = Pick<CodeModeArtifactRenderFailed, "message"> & {
+type TaggedArtifactRenderFailure = Pick<ArtifactRenderFailed, "message"> & {
 	readonly _tag: string;
 };
 
-export interface CodeModeArtifactRenderer<
+export interface ArtifactRenderer<
 	E extends TaggedArtifactRenderFailure = TaggedArtifactRenderFailure,
 > {
 	renderPng(input: {

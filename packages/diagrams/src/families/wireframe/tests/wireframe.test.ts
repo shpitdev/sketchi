@@ -3,9 +3,9 @@ import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect, Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { ArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
 import { buildWireframe } from "../../../build/builds";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { BuildRuntimeEnvironment } from "../../../build/runtime";
 import { applyDiagramPatch } from "../../../canvas/patch";
 import { buildResponse, type BuildRejection } from "../../../build/operation";
 import {
@@ -28,14 +28,14 @@ import { renderWireframeDiagram } from "../render";
 
 const storage = makeMemoryArtifactStorage();
 function run<A, E extends BuildRejection<unknown>>(
-	effect: Effect.Effect<A, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+	effect: Effect.Effect<A, E, BuildRuntimeEnvironment | ArtifactStorage>,
 ) {
 	return Effect.runPromise(
 		buildResponse(effect).pipe(
-			Effect.provideService(CodeModeRuntimeEnvironment, {
+			Effect.provideService(BuildRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 			}),
-			Effect.provideService(CodeModeArtifactStorage, storage),
+			Effect.provideService(ArtifactStorage, storage),
 		),
 	);
 }

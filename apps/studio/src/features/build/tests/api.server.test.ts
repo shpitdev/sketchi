@@ -7,8 +7,8 @@ import { describe, expect, it } from "vitest";
 import { serveDiagramsApi } from "../http.server";
 
 import {
-	type CodeModeObjectBucket,
-	type CodeModeObjectBucketObject,
+	type ArtifactObjectBucket,
+	type ArtifactObjectBucketObject,
 } from "@sketchi/diagrams/build";
 import { CANVAS_LIMITS } from "@sketchi/drawing";
 
@@ -121,10 +121,10 @@ function usageCaptures(spans: SpanPipeline) {
 		});
 }
 
-class MemoryBucket implements CodeModeObjectBucket {
+class MemoryBucket implements ArtifactObjectBucket {
 	readonly objects = new Map<string, string | Uint8Array>();
 
-	async get(key: string): Promise<CodeModeObjectBucketObject | null> {
+	async get(key: string): Promise<ArtifactObjectBucketObject | null> {
 		const value = this.objects.get(key);
 		if (!value) {
 			return null;

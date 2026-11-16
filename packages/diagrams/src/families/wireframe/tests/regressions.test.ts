@@ -3,9 +3,9 @@ import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect } from "effect";
 import { expect, it } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { ArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
 import { buildWireframe } from "../../../build/builds";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { BuildRuntimeEnvironment } from "../../../build/runtime";
 import { buildResponse } from "../../../build/operation";
 
 const build = (spec: unknown) =>
@@ -19,10 +19,10 @@ const build = (spec: unknown) =>
 				},
 			}),
 		).pipe(
-			Effect.provideService(CodeModeRuntimeEnvironment, {
+			Effect.provideService(BuildRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 			}),
-			Effect.provideService(CodeModeArtifactStorage, makeMemoryArtifactStorage()),
+			Effect.provideService(ArtifactStorage, makeMemoryArtifactStorage()),
 		),
 	);
 

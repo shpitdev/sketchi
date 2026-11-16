@@ -2,13 +2,13 @@
 // environment, storage and icon services they provide. Schemas alone come from
 // `./contract`; agent limits from `./policy`.
 export {
-	CodeModeArtifactStorage,
-	CodeModeArtifactStorageMemory,
+	ArtifactStorage,
+	ArtifactStorageMemory,
 	makeMemoryArtifactStorage,
 	makeObjectBucketArtifactStorage,
-	type CodeModeArtifactStorageShape,
-	type CodeModeObjectBucket,
-	type CodeModeObjectBucketObject,
+	type ArtifactStorageShape,
+	type ArtifactObjectBucket,
+	type ArtifactObjectBucketObject,
 	type StoredArtifactFormat,
 } from "./artifacts";
 export { observeCodeModeBoundary } from "./boundary";
@@ -20,16 +20,16 @@ export {
 } from "./documents";
 export { editFlowchart } from "./edit-flowchart";
 export {
-	CodeModeIconLoadError,
-	makeCodeModeIconCatalog,
+	BuildIconLoadError,
+	makeBuildIconCatalog,
 	normalizeIconSlug,
-	type CodeModeCommunityIcons,
-	type CodeModeIconCatalog,
+	type BuildCommunityIcons,
+	type BuildIconCatalog,
 } from "./icons";
 export { buildResponse, type BuildRejection } from "./operation";
 export {
-	CodeModeRuntimeEnvironment,
-	makeCodeModeRuntimeEnvironmentLayer,
-	type CodeModeArtifactRenderer,
+	BuildRuntimeEnvironment,
+	makeBuildRuntimeEnvironmentLayer,
+	type ArtifactRenderer,
 } from "./runtime";
 export { searchIcons } from "./search-icons";

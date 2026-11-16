@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 
-import { CodeModeArtifactStorage, CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build";
+import { ArtifactStorage, BuildRuntimeEnvironment } from "@sketchi/diagrams/build";
 import { Effect } from "effect";
 import { Tool, Toolkit } from "effect/ai";
 import {
@@ -53,8 +53,8 @@ const Execute = Tool.make("execute", {
 		PlaygroundClock,
 		PlaygroundIds,
 		PlaygroundRequestMetadata,
-		CodeModeArtifactStorage,
-		CodeModeRuntimeEnvironment,
+		ArtifactStorage,
+		BuildRuntimeEnvironment,
 		PlaygroundCodeModeUsage,
 		CodeModeSandbox,
 	],

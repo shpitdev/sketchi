@@ -2,9 +2,9 @@ import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect } from "effect";
 import { expect, it } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { ArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
 import { buildQuadrantChart } from "../../../build/builds";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { BuildRuntimeEnvironment } from "../../../build/runtime";
 import { buildResponse } from "../../../build/operation";
 import { quadrantFixture } from "../document";
 
@@ -21,8 +21,8 @@ it("keeps prototype-like labels and groups apart through build and export", asyn
 				options: { inlineArtifacts: ["excalidraw"], artifactFormats: ["excalidraw"] },
 			}),
 		).pipe(
-			Effect.provideService(CodeModeRuntimeEnvironment, { createId: (prefix) => `${prefix}_1` }),
-			Effect.provideService(CodeModeArtifactStorage, makeMemoryArtifactStorage()),
+			Effect.provideService(BuildRuntimeEnvironment, { createId: (prefix) => `${prefix}_1` }),
+			Effect.provideService(ArtifactStorage, makeMemoryArtifactStorage()),
 		),
 	);
 	if (!built.ok) throw new Error(JSON.stringify(built.issues));

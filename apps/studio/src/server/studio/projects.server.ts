@@ -1,7 +1,7 @@
 import { CanvasSpec } from "@sketchi/drawing";
 import "@tanstack/react-start/server-only";
 
-import { CodeModeArtifactStorage, CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build";
+import { ArtifactStorage, BuildRuntimeEnvironment } from "@sketchi/diagrams/build";
 import { getArtifact } from "@sketchi/diagrams/canvas/artifact";
 
 import {
@@ -44,7 +44,7 @@ export const PlaygroundStudioLayer = Layer.effect(
 	PlaygroundStudio,
 	Effect.gen(function* () {
 		const clock = yield* PlaygroundClock;
-		const localStorage = yield* CodeModeArtifactStorage;
+		const localStorage = yield* ArtifactStorage;
 		const ids = yield* PlaygroundIds;
 		const localBucket = yield* PlaygroundStudioLocalBucket;
 
@@ -63,8 +63,8 @@ export const PlaygroundStudioLayer = Layer.effect(
 							format: "scene",
 							inline: true,
 						}).pipe(
-							Effect.provideService(CodeModeArtifactStorage, storage),
-							Effect.provideService(CodeModeRuntimeEnvironment, {
+							Effect.provideService(ArtifactStorage, storage),
+							Effect.provideService(BuildRuntimeEnvironment, {
 								createId: ids.create,
 							}),
 						);

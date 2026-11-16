@@ -3,7 +3,7 @@ import { CodeModeIssue, type CodeModeIssueCode, type CodeModeIssueRef } from "./
 
 import { type Cause, Schema } from "effect";
 
-import { storageIssue, type CodeModeArtifactStorageError } from "./artifacts";
+import { storageIssue, type ArtifactStorageError } from "./artifacts";
 
 export function issue(input: {
 	code: CodeModeIssueCode;
@@ -37,7 +37,7 @@ export function responseRequestId(requestId: string | undefined) {
 }
 
 export function storageFailureIssue(
-	error: CodeModeArtifactStorageError,
+	error: ArtifactStorageError,
 	code: "storage_read_failed" | "storage_write_failed",
 ) {
 	return storageIssue(error.message, code);

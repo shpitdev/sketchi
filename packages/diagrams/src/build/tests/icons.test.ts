@@ -14,22 +14,22 @@ import nativeIcons from "@sketchi/icon-catalog/native-icons";
 import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../artifacts";
+import { ArtifactStorage, makeMemoryArtifactStorage } from "../artifacts";
 import {
-	CodeModeIconLoadError,
-	makeCodeModeIconCatalog,
+	BuildIconLoadError,
+	makeBuildIconCatalog,
 	withCommunityIcons,
-	type CodeModeCommunityIcon,
-	type CodeModeIconCatalog,
+	type BuildCommunityIcon,
+	type BuildIconCatalog,
 } from "../icons";
 import { getArtifact } from "../../canvas/artifact";
 import { createCanvas } from "../../canvas/create";
 import { buildFlowchart, buildSequenceDiagram } from "../builds";
 import { editFlowchart } from "../edit-flowchart";
 import {
-	type CodeModeArtifactRenderer,
-	CodeModeRuntimeEnvironment,
-	makeCodeModeRuntimeEnvironmentLayer,
+	type ArtifactRenderer,
+	BuildRuntimeEnvironment,
+	makeBuildRuntimeEnvironmentLayer,
 } from "../runtime";
 
 function catalogIcon(
@@ -56,8 +56,8 @@ const SOURCES: Record<string, string> = {
 	github: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><circle r="1"/></svg>',
 };
 
-function fixtureCatalog(): CodeModeIconCatalog {
-	return makeCodeModeIconCatalog({
+function fixtureCatalog(): BuildIconCatalog {
+	return makeBuildIconCatalog({
 		icons: [catalogIcon("docker", "Docker"), catalogIcon("github", "GitHub")],
 		slugLookup: "sketchi.searchIcons({ q })",
 		loadSvg: (icon) => {
@@ -65,7 +65,7 @@ function fixtureCatalog(): CodeModeIconCatalog {
 			return source
 				? Effect.succeed(source)
 				: Effect.fail(
-						CodeModeIconLoadError.make({
+						BuildIconLoadError.make({
 							cause: new Error("missing"),
 							message: `No source for ${icon.slug}.`,
 							slug: icon.slug,
@@ -82,20 +82,20 @@ const RING: IconRecipe = {
 	],
 };
 
-const COMMUNITY: readonly CodeModeCommunityIcon[] = [
+const COMMUNITY: readonly BuildCommunityIcon[] = [
 	{ slug: "community/ring-queue", name: "Ring queue", recipe: RING },
 ];
 
 function runtime(
 	options: {
-		readonly icons?: CodeModeIconCatalog;
-		readonly renderer?: CodeModeArtifactRenderer;
+		readonly icons?: BuildIconCatalog;
+		readonly renderer?: ArtifactRenderer;
 	} = {},
 ) {
 	const storage = makeMemoryArtifactStorage();
 	const loads: string[][] = [];
 	let id = 0;
-	const environment = makeCodeModeRuntimeEnvironmentLayer({
+	const environment = makeBuildRuntimeEnvironmentLayer({
 		createId: (prefix) => `${prefix}-${(id += 1)}`,
 		icons: options.icons ?? fixtureCatalog(),
 		...(options.renderer ? { renderer: options.renderer } : {}),
@@ -109,13 +109,10 @@ function runtime(
 		},
 	});
 	const provide = <A>(
-		program: Effect.Effect<A, never, CodeModeArtifactStorage | CodeModeRuntimeEnvironment>,
+		program: Effect.Effect<A, never, ArtifactStorage | BuildRuntimeEnvironment>,
 	) =>
 		Effect.runPromise(
-			program.pipe(
-				Effect.provide(environment),
-				Effect.provideService(CodeModeArtifactStorage, storage),
-			),
+			program.pipe(Effect.provide(environment), Effect.provideService(ArtifactStorage, storage)),
 		);
 	return {
 		loads,
@@ -269,7 +266,7 @@ describe("catalog icons", () => {
 describe("named logo fill", () => {
 	const production = () =>
 		runtime({
-			icons: makeCodeModeIconCatalog({
+			icons: makeBuildIconCatalog({
 				icons: iconManifest.icons,
 				slugLookup: "sketchi.searchIcons({ q })",
 				loadSvg: () => Effect.succeed(SOURCES["docker"] ?? ""),

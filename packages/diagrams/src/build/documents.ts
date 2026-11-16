@@ -9,11 +9,11 @@ import {
 	type FamilyBuildResult,
 } from "../family";
 import { bindBuild } from "./builds";
-import { type CodeModeRuntimeEnvironment } from "./runtime";
+import { type BuildRuntimeEnvironment } from "./runtime";
 
 import { type BuildOptions } from "./result";
 
-import { type CodeModeArtifactStorage } from "./artifacts";
+import { type ArtifactStorage } from "./artifacts";
 
 export function isCanonicalDocumentType(value: unknown): value is DiagramTypeValue {
 	return DIAGRAM_TYPES.some((type) => type === value);
@@ -26,7 +26,7 @@ export function buildCanonicalDocument(
 ): Effect.Effect<
 	FamilyBuildResult,
 	import("./operation").BuildRejection<FamilyBuildResult>,
-	CodeModeArtifactStorage | CodeModeRuntimeEnvironment
+	ArtifactStorage | BuildRuntimeEnvironment
 > {
 	return familyForType(document.type).build({ bindBuild })({
 		spec: document.spec,

@@ -5,11 +5,11 @@ import { HttpRouter, HttpServer, type HttpServerRequest, HttpServerResponse } fr
 import { HttpApiBuilder } from "effect/http-api";
 
 import {
-	CodeModeArtifactStorage,
+	ArtifactStorage,
 	type StoredArtifactFormat,
 	bindBuild,
 	editFlowchart,
-	type CodeModeRuntimeEnvironment,
+	type BuildRuntimeEnvironment,
 	buildResponse,
 } from "@sketchi/diagrams/build";
 import { getArtifact } from "@sketchi/diagrams/canvas/artifact";
@@ -55,7 +55,7 @@ import {
 	type CodeModeUsageOperation,
 } from "./usage-events.server";
 
-type BuildServices = CodeModeArtifactStorage | CodeModeRuntimeEnvironment;
+type BuildServices = ArtifactStorage | BuildRuntimeEnvironment;
 
 /** A refusal the host makes before an operation runs: a body too large or not JSON. */
 function requestRefusal(code: "request_too_large" | "invalid_type", message: string, hint: string) {
@@ -277,7 +277,7 @@ const CanvasLive = HttpApiBuilder.group(DiagramsHttpApi, "canvas", (handlers) =>
 				);
 				if (!result.ok) return yield* Effect.fail(httpFailure(result));
 				if (!raw) return result;
-				const read = yield* (yield* CodeModeArtifactStorage)
+				const read = yield* (yield* ArtifactStorage)
 					.read(params.artifactId, result.format)
 					.pipe(Effect.result);
 				if (read._tag === "Failure")
@@ -375,8 +375,8 @@ export const serveDiagramsApi = Effect.fn("playground.http.diagrams")(function* 
 		| PlaygroundCodeModeUsage
 		| PlaygroundGeneration
 		| PlaygroundRequestMetadata
-		| CodeModeArtifactStorage
-		| CodeModeRuntimeEnvironment
+		| ArtifactStorage
+		| BuildRuntimeEnvironment
 	>();
 	const response = yield* Effect.promise(() =>
 		diagramsApp.handler(request, Context.add(context, CurrentCodeModeUsage, usage)),

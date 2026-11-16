@@ -4,9 +4,9 @@ import { CANVAS_LIMITS } from "@sketchi/drawing";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { buildResponse, type BuildRejection } from "../../../build/operation";
 import { buildTimeline } from "../../../build/builds";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { BuildRuntimeEnvironment } from "../../../build/runtime";
 import { applyDiagramPatch } from "../../../canvas/patch";
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { ArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
 import {
 	orderedTimelineEvents,
 	parseTimelineDiagram,
@@ -18,15 +18,15 @@ import {
 
 const storage = makeMemoryArtifactStorage();
 function run<A, E extends BuildRejection<unknown>>(
-	effect: Effect.Effect<A, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+	effect: Effect.Effect<A, E, BuildRuntimeEnvironment | ArtifactStorage>,
 ) {
 	let id = 0;
 	return Effect.runPromise(
 		buildResponse(effect).pipe(
-			Effect.provideService(CodeModeRuntimeEnvironment, {
+			Effect.provideService(BuildRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_timeline_${(id += 1)}`,
 			}),
-			Effect.provideService(CodeModeArtifactStorage, storage),
+			Effect.provideService(ArtifactStorage, storage),
 		),
 	);
 }

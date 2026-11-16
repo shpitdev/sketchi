@@ -3,9 +3,9 @@ import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect, Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { ArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
 import { buildQuadrantChart } from "../../../build/builds";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { BuildRuntimeEnvironment } from "../../../build/runtime";
 import { applyDiagramPatch } from "../../../canvas/patch";
 import { buildResponse, type BuildRejection } from "../../../build/operation";
 import {
@@ -23,12 +23,12 @@ const environment = {
 	createId: (prefix: string) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 };
 function run<A, E extends BuildRejection<unknown>>(
-	effect: Effect.Effect<A, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+	effect: Effect.Effect<A, E, BuildRuntimeEnvironment | ArtifactStorage>,
 ) {
 	return Effect.runPromise(
 		buildResponse(effect).pipe(
-			Effect.provideService(CodeModeRuntimeEnvironment, environment),
-			Effect.provideService(CodeModeArtifactStorage, storage),
+			Effect.provideService(BuildRuntimeEnvironment, environment),
+			Effect.provideService(ArtifactStorage, storage),
 		),
 	);
 }
@@ -98,8 +98,8 @@ describe("quadrant charts", () => {
 		const typed = await Effect.runPromise(
 			buildQuadrantChart({ spec, options }).pipe(
 				Effect.result,
-				Effect.provideService(CodeModeRuntimeEnvironment, environment),
-				Effect.provideService(CodeModeArtifactStorage, storage),
+				Effect.provideService(BuildRuntimeEnvironment, environment),
+				Effect.provideService(ArtifactStorage, storage),
 			),
 		);
 		if (Result.isSuccess(typed)) return expect.fail("Expected a layout refusal");

@@ -10,23 +10,21 @@ import {
 } from "../document";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { ArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
 import { erBuild } from "../build";
 import { buildResponse } from "../../../build/operation";
 import { canonicalDocumentFromDiagram } from "../../../build/documents";
 import { buildErDiagram } from "../../../build/builds";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { BuildRuntimeEnvironment } from "../../../build/runtime";
 
 const storage = makeMemoryArtifactStorage();
-function run<A>(
-	effect: Effect.Effect<A, never, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
-) {
+function run<A>(effect: Effect.Effect<A, never, BuildRuntimeEnvironment | ArtifactStorage>) {
 	return Effect.runPromise(
 		effect.pipe(
-			Effect.provideService(CodeModeRuntimeEnvironment, {
+			Effect.provideService(BuildRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 			}),
-			Effect.provideService(CodeModeArtifactStorage, storage),
+			Effect.provideService(ArtifactStorage, storage),
 		),
 	);
 }

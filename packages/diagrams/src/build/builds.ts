@@ -3,20 +3,20 @@ import { familyForType } from "../family";
 
 import { Effect } from "effect";
 
-import { type CodeModeArtifactStorage } from "./artifacts";
+import { type ArtifactStorage } from "./artifacts";
 import { observeCodeModeBoundary, type ObservableCodeModeResult } from "./boundary";
 import { artifactBuildCapabilities } from "./export";
 import { BuildIconSource, catalogForRequest } from "./icons";
-import { CodeModeRuntimeEnvironment } from "./runtime";
+import { BuildRuntimeEnvironment } from "./runtime";
 
 /** The host supplies one catalog and artifact boundary to both builds and edits. */
 interface HostedBuild<A, E, R> {
 	readonly decode: (input: unknown) => Effect.Effect<A, E>;
 	readonly build: (
 		request: A,
-		capabilities: ArtifactBuildCapabilities<CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+		capabilities: ArtifactBuildCapabilities<BuildRuntimeEnvironment | ArtifactStorage>,
 		delivery?: Pick<BuildDelivery, "provenance">,
-	) => Effect.Effect<R, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage | BuildIconSource>;
+	) => Effect.Effect<R, E, BuildRuntimeEnvironment | ArtifactStorage | BuildIconSource>;
 }
 export function runFamilyBuild<A, E, R>(
 	build: HostedBuild<A, E, R>,
@@ -25,7 +25,7 @@ export function runFamilyBuild<A, E, R>(
 ) {
 	return Effect.gen(function* () {
 		const request = yield* build.decode(input);
-		const environment = yield* CodeModeRuntimeEnvironment;
+		const environment = yield* BuildRuntimeEnvironment;
 		return yield* build.build(request, yield* artifactBuildCapabilities, delivery).pipe(
 			Effect.provideService(BuildIconSource, {
 				catalog: (document) =>

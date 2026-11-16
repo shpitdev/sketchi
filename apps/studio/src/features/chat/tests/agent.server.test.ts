@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "@effect/vitest";
 import type { CloudflareAiGateway } from "@sketchi/cloudflare/ai-gateway";
 import {
-	CodeModeArtifactStorage,
+	ArtifactStorage,
 	makeMemoryArtifactStorage,
 	buildFlowchart,
-	CodeModeRuntimeEnvironment,
+	BuildRuntimeEnvironment,
 	buildResponse,
 } from "@sketchi/diagrams/build";
 import { toCodeModeJsonSchema } from "@sketchi/diagrams/build/contract";
@@ -197,7 +197,7 @@ async function runWire(respond: (round: number) => Response, content = "Draw a f
 	});
 	const response = await runPlaygroundEffect(
 		handleStudioAgentRequest(request).pipe(
-			Effect.provideService(CodeModeArtifactStorage, { ...storage, write }),
+			Effect.provideService(ArtifactStorage, { ...storage, write }),
 			Effect.provide(makeWorkersTelemetryLayer({ resource: { serviceName: "studio-test" }, sink })),
 		),
 		{
@@ -545,8 +545,8 @@ describe("Studio build results the model reads", () => {
 	};
 	const build = (input: unknown) =>
 		buildResponse(buildFlowchart(input)).pipe(
-			Effect.provideService(CodeModeArtifactStorage, makeMemoryArtifactStorage()),
-			Effect.provideService(CodeModeRuntimeEnvironment, {
+			Effect.provideService(ArtifactStorage, makeMemoryArtifactStorage()),
+			Effect.provideService(BuildRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_fixed`,
 			}),
 		);
@@ -774,8 +774,8 @@ function countingStore() {
 function deterministicRuntime(counted: ReturnType<typeof countingStore>) {
 	return (input: unknown) =>
 		buildResponse(buildFlowchart(input)).pipe(
-			Effect.provideService(CodeModeArtifactStorage, counted.store),
-			Effect.provideService(CodeModeRuntimeEnvironment, {
+			Effect.provideService(ArtifactStorage, counted.store),
+			Effect.provideService(BuildRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_fixed`,
 			}),
 		);

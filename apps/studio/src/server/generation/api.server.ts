@@ -4,7 +4,7 @@ import {
 	buildCanonicalDocument,
 	canonicalDocumentFromDiagram,
 	buildResponse,
-	CodeModeRuntimeEnvironment,
+	BuildRuntimeEnvironment,
 } from "@sketchi/diagrams/build";
 import {
 	decodeFlowchartDocument,
@@ -483,7 +483,7 @@ export const generateDiagram = Effect.fn("playground.generate")(function* (bound
 			}),
 		);
 	}).pipe(
-		Effect.updateService(CodeModeRuntimeEnvironment, (capabilities) => ({
+		Effect.updateService(BuildRuntimeEnvironment, (capabilities) => ({
 			...capabilities,
 			fillNamedLogos: true,
 		})),
@@ -539,7 +539,7 @@ export const generateDiagram = Effect.fn("playground.generate")(function* (bound
 						options: { artifactFormats: ["scene"], inlineArtifacts: [] },
 					}),
 				).pipe(
-					Effect.updateService(CodeModeRuntimeEnvironment, (capabilities) => ({
+					Effect.updateService(BuildRuntimeEnvironment, (capabilities) => ({
 						...capabilities,
 						fillNamedLogos: true,
 					})),

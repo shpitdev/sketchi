@@ -4,7 +4,7 @@ import { cleanToolString } from "../clean-text";
 import { Effect, Result, Schema } from "effect";
 
 import { boundary, type CodeModeWorkflowEffect } from "./boundary";
-import { type CodeModeCommunityIcon, type CodeModeIconCatalog } from "./icons";
+import { type BuildCommunityIcon, type BuildIconCatalog } from "./icons";
 import {
 	codeModeInputIssues,
 	failureResult,
@@ -12,7 +12,7 @@ import {
 	issue,
 	workflowFailure,
 } from "./issues";
-import { CodeModeRuntimeEnvironment } from "./runtime";
+import { BuildRuntimeEnvironment } from "./runtime";
 import {
 	DEFAULT_ICON_SEARCH_LIMIT,
 	SearchIconsRejected,
@@ -37,7 +37,7 @@ function communityIconQuery(query: string): string {
 }
 
 /** How a community icon answers a query: exact when its name or slug is the query, else weak. */
-function communityIconMatch(query: string, icon: CodeModeCommunityIcon): "exact" | "weak" {
+function communityIconMatch(query: string, icon: BuildCommunityIcon): "exact" | "weak" {
 	const words = (text: string) =>
 		text
 			.toLowerCase()
@@ -56,8 +56,8 @@ function communityIconMatch(query: string, icon: CodeModeCommunityIcon): "exact"
  */
 function rankIconSearch(
 	query: string,
-	curated: ReturnType<CodeModeIconCatalog["search"]>,
-	community: readonly CodeModeCommunityIcon[],
+	curated: ReturnType<BuildIconCatalog["search"]>,
+	community: readonly BuildCommunityIcon[],
 	limit: number,
 ) {
 	const marks = curated.map(({ collection, match, name, slug }) => ({
@@ -95,7 +95,7 @@ const searchIconsWorkflow = Effect.fn("codeMode.searchIcons.workflow")(function*
 			},
 		});
 	}
-	const environment = yield* CodeModeRuntimeEnvironment;
+	const environment = yield* BuildRuntimeEnvironment;
 	const query = cleanToolString(parsed.success.q);
 	const limit = parsed.success.limit ?? DEFAULT_ICON_SEARCH_LIMIT;
 	const curated = environment.icons?.search(query, limit) ?? [];

@@ -4,9 +4,9 @@ import { type CanvasSpec, SKETCHI_DIAGRAM_PALETTE } from "@sketchi/drawing";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { describe, expect, it } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { ArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
 import { buildVennDiagram } from "../../../build/builds";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { BuildRuntimeEnvironment } from "../../../build/runtime";
 import { buildResponse } from "../../../build/operation";
 import {
 	parseVennDiagram,
@@ -36,10 +36,10 @@ function build(spec: unknown) {
 			},
 		}).pipe(
 			buildResponse,
-			Effect.provideService(CodeModeRuntimeEnvironment, {
+			Effect.provideService(BuildRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 			}),
-			Effect.provideService(CodeModeArtifactStorage, storage),
+			Effect.provideService(ArtifactStorage, storage),
 		),
 	);
 }

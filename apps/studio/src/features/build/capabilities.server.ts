@@ -1,11 +1,11 @@
 import "@tanstack/react-start/server-only";
 
 import {
-	CodeModeArtifactStorage,
+	ArtifactStorage,
 	makeMemoryArtifactStorage,
 	makeObjectBucketArtifactStorage,
-	type CodeModeArtifactStorageShape,
-	CodeModeRuntimeEnvironment,
+	type ArtifactStorageShape,
+	BuildRuntimeEnvironment,
 } from "@sketchi/diagrams/build";
 import type { ArtifactFormat } from "@sketchi/drawing/artifacts";
 import { Context, Effect, Layer } from "effect";
@@ -26,13 +26,13 @@ import { playgroundIconCatalog } from "./icon-catalog.server";
 /** Concrete host capabilities only. Family operations and policy stay in diagrams. */
 export const StudioBuildHostLive = Layer.merge(
 	PlaygroundBrowserRenderingLive,
-	Layer.sync(CodeModeArtifactStorage, makeMemoryArtifactStorage),
+	Layer.sync(ArtifactStorage, makeMemoryArtifactStorage),
 );
 
 export function artifactStoreForBindings(
 	env: Context.Service.Shape<typeof PlaygroundBindings>,
-	localStorage: CodeModeArtifactStorageShape,
-): CodeModeArtifactStorageShape {
+	localStorage: ArtifactStorageShape,
+): ArtifactStorageShape {
 	return env.SKETCHI_ARTIFACTS
 		? makeObjectBucketArtifactStorage(env.SKETCHI_ARTIFACTS, {
 				prefix: "codemode",
@@ -79,9 +79,9 @@ export const StudioBuildRequestLive = Layer.effectContext(
 		const ids = yield* PlaygroundIds;
 		const metadata = yield* PlaygroundRequestMetadata;
 		const browserRendering = yield* PlaygroundBrowserRendering;
-		const localStorage = yield* CodeModeArtifactStorage;
-		return Context.make(CodeModeArtifactStorage, artifactStoreForBindings(env, localStorage)).pipe(
-			Context.add(CodeModeRuntimeEnvironment, {
+		const localStorage = yield* ArtifactStorage;
+		return Context.make(ArtifactStorage, artifactStoreForBindings(env, localStorage)).pipe(
+			Context.add(BuildRuntimeEnvironment, {
 				createId: ids.create,
 				artifactUrl: (input) => artifactUrl(metadata.origin, input),
 				...(env.ASSETS ? { icons: playgroundIconCatalog(env.ASSETS, metadata.origin) } : {}),

@@ -1,9 +1,9 @@
 import "@tanstack/react-start/server-only";
 
 import {
-	CodeModeIconLoadError,
-	makeCodeModeIconCatalog,
-	type CodeModeIconCatalog,
+	BuildIconLoadError,
+	makeBuildIconCatalog,
+	type BuildIconCatalog,
 } from "@sketchi/diagrams/build";
 import { logosNamedInText, type NamedLogo } from "@sketchi/icon-catalog";
 import { iconManifest, nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
@@ -39,7 +39,7 @@ export interface PlaygroundAssetsBinding {
 	fetch(input: Request | URL | string, init?: RequestInit): Promise<Response>;
 }
 
-const catalogs = new WeakMap<PlaygroundAssetsBinding, Map<string, CodeModeIconCatalog>>();
+const catalogs = new WeakMap<PlaygroundAssetsBinding, Map<string, BuildIconCatalog>>();
 
 /**
  * Node-logo catalog backed by the Worker's static assets. The manifest and the
@@ -51,12 +51,12 @@ const catalogs = new WeakMap<PlaygroundAssetsBinding, Map<string, CodeModeIconCa
 export function playgroundIconCatalog(
 	assets: PlaygroundAssetsBinding,
 	origin: string,
-): CodeModeIconCatalog {
-	const byOrigin = catalogs.get(assets) ?? new Map<string, CodeModeIconCatalog>();
+): BuildIconCatalog {
+	const byOrigin = catalogs.get(assets) ?? new Map<string, BuildIconCatalog>();
 	catalogs.set(assets, byOrigin);
 	const cached = byOrigin.get(origin);
 	if (cached) return cached;
-	const catalog = makeCodeModeIconCatalog({
+	const catalog = makeBuildIconCatalog({
 		icons: iconManifest.icons,
 		concepts: CONCEPT_ICONS,
 		loadSvg: (icon) =>
@@ -72,7 +72,7 @@ export function playgroundIconCatalog(
 					return response.text();
 				},
 				catch: (cause) =>
-					CodeModeIconLoadError.make({
+					BuildIconLoadError.make({
 						cause,
 						message: `Node logo ${icon.slug} could not be read from static assets.`,
 						slug: icon.slug,

@@ -1,7 +1,4 @@
-import {
-	CodeModeArtifactStorageMemory,
-	makeCodeModeRuntimeEnvironmentLayer,
-} from "@sketchi/diagrams/build";
+import { ArtifactStorageMemory, makeBuildRuntimeEnvironmentLayer } from "@sketchi/diagrams/build";
 import { Cause, Effect, type FileSystem, Layer, Option } from "effect";
 import type { Stdio } from "effect/Stdio";
 
@@ -88,15 +85,15 @@ export const cliProgram = Effect.fn("sketchi.cli.run")(function* (args: Readonly
 	);
 });
 
-const codeModeDependencies = Layer.mergeAll(
-	CodeModeArtifactStorageMemory,
-	makeCodeModeRuntimeEnvironmentLayer({
+const buildServices = Layer.mergeAll(
+	ArtifactStorageMemory,
+	makeBuildRuntimeEnvironmentLayer({
 		createId: (prefix) => `${prefix}_offline_cli`,
 		icons: cliIconCatalog,
 	}),
 );
-const diagramBuilderLayer = Layer.provide(DiagramBuilderLive, codeModeDependencies);
-const diagramPatcherLayer = Layer.provide(DiagramPatcherLive, codeModeDependencies);
+const diagramBuilderLayer = Layer.provide(DiagramBuilderLive, buildServices);
+const diagramPatcherLayer = Layer.provide(DiagramPatcherLive, buildServices);
 const excalidrawShareLayer = Layer.provide(
 	ExcalidrawShareLive,
 	Layer.mergeAll(ShareTransportLive, ShareCryptoLive),

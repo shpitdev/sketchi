@@ -9,7 +9,7 @@ import {
 } from "@sketchi/drawing";
 import { Effect, Result, Schema } from "effect";
 
-import { CodeModeArtifactStorage, storageIssue } from "../build/artifacts";
+import { ArtifactStorage, storageIssue } from "../build/artifacts";
 import { boundary, type CodeModeWorkflowEffect } from "../build/boundary";
 import {
 	exportAndStoreScene,
@@ -26,7 +26,7 @@ import {
 	responseRequestId,
 	workflowFailure,
 } from "../build/issues";
-import { CodeModeRuntimeEnvironment } from "../build/runtime";
+import { BuildRuntimeEnvironment } from "../build/runtime";
 import { type CanvasInput } from "./input";
 import { canvasExportIssues, normalizeCanvasInput, serializedCanvasLimitIssue } from "./normalize";
 import {
@@ -86,7 +86,7 @@ const resolvePatchSource = Effect.fn("codeMode.patch.resolveSource")(function* (
 		return { scene: cloneScene(input.source.scene) };
 	}
 
-	const store = yield* CodeModeArtifactStorage;
+	const store = yield* ArtifactStorage;
 	const manifest = yield* store.readManifest(input.source.artifactId).pipe(
 		Effect.mapError((error) =>
 			ApplyDiagramPatchFailure.new({
@@ -216,7 +216,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 		});
 	}
 
-	const environment = yield* CodeModeRuntimeEnvironment;
+	const environment = yield* BuildRuntimeEnvironment;
 
 	const request = parsed.success;
 	const patchId = yield* Effect.sync(() => environment.createId("patch"));

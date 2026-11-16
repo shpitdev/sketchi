@@ -3,10 +3,10 @@ import { Effect, Schema } from "effect";
 import { groupRegionIssues, type CanvasSpec } from "@sketchi/drawing";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { ArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
 import { canonicalDocumentFromDiagram } from "../../../build/documents";
 import { buildStateMachine } from "../../../build/builds";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { BuildRuntimeEnvironment } from "../../../build/runtime";
 import { applyDiagramPatch } from "../../../canvas/patch";
 import { buildResponse } from "../../../build/operation";
 import { stateMachineBuild } from "../build";
@@ -19,15 +19,13 @@ import {
 } from "../document";
 
 const storage = makeMemoryArtifactStorage();
-function run<A>(
-	effect: Effect.Effect<A, never, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
-) {
+function run<A>(effect: Effect.Effect<A, never, BuildRuntimeEnvironment | ArtifactStorage>) {
 	return Effect.runPromise(
 		effect.pipe(
-			Effect.provideService(CodeModeRuntimeEnvironment, {
+			Effect.provideService(BuildRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 			}),
-			Effect.provideService(CodeModeArtifactStorage, storage),
+			Effect.provideService(ArtifactStorage, storage),
 		),
 	);
 }

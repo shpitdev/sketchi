@@ -1,8 +1,8 @@
 import {
 	buildResponse,
-	CodeModeArtifactStorage,
+	ArtifactStorage,
 	buildCanonicalDocument,
-	CodeModeRuntimeEnvironment,
+	BuildRuntimeEnvironment,
 } from "@sketchi/diagrams/build";
 import { type FamilyBuildResult } from "@sketchi/diagrams/family";
 import { Context, Effect, Layer } from "effect";
@@ -24,8 +24,8 @@ export class DiagramBuilder extends Context.Service<
 export const DiagramBuilderLive = Layer.effect(
 	DiagramBuilder,
 	Effect.gen(function* () {
-		const artifactStorage = yield* CodeModeArtifactStorage;
-		const environment = yield* CodeModeRuntimeEnvironment;
+		const artifactStorage = yield* ArtifactStorage;
+		const environment = yield* BuildRuntimeEnvironment;
 
 		const build = Effect.fn("sketchi.cli.diagram.build")(function* (
 			document: CanonicalDiagramDocument,

@@ -7,15 +7,15 @@ import { Context, Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
-	CodeModeArtifactStorage,
+	ArtifactStorage,
 	makeMemoryArtifactStorage,
 	makeObjectBucketArtifactStorage,
-	type CodeModeArtifactStorageShape,
-	type CodeModeObjectBucket,
-	type CodeModeObjectBucketObject,
+	type ArtifactStorageShape,
+	type ArtifactObjectBucket,
+	type ArtifactObjectBucketObject,
 } from "../../build/artifacts";
 import { buildFlowchart } from "../../build/builds";
-import { CodeModeRuntimeEnvironment, type CodeModeRuntimeOptions } from "../../build/runtime";
+import { BuildRuntimeEnvironment, type BuildRuntimeOptions } from "../../build/runtime";
 import { getArtifact } from "../artifact";
 import { type GetArtifactResult } from "../artifact-contract";
 import { createCanvas } from "../create";
@@ -28,22 +28,22 @@ import {
 } from "../patch-contract";
 
 function makeTestRuntime(
-	options: CodeModeRuntimeOptions & {
-		readonly store?: CodeModeArtifactStorageShape;
+	options: BuildRuntimeOptions & {
+		readonly store?: ArtifactStorageShape;
 	} = {},
 ) {
 	const storage = options.store ?? makeMemoryArtifactStorage();
-	const environment: Context.Service.Shape<typeof CodeModeRuntimeEnvironment> = {
+	const environment: Context.Service.Shape<typeof BuildRuntimeEnvironment> = {
 		createId: options.createId ?? ((prefix) => `${prefix}-test`),
 		...(options.renderer ? { renderer: options.renderer } : {}),
 	};
 	const run = <A, E extends BuildRejection<unknown>>(
-		program: Effect.Effect<A, E, CodeModeArtifactStorage | CodeModeRuntimeEnvironment>,
+		program: Effect.Effect<A, E, ArtifactStorage | BuildRuntimeEnvironment>,
 	) =>
 		Effect.runPromise(
 			buildResponse(program).pipe(
-				Effect.provideService(CodeModeArtifactStorage, storage),
-				Effect.provideService(CodeModeRuntimeEnvironment, environment),
+				Effect.provideService(ArtifactStorage, storage),
+				Effect.provideService(BuildRuntimeEnvironment, environment),
 			),
 		);
 
@@ -181,10 +181,10 @@ function parseInlineScene(value: unknown) {
 	})(value);
 }
 
-class MemoryBucket implements CodeModeObjectBucket {
+class MemoryBucket implements ArtifactObjectBucket {
 	readonly objects = new Map<string, string | Uint8Array>();
 
-	async get(key: string): Promise<CodeModeObjectBucketObject | null> {
+	async get(key: string): Promise<ArtifactObjectBucketObject | null> {
 		const value = this.objects.get(key);
 		if (!value) {
 			return null;
@@ -529,7 +529,7 @@ describe("limits", () => {
 			};
 			const memory = makeMemoryArtifactStorage();
 			let writes = 0;
-			const store: CodeModeArtifactStorageShape = {
+			const store: ArtifactStorageShape = {
 				...memory,
 				write(input) {
 					writes += 1;
