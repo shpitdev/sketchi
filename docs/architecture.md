@@ -145,7 +145,8 @@ Content is recorded in full, under these attribute names:
 - `playground.request` records the URL, the request and response headers, the
   status and the response body. Cookie and authorization headers are left out
   because they are credentials. The span that reads a body records it as
-  `http.request.body`: `playground.http.readBoundedJson` within its byte limit,
+  `http.request.body`: `playground.http.readJsonBody` (diagrams API) or
+  `playground.http.readBoundedJson` (chat and icon draw) within its byte limit,
   `playground.http.mcp`, and `studioPersistence.http.readJson`. An event-stream
   response passes through unchanged, keeping its backpressure and cancellation.
   `playground.response.stream` records it once it ends, and marks a stream the
