@@ -3,11 +3,7 @@ import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { embedCanvasIcons, type CanvasShapeElement } from "@sketchi/drawing";
-import {
-	convertSceneToExcalidraw,
-	validateExcalidrawScene,
-	type ExcalidrawElement,
-} from "@sketchi/drawing/excalidraw";
+import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
 import {
 	decodeFlowchartDocument,
@@ -20,12 +16,7 @@ import {
 	getFlowchartValidationIssues,
 } from "../document";
 import { applyFlowchartEdits, type FlowchartEdit } from "../edits";
-import {
-	deployPipelineLogoFlowchart,
-	flowchartFixture,
-	pharmaBatchDispositionFlowchart,
-} from "../fixtures/index";
-import { zoneFixtures } from "../fixtures/zone-fixtures";
+import { deployPipelineLogoFlowchart, flowchartFixture } from "../fixtures/index";
 import { renderFlowchartDiagram } from "../render";
 
 const waitlist: FlowchartDocument = {
@@ -454,85 +445,4 @@ describe("node logos in Excalidraw output", () => {
 			]);
 		},
 	);
-});
-
-function exported() {
-	return convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
-}
-
-function find(elements: readonly ExcalidrawElement[], id: string) {
-	const element = elements.find((entry) => entry.id === id);
-	if (!element) throw new Error(`Missing element ${id}.`);
-	return element;
-}
-
-function elbowExport() {
-	for (const diagram of [
-		flowchartFixture,
-		pharmaBatchDispositionFlowchart,
-		...Object.values(zoneFixtures),
-	]) {
-		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(diagram));
-		const arrow = scene.elements.find(
-			(element) => element.type === "arrow" && element.elbowed === true,
-		);
-		if (arrow) return { scene, arrow };
-	}
-	throw new Error("Expected a fixture with an elbow arrow.");
-}
-
-// Every fuzz trusts this validator to fail a broken export. It belongs with
-// @sketchi/drawing; it sits here until that area's cull moves it.
-describe("Excalidraw export validator", () => {
-	it("accepts Excalidraw-edited elbow arrows with null fixed segments", () => {
-		const { scene, arrow } = elbowExport();
-		arrow.fixedSegments = null;
-		expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
-	});
-
-	it.each([
-		{
-			code: "missing-bound-arrow",
-			id: "node:prompt",
-			corrupt: (elements: readonly ExcalidrawElement[]) => {
-				find(elements, "node:prompt").boundElements = [];
-			},
-		},
-		{
-			code: "overlapping-arrow-segment",
-			id: "edge:prompt-requirements",
-			corrupt: (elements: readonly ExcalidrawElement[]) => {
-				const first = find(elements, "edge:prompt-requirements");
-				const second = find(elements, "edge:requirements-clear");
-				second.x = first.x;
-				second.y = first.y;
-				second.points = first.points;
-			},
-		},
-		{
-			code: "arrow-endpoint-off-shape",
-			id: "edge:prompt-requirements",
-			corrupt: (elements: readonly ExcalidrawElement[]) => {
-				const arrow = find(elements, "edge:prompt-requirements");
-				arrow.x = Number(arrow.x) + 220;
-			},
-		},
-	])("reports $code", ({ code, id, corrupt }) => {
-		const scene = exported();
-		corrupt(scene.elements);
-		const validation = validateExcalidrawScene(scene);
-		expect(validation.ok).toBe(false);
-		expect(validation.issues).toContainEqual(expect.objectContaining({ code, elementId: id }));
-	});
-
-	it("reports an elbow route stripped of its elbow metadata", () => {
-		const { scene, arrow } = elbowExport();
-		arrow.elbowed = false;
-		delete arrow.fixedSegments;
-		const validation = validateExcalidrawScene(scene);
-		expect(validation.ok).toBe(false);
-		expect(validation.issues).toContainEqual(
-			expect.objectContaining({ code: "arrow-endpoint-off-shape", elementId: arrow.id }),
-		);
-	});
 });
