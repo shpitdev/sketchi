@@ -6,6 +6,7 @@ import {
 	type CanvasPoint as ScenePoint,
 	type CanvasSpec,
 } from "@sketchi/drawing";
+import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
@@ -14,19 +15,18 @@ import {
 	parseGanttDay,
 	parseGanttDiagram,
 	type GanttDiagram,
-} from "./document.js";
+} from "../document.js";
 
-import { readGanttScene } from "./readout.js";
+import { readGanttScene } from "../readout.js";
 import {
 	GANTT_MIN_BAR_WIDTH,
 	JOIN_BUDGET,
 	REPAIR_BUDGET,
-	ganttCaptions,
 	layoutGanttDiagram,
 	renderGanttDiagram,
-} from "./render.js";
-import { ROUTE_BUDGET, ROUTE_CHART_BUDGET, ROUTE_KINK_BUDGET } from "./routing.js";
-import { GANTT_TICK_FONT_SIZE, ganttAxis } from "./scale.js";
+} from "../render.js";
+import { ROUTE_BUDGET, ROUTE_CHART_BUDGET, ROUTE_KINK_BUDGET } from "../routing.js";
+import { GANTT_TICK_FONT_SIZE, ganttAxis } from "../scale.js";
 
 interface Box {
 	readonly id: string;
@@ -81,6 +81,7 @@ function expectReadableGantt(
 	const { scene, work } = layoutGanttDiagram(diagram);
 	const context = diagram.id;
 	expect(getCanvasValidationIssues(scene), context).toEqual([]);
+	expect(validateExcalidrawScene(convertSceneToExcalidraw(scene)).issues, context).toEqual([]);
 	// Routing work is bounded however crowded the plan: per layout, each dependency is placed,
 	// tried in at most two more arrival plans, and rerouted at most twice, within the chart's and
 	// the repairs' search budgets (each may overrun by one route's last search) and the budgets for
@@ -345,63 +346,6 @@ function distinctProblems(scene: CanvasSpec, strict: boolean): string[] {
 	return problems;
 }
 
-/** Pairs of routes that cross: a run of one through the interior of a run of the other. */
-function crossings(routes: readonly { from: string; to: string; points: readonly ScenePoint[] }[]) {
-	const runsOf = (points: readonly ScenePoint[]) =>
-		points.slice(1).map((to, index) => ({ from: points[index]!, to }));
-	return routes.flatMap((route, index) =>
-		routes.slice(index + 1).flatMap((other) =>
-			runsOf(route.points).some((a) =>
-				runsOf(other.points).some((b) => {
-					if (isHorizontal(a) === isHorizontal(b)) return false;
-					const [h, v] = isHorizontal(a) ? [a, b] : [b, a];
-					return (
-						v.from.x > Math.min(h.from.x, h.to.x) + 0.5 &&
-						v.from.x < Math.max(h.from.x, h.to.x) - 0.5 &&
-						h.from.y > Math.min(v.from.y, v.to.y) + 0.5 &&
-						h.from.y < Math.max(v.from.y, v.to.y) - 0.5
-					);
-				}),
-			)
-				? [`${route.from}->${route.to} crosses ${other.from}->${other.to}`]
-				: [],
-		),
-	);
-}
-
-/** How often a route turns. */
-function turns(points: readonly ScenePoint[]): number {
-	const runs = points.slice(1).map((to, index) => ({ from: points[index]!, to }));
-	return runs.filter(
-		(run, index) => index > 0 && isHorizontal(run) !== isHorizontal(runs[index - 1]!),
-	).length;
-}
-
-/** Steps in a route: a run shorter than 28 px between two parallel runs. */
-function steps(points: readonly ScenePoint[]): number[] {
-	const runs = points.slice(1).map((to, index) => ({ from: points[index]!, to }));
-	return runs.flatMap((run, index) => {
-		const [before, after] = [runs[index - 1], runs[index + 1]];
-		const length = Math.abs(run.to.x - run.from.x) + Math.abs(run.to.y - run.from.y);
-		return before && after && isHorizontal(before) === isHorizontal(after) && length < 28
-			? [Math.round(length * 10) / 10]
-			: [];
-	});
-}
-
-/** Whether a route hooks: some run heads against an earlier run along the same axis. */
-function hooks(points: readonly ScenePoint[]): boolean {
-	const headings = new Set<string>();
-	for (const [index, to] of points.slice(1).entries()) {
-		const from = points[index]!;
-		const heading =
-			Math.abs(from.y - to.y) < 0.01 ? Math.sign(to.x - from.x) * 2 : Math.sign(to.y - from.y);
-		if (headings.has(String(-heading))) return true;
-		headings.add(String(heading));
-	}
-	return false;
-}
-
 /**
  * Whether a route doubles back: some run goes left of both its predecessor's start and the
  * corridor just before its successor's start.
@@ -433,419 +377,7 @@ const plan = (tasks: object[], extra: object = {}) =>
 		Result.getOrThrow,
 	);
 
-describe("Gantt renderer", () => {
-	it.each([
-		["3 weeks", "2026-03-02", "2026-03-20", "day", 1],
-		["3 months", "2026-03-02", "2026-05-29", "week", 1],
-		["a year", "2026-01-05", "2026-12-18", "month", 1],
-		["3 years", "2026-01-05", "2028-11-30", "quarter", 1],
-		["12 years", "2026-01-05", "2037-06-30", "year", 1],
-	])("chooses nice ticks by span: %s reads in %ss", (_name, start, end, unit, step) => {
-		const axis = ganttAxis(parseGanttDay(start)!, parseGanttDay(end)! + 1);
-		expect([axis.unit, axis.step]).toEqual([unit, step]);
-		expect(axis.start).toBeLessThanOrEqual(parseGanttDay(start)!);
-		expect(axis.end).toBeGreaterThan(parseGanttDay(end)!);
-		// Cells start on their unit's boundary and tile the axis.
-		for (const [index, cell] of axis.cells.entries()) {
-			const date = new Date(cell.start * 86_400_000);
-			if (unit === "week") expect(date.getUTCDay()).toBe(1);
-			if (unit === "month" || unit === "quarter" || unit === "year")
-				expect(date.getUTCDate()).toBe(1);
-			if (unit === "quarter") expect(date.getUTCMonth() % 3).toBe(0);
-			if (unit === "year") expect(date.getUTCMonth()).toBe(0);
-			expect(cell.end).toBe(axis.cells[index + 1]?.start ?? axis.end);
-		}
-	});
-
-	it("draws bars to scale, and names every task in a column left of the plot, level with its bar", () => {
-		const diagram = plan(
-			[
-				{ id: "long", label: "Fits", start: "2026-03-02", duration: 10, phase: "Build" },
-				{
-					id: "short",
-					label: "A name far too long for its bar",
-					start: "2026-03-05",
-					duration: 1,
-					phase: "Build",
-				},
-				{ id: "gate", label: "Gate", start: "2026-03-16", milestone: true, phase: "Ship" },
-			],
-			{ phases: ["Build", "Ship"] },
-		);
-		const scene = expectReadableGantt(diagram);
-		const readout = readGanttScene(scene);
-		const long = readout.marks.get("long")!;
-		const short = readout.marks.get("short")!;
-		expect((long.right - long.left) / (short.right - short.left)).toBeCloseTo(10, 2);
-		const box = (id: string) => {
-			const element = scene.elements.find((entry) => entry.id === id);
-			if (element?.type !== "text") throw new Error(`missing ${id}`);
-			return textBox(element);
-		};
-		const plotLeft = readout.gridlines[0]!.x;
-		const names = ["long", "short", "gate"].map((id) => box(`gantt:label:${id}`));
-		const phase = box("gantt:phase:0");
-		for (const [index, id] of ["long", "short", "gate"].entries()) {
-			const name = names[index]!;
-			const dates = box(`gantt:caption:${id}`);
-			const mark = readout.marks.get(id)!;
-			// Names line up, in from their phase's, then dates, then the plot; each level with its mark.
-			expect(name.left, id).toBeCloseTo(names[0]!.left, 1);
-			expect(name.left, id).toBeGreaterThan(phase.left);
-			expect(dates.left, id).toBeGreaterThan(name.right);
-			expect(dates.right, id).toBeLessThan(plotLeft);
-			expect((name.top + name.bottom) / 2, id).toBeCloseTo((mark.top + mark.bottom) / 2, 0);
-		}
-		// Dates right-align in their column, phase spans with them.
-		expect(box("gantt:caption:long").right).toBeCloseTo(box("gantt:phase-caption:0").right, 1);
-		// A rule runs between every two rows, from the table's left across the plot.
-		const rules = scene.elements.filter(
-			(element) => element.type === "line" && element.id.startsWith("gantt:row-rule:"),
-		);
-		expect(rules).toHaveLength(5);
-		for (const rule of rules)
-			if (rule.type === "line") {
-				expect(rule.points[0].x).toBeLessThanOrEqual(phase.left + 0.5);
-				expect(rule.points[1].x).toBeCloseTo(readout.gridlines.at(-1)!.x, 1);
-			}
-	});
-
-	it("groups a row's name with its dates, apart from its bar, so dragging a bar keeps the table", () => {
-		const scene = expectReadableGantt(
-			plan([{ id: "a", label: "Build", start: "2026-03-02", end: "2026-03-13", progress: 40 }]),
-		);
-		const groups = (id: string) => scene.elements.find((element) => element.id === id)?.groupIds;
-		expect(groups("gantt:label:a")).toEqual(["gantt:row:a"]);
-		expect(groups("gantt:caption:a")).toEqual(["gantt:row:a"]);
-		expect(groups("node:gantt:task:a")).toEqual(["gantt:task:a"]);
-		expect(groups("node:gantt:progress:a")).toEqual(["gantt:task:a"]);
-	});
-
-	it("draws milestones as diamonds on their day and Today as a dashed line", () => {
-		const diagram = plan(
-			[
-				{ id: "build", label: "Build", start: "2026-03-02", end: "2026-03-13" },
-				{ id: "ship", label: "Ship", start: "2026-03-16", milestone: true, dependsOn: ["build"] },
-			],
-			{ today: "2026-03-10" },
-		);
-		const scene = expectReadableGantt(diagram);
-		const readout = readGanttScene(scene);
-		expect(readout.marks.get("ship")?.milestone).toBe(true);
-		expect(readout.today).toBe(parseGanttDay("2026-03-10"));
-		const today = scene.elements.find((element) => element.id === "gantt:today");
-		expect(today?.type === "line" && today.strokeStyle).toBe("dashed");
-		expect(scene.elements.find((element) => element.id === "gantt:today-label")).toMatchObject({
-			text: "Today · Mar 10",
-		});
-	});
-
-	it("routes a dependency from its predecessor's end into its successor's start", () => {
-		const diagram = plan([
-			{ id: "a", label: "Design", start: "2026-03-02", end: "2026-03-06" },
-			{ id: "b", label: "Build", start: "2026-03-09", duration: 5, dependsOn: ["a"] },
-		]);
-		const scene = expectReadableGantt(diagram);
-		const readout = readGanttScene(scene);
-		const [arrow] = readout.dependencies;
-		const a = readout.marks.get("a")!;
-		const b = readout.marks.get("b")!;
-		const start = arrow!.points[0]!;
-		const end = arrow!.points.at(-1)!;
-		expect(start.x).toBeGreaterThan(a.right - 31);
-		expect(start.x).toBeLessThanOrEqual(a.right);
-		expect(end).toEqual({ x: b.left, y: (b.top + b.bottom) / 2 });
-	});
-
-	it("runs every dependency forward when a forward route exists, and never back past its predecessor", () => {
-		const diagram = plan([
-			{ id: "a", label: "Discovery", start: "2026-03-02", end: "2026-03-06" },
-			{ id: "b", label: "Build", start: "2026-03-09", end: "2026-03-13", dependsOn: ["a"] },
-			{ id: "c", label: "Docs", start: "2026-03-09", end: "2026-03-20", dependsOn: ["a"] },
-			{ id: "d", label: "Test", start: "2026-03-23", end: "2026-03-27", dependsOn: ["b", "c"] },
-			{ id: "e", label: "Release", start: "2026-03-30", milestone: true, dependsOn: ["d", "a"] },
-		]);
-		const scene = expectReadableGantt(diagram);
-		for (const arrow of readGanttScene(scene).dependencies)
-			expect(runsBack(scene, `gantt:dependency:${arrow.from}:${arrow.to}`), arrow.to).toBe(false);
-	});
-
-	it("takes a successor that starts before its predecessor ends through its own elbow into its start", () => {
-		const diagram = plan([
-			{ id: "p", label: "Platform", start: "2026-03-02", end: "2026-03-13" },
-			{ id: "s", label: "Pilot", start: "2026-03-09", end: "2026-03-20", dependsOn: ["p"] },
-		]);
-		const scene = expectReadableGantt(diagram);
-		const readout = readGanttScene(scene);
-		const [arrow] = readout.dependencies;
-		const p = readout.marks.get("p")!;
-		const s = readout.marks.get("s")!;
-		// Down from the predecessor's end, back in the gutter above the successor, into its start.
-		expect(arrow!.points[0]!.y).toBe(p.bottom);
-		expect(arrow!.points[0]!.x).toBeGreaterThan(s.left);
-		const end = arrow!.points.at(-1)!;
-		expect(end.x - s.left).toBeLessThanOrEqual(32);
-		expect([s.top, (s.top + s.bottom) / 2]).toContain(end.y);
-		for (const point of arrow!.points) expect(point.x).toBeGreaterThanOrEqual(s.left - 40);
-		expect(runsBack(scene, "gantt:dependency:p:s")).toBe(false);
-	});
-
-	it("routes around bars and labels in the rows between, and never along another dependency", () => {
-		// The middle task's long bar sits between the predecessor and its successors.
-		const diagram = plan([
-			{ id: "a", label: "Discovery", start: "2026-03-02", end: "2026-03-06" },
-			{ id: "wide", label: "Platform work", start: "2026-03-02", end: "2026-04-24" },
-			{ id: "b", label: "Build", start: "2026-03-09", duration: 10, dependsOn: ["a"] },
-			{ id: "c", label: "Docs", start: "2026-03-09", duration: 5, dependsOn: ["a"] },
-			{
-				id: "d",
-				label: "Release",
-				start: "2026-04-27",
-				milestone: true,
-				dependsOn: ["wide", "b", "c"],
-			},
-		]);
-		expectReadableGantt(diagram);
-	});
-
-	it("runs dependencies out of one milestone down one trunk, branching off without crossing", () => {
-		// Review: three routes out of a sign-off milestone each found their own way down and crossed
-		// twice.
-		const diagram = plan([
-			{ id: "prep", label: "Preparation work", start: "2026-03-02", end: "2026-03-13" },
-			{ id: "gate", label: "Gate", start: "2026-03-16", milestone: true, dependsOn: ["prep"] },
-			{ id: "c1", label: "Catalog", start: "2026-03-18", duration: 10, dependsOn: ["gate"] },
-			{ id: "c2", label: "Orders", start: "2026-03-18", duration: 20, dependsOn: ["gate"] },
-			{ id: "c3", label: "Clickstream", start: "2026-03-23", duration: 8, dependsOn: ["gate"] },
-		]);
-		const routes = readGanttScene(expectReadableGantt(diagram)).dependencies;
-		const fanned = routes.filter((route) => route.from === "gate");
-		for (const route of fanned) {
-			expect(route.points[0], route.to).toEqual(fanned[0]!.points[0]);
-			expect(turns(route.points), route.to).toBe(1);
-		}
-		expect(crossings(routes)).toEqual([]);
-	});
-
-	it("drops straight into a successor starting under its predecessor's end, or turns once into its side", () => {
-		// Review: these drew a small step just before each arrowhead.
-		const diagram = plan([
-			{ id: "a", label: "Workstream 1", start: "2026-01-05", duration: 4 },
-			{ id: "b", label: "Workstream 2", start: "2026-01-08", duration: 6, dependsOn: ["a"] },
-			{ id: "c", label: "Architecture", start: "2026-01-26", duration: 10, dependsOn: ["b"] },
-			{ id: "d", label: "Approved", start: "2026-02-06", milestone: true, dependsOn: ["c"] },
-		]);
-		const routes = readGanttScene(expectReadableGantt(diagram)).dependencies;
-		const route = (to: string) => routes.find((entry) => entry.to === to)!.points;
-		expect(turns(route("b")), "a->b").toBe(0);
-		expect(turns(route("d")), "c->d").toBe(1);
-		for (const { to, points } of routes) expect(steps(points), to).toEqual([]);
-	});
-
-	it("turns once out of a short bar's end into a tiny successor starting the next day", () => {
-		// A/B: Final delta sync -> Switch traffic stepped into the tiny bar from the gutter above.
-		const diagram = plan([
-			{ id: "freeze", label: "Freeze", start: "2026-06-22", milestone: true },
-			{ id: "sync", label: "Sync", start: "2026-06-22", duration: 3, dependsOn: ["freeze"] },
-			{ id: "switch", label: "Switch", start: "2026-06-25", duration: 2, dependsOn: ["sync"] },
-			{ id: "live", label: "Live", start: "2026-06-29", milestone: true, dependsOn: ["switch"] },
-			{ id: "archive", label: "Archive", start: "2026-02-02", end: "2026-07-17" },
-		]);
-		const routes = readGanttScene(expectReadableGantt(diagram)).dependencies;
-		const route = routes.find((entry) => entry.to === "switch")!.points;
-		expect(turns(route)).toBe(1);
-		expect(steps(route)).toEqual([]);
-	});
-
-	it("drops onto a milestone's edge past a bar that ends just short of its vertex", () => {
-		// Round 18: Finance reports -> Wave 1 sign-off passed Wave 1 validation, which ends 2 px short
-		// of the diamond's vertex, and hooked back to that vertex.
-		const diagram = plan([
-			{ id: "finance", label: "Finance reports", start: "2026-04-13", duration: 15 },
-			{ id: "validation", label: "Wave 1 validation", start: "2026-04-20", end: "2026-04-30" },
-			{
-				id: "signoff",
-				label: "Sign-off",
-				start: "2026-05-01",
-				milestone: true,
-				dependsOn: ["finance", "validation"],
-			},
-			{ id: "programme", label: "Programme", start: "2026-01-05", end: "2026-07-31" },
-		]);
-		const readout = readGanttScene(expectReadableGantt(diagram));
-		const route = readout.dependencies.find((entry) => entry.from === "finance")!.points;
-		expect(hooks(route)).toBe(false);
-		expect(turns(route)).toBe(1);
-		const end = route.at(-1)!;
-		const signoff = readout.marks.get("signoff")!;
-		expect(end.x).toBeGreaterThan(readout.marks.get("validation")!.right);
-		expect(end.x).toBeLessThan(signoff.right);
-		expect(end.y).toBeLessThan((signoff.top + signoff.bottom) / 2);
-	});
-
-	it("hooks around a bar over its successor's start half a bar height clear of it, back to the start", () => {
-		// Round 18: Data lake storage -> Monitoring turned 14 px past Orchestration's end, only to keep
-		// its run back to Monitoring's start 28 px long; at 8 px, judges read a route rounding a bar
-		// as tracing its edge.
-		const diagram = plan([
-			{ id: "lake", label: "Lake", start: "2026-03-02", end: "2026-03-13" },
-			{ id: "orchestration", label: "Orchestration", start: "2026-03-02", end: "2026-03-20" },
-			{
-				id: "monitoring",
-				label: "Monitoring",
-				start: "2026-03-16",
-				duration: 7,
-				dependsOn: ["lake"],
-			},
-			{ id: "programme", label: "Programme", start: "2026-01-05", end: "2026-07-31" },
-		]);
-		const readout = readGanttScene(expectReadableGantt(diagram));
-		const [route] = readout.dependencies;
-		const blocker = readout.marks.get("orchestration")!;
-		const monitoring = readout.marks.get("monitoring")!;
-		// Orchestration covers every column from Lake's end to Monitoring's start: the route must hook.
-		expect(hooks(route!.points)).toBe(true);
-		const turn = Math.max(...route!.points.map((point) => point.x));
-		expect(turn - blocker.right).toBeGreaterThanOrEqual(14.5);
-		expect(turn - blocker.right).toBeLessThanOrEqual(15.5);
-		expect(route!.points.at(-1)!.x - monitoring.left).toBeLessThanOrEqual(8);
-	});
-
-	it("keeps fallback routes down the corridor a bar's clearance from the bars at the axis start", () => {
-		// Review (PR #506): fallback routes down the corridor ran 1.5 px beside bars starting on the
-		// axis's first day, and their gutter runs 1 px above others.
-		expectReadableGantt(fuzzGantt(62), { distinct: false });
-	});
-
-	it("keeps a crowded plan's fallback routes apart and clear of its marks, without roomier layouts", () => {
-		// Review (PR #506): with every search spent, t2 -> t29 fell back down the corridor 1.5 px from
-		// t8 -> t28 for 1,600 px, and two roomier layouts tried in vain to clear it. The earlier
-		// routing's own fallbacks here ran 2 px from bars at the axis start, so it is laid out once more
-		// clear of them.
-		const scene = expectReadableGantt(fuzzGantt(464));
-		expect(readGanttScene(scene).dependencies.length).toBeGreaterThan(40);
-		const repeated = layoutGanttDiagram(fuzzGantt(464));
-		expect(repeated.scene).toEqual(scene);
-		const { work } = repeated;
-		expect(work.layouts).toBeLessThanOrEqual(3);
-		expect(work.conflicts).toBe(0);
-	});
-
-	it("crosses no more often than the earlier routing where its forward choices would", () => {
-		// Review (PR #506): scheduled-188's routes crossed in 26 pairs where the earlier routing's
-		// crossed in 16.
-		const routes = readGanttScene(expectReadableGantt(scheduledGantt(188))).dependencies;
-		expect(crossings(routes).length).toBeLessThanOrEqual(16);
-	});
-
-	it("keeps a plain elbow however the search first reaches its turn", () => {
-		// Review: two ways into one point and heading were kept as one, the cheaper so far, though
-		// the dearer had turned long enough before to bend again without a kink. t19 -> t23 took a
-		// 25 px step that a cheaper route avoided.
-		const routes = readGanttScene(expectReadableGantt(scheduledGantt(4))).dependencies;
-		const route = routes.find((entry) => entry.from === "t19" && entry.to === "t23")!;
-		expect(steps(route.points)).toEqual([]);
-	});
-
-	it("groups rows under phase headers in phase order, with phase spans in the date column", () => {
-		const diagram = plan(
-			[
-				{ id: "a", label: "Survey", start: "2026-06-01", duration: 3, phase: "Prepare" },
-				{
-					id: "b",
-					label: "Build",
-					start: "2026-06-08",
-					duration: 5,
-					phase: "Make",
-					dependsOn: ["a"],
-				},
-				{ id: "c", label: "Permit", start: "2026-06-01", duration: 2, phase: "Prepare" },
-			],
-			{ phases: ["Make", "Prepare"] },
-		);
-		const scene = expectReadableGantt(diagram);
-		const readout = readGanttScene(scene);
-		expect(readout.phases).toEqual([
-			{ name: "Make", tasks: ["b"] },
-			{ name: "Prepare", tasks: ["a", "c"] },
-		]);
-		const captions = ganttCaptions(diagram);
-		expect(captions.phases.get("Prepare")).toBe("Jun 1–3, 2026");
-		expect(readout.captions.get("b")).toBe("Jun 8–12");
-	});
-
-	it("states progress in the date column and as a darker fill over the completed part", () => {
-		const scene = expectReadableGantt(
-			plan([{ id: "a", label: "Build", start: "2026-03-02", end: "2026-03-13", progress: 40 }]),
-		);
-		expect(readGanttScene(scene).captions.get("a")).toBe("Mar 2–13, 2026 · 40%");
-		const done = scene.elements.find((element) => element.id === "node:gantt:progress:a");
-		const bar = scene.elements.find((element) => element.id === "node:gantt:task:a");
-		if (done?.type !== "node" || bar?.type !== "node") throw new Error("missing progress fill");
-		expect(done).toMatchObject({ x: bar.x, y: bar.y, height: bar.height, shape: "rectangle" });
-		expect(done.width / bar.width).toBeCloseTo(0.4, 2);
-		expect(done.fillColor).not.toBe(bar.fillColor);
-	});
-
-	it("gives every incoming dependency its own entry, clear of the Today line", () => {
-		const diagram = plan(
-			[
-				{ id: "a", label: "A", start: "2026-03-02", duration: 3 },
-				{ id: "b", label: "B", start: "2026-03-02", duration: 4 },
-				{ id: "c", label: "C", start: "2026-03-03", duration: 3 },
-				{ id: "d", label: "D", start: "2026-03-09", duration: 6, dependsOn: ["a", "b", "c"] },
-				{ id: "m", label: "M", start: "2026-03-16", milestone: true, dependsOn: ["a", "b", "d"] },
-			],
-			{ today: "2026-03-09" },
-		);
-		const scene = expectReadableGantt(diagram);
-		const readout = readGanttScene(scene);
-		for (const target of ["d", "m"]) {
-			const ends = readout.dependencies
-				.filter((dependency) => dependency.to === target)
-				.map((dependency) => dependency.points.at(-1)!);
-			expect(ends).toHaveLength(3);
-			ends.forEach((end, index) => {
-				for (const other of ends.slice(index + 1))
-					expect(Math.hypot(end.x - other.x, end.y - other.y)).toBeGreaterThanOrEqual(7);
-			});
-		}
-		const today = scene.elements.find((element) => element.id === "gantt:today");
-		if (today?.type !== "line") throw new Error("missing Today");
-		for (const dependency of readout.dependencies)
-			for (const [index, to] of dependency.points.slice(1).entries()) {
-				const from = dependency.points[index]!;
-				if (Math.abs(from.x - to.x) < 0.01)
-					expect(Math.abs(from.x - today.points[0].x)).toBeGreaterThanOrEqual(3.5);
-			}
-	});
-
-	it("names each dependency unambiguously when task ids contain colons", () => {
-		const scene = expectReadableGantt(
-			plan([
-				{ id: "a", label: "A", start: "2026-03-01", duration: 1 },
-				{ id: "b:c", label: "BC", start: "2026-03-02", duration: 1, dependsOn: ["a"] },
-				{ id: "a:b", label: "AB", start: "2026-03-03", duration: 1 },
-				{ id: "c", label: "C", start: "2026-03-04", duration: 1, dependsOn: ["a:b"] },
-			]),
-		);
-		const ids = scene.elements.flatMap((element) => (element.type === "arrow" ? [element.id] : []));
-		expect(new Set(ids).size).toBe(2);
-		expect(readGanttScene(scene).dependencies.map(({ from, to }) => `${from}>${to}`)).toEqual([
-			"a>b:c",
-			"a:b>c",
-		]);
-	});
-
-	it("keeps years below 100 on their own calendar", () => {
-		const scene = expectReadableGantt(
-			plan([{ id: "a", label: "Ancient works", start: "0090-01-01", end: "0090-06-30" }]),
-		);
-		const readout = readGanttScene(scene);
-		expect(formatGanttDay(readout.gridlines[0]!.day)).toBe("0090-01-01");
-		expect(readout.marks.get("a")!.start).toBeCloseTo(parseGanttDay("0090-01-01")!, 1);
-	});
-
+describe("Gantt layout", () => {
 	it("keeps tick labels apart however long the plan, on a plot narrowed for a short chart", () => {
 		// Review: a century on a 640 px plot drew decade labels over one another.
 		const scene = renderGanttDiagram(
@@ -905,16 +437,20 @@ describe("Gantt renderer", () => {
 		);
 	});
 
-	it("keeps the fallback corridor clear of a milestone in the axis's first days", () => {
-		// Review: with 275 fuzz plans, two fallback routes crossed milestone t22 here.
-		expectReadableGantt(fuzzGantt(275), { distinct: false });
+	it("keeps years below 100 on their own calendar", () => {
+		const scene = expectReadableGantt(
+			plan([{ id: "a", label: "Ancient works", start: "0090-01-01", end: "0090-06-30" }]),
+		);
+		const readout = readGanttScene(scene);
+		expect(formatGanttDay(readout.gridlines[0]!.day)).toBe("0090-01-01");
+		expect(readout.marks.get("a")!.start).toBeCloseTo(parseGanttDay("0090-01-01")!, 1);
 	});
 
 	it("lands no arrowhead on a route, and runs no route through one, around crowded marks", () => {
-		// Review: t9 → t11 ran through the head of t3 → t9 at a crowded milestone. A wider sweep
-		// found a sibling hugging its own milestone's bounds (477), and, once names left the plot, routes
-		// out of a 3 px bar's right end through the arrowhead entering its left (1000).
-		for (const seed of [81, 477, 1000]) expectReadableGantt(scheduledGantt(seed));
+		// Review: past the fuzz's 300 seeds, a sibling hugged its own milestone's bounds (477) and,
+		// once names left the plot, routes out of a 3 px bar's right end ran through the arrowhead
+		// entering its left (1000).
+		for (const seed of [477, 1000]) expectReadableGantt(scheduledGantt(seed));
 	});
 
 	it(
