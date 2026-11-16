@@ -13,11 +13,11 @@ import { Route as IndexRouteImport } from "./routes/index";
 import { Route as CodemodeExportHarnessRouteImport } from "./routes/codemode-export-harness";
 import { Route as McpRouteImport } from "./routes/mcp";
 import { Route as ProjectsRouteImport } from "./routes/projects";
-import { Route as ApiStudioChatRouteImport } from "./routes/api/studio/chat";
 import { Route as ArtifactsArtifactIdRouteImport } from "./routes/artifacts/$artifactId";
 import { Route as DiagramsDiagramIdRouteImport } from "./routes/diagrams/$diagramId";
 import { Route as ExamplesExampleIdRouteImport } from "./routes/examples/$exampleId";
 import { Route as ProjectsProjectIdRouteImport } from "./routes/projects_/$projectId";
+import { Route as ApiStudioChatRouteImport } from "./routes/api/studio/chat";
 import { Route as ApiStudioProjectsRouteImport } from "./routes/api/studio/projects";
 import { Route as ApiV1GenerateRouteImport } from "./routes/api/v1/generate";
 import { Route as ArtifactsArtifactIdEditRouteImport } from "./routes/artifacts_/$artifactId/edit";
@@ -53,11 +53,6 @@ const ProjectsRoute = ProjectsRouteImport.update({
   path: "/projects",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ApiStudioChatRoute = ApiStudioChatRouteImport.update({
-  id: "/api/studio/chat",
-  path: "/api/studio/chat",
-  getParentRoute: () => rootRouteImport,
-} as any);
 const ArtifactsArtifactIdRoute = ArtifactsArtifactIdRouteImport.update({
   id: "/artifacts/$artifactId",
   path: "/artifacts/$artifactId",
@@ -76,6 +71,11 @@ const ExamplesExampleIdRoute = ExamplesExampleIdRouteImport.update({
 const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
   id: "/projects_/$projectId",
   path: "/projects/$projectId",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ApiStudioChatRoute = ApiStudioChatRouteImport.update({
+  id: "/api/studio/chat",
+  path: "/api/studio/chat",
   getParentRoute: () => rootRouteImport,
 } as any);
 const ApiStudioProjectsRoute = ApiStudioProjectsRouteImport.update({
@@ -160,11 +160,11 @@ export interface FileRoutesByFullPath {
   "/codemode-export-harness": typeof CodemodeExportHarnessRoute;
   "/mcp": typeof McpRoute;
   "/projects": typeof ProjectsRoute;
-  "/api/studio/chat": typeof ApiStudioChatRoute;
   "/artifacts/$artifactId": typeof ArtifactsArtifactIdRoute;
   "/diagrams/$diagramId": typeof DiagramsDiagramIdRoute;
   "/examples/$exampleId": typeof ExamplesExampleIdRoute;
   "/projects/$projectId": typeof ProjectsProjectIdRoute;
+  "/api/studio/chat": typeof ApiStudioChatRoute;
   "/api/studio/projects": typeof ApiStudioProjectsRouteWithChildren;
   "/api/v1/generate": typeof ApiV1GenerateRoute;
   "/artifacts/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
@@ -185,11 +185,11 @@ export interface FileRoutesByTo {
   "/codemode-export-harness": typeof CodemodeExportHarnessRoute;
   "/mcp": typeof McpRoute;
   "/projects": typeof ProjectsRoute;
-  "/api/studio/chat": typeof ApiStudioChatRoute;
   "/artifacts/$artifactId": typeof ArtifactsArtifactIdRoute;
   "/diagrams/$diagramId": typeof DiagramsDiagramIdRoute;
   "/examples/$exampleId": typeof ExamplesExampleIdRoute;
   "/projects/$projectId": typeof ProjectsProjectIdRoute;
+  "/api/studio/chat": typeof ApiStudioChatRoute;
   "/api/studio/projects": typeof ApiStudioProjectsRouteWithChildren;
   "/api/v1/generate": typeof ApiV1GenerateRoute;
   "/artifacts/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
@@ -211,11 +211,11 @@ export interface FileRoutesById {
   "/codemode-export-harness": typeof CodemodeExportHarnessRoute;
   "/mcp": typeof McpRoute;
   "/projects": typeof ProjectsRoute;
-  "/api/studio/chat": typeof ApiStudioChatRoute;
   "/artifacts/$artifactId": typeof ArtifactsArtifactIdRoute;
   "/diagrams/$diagramId": typeof DiagramsDiagramIdRoute;
   "/examples/$exampleId": typeof ExamplesExampleIdRoute;
   "/projects_/$projectId": typeof ProjectsProjectIdRoute;
+  "/api/studio/chat": typeof ApiStudioChatRoute;
   "/api/studio/projects": typeof ApiStudioProjectsRouteWithChildren;
   "/api/v1/generate": typeof ApiV1GenerateRoute;
   "/artifacts_/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
@@ -238,11 +238,11 @@ export interface FileRouteTypes {
     | "/codemode-export-harness"
     | "/mcp"
     | "/projects"
-    | "/api/studio/chat"
     | "/artifacts/$artifactId"
     | "/diagrams/$diagramId"
     | "/examples/$exampleId"
     | "/projects/$projectId"
+    | "/api/studio/chat"
     | "/api/studio/projects"
     | "/api/v1/generate"
     | "/artifacts/$artifactId/edit"
@@ -263,11 +263,11 @@ export interface FileRouteTypes {
     | "/codemode-export-harness"
     | "/mcp"
     | "/projects"
-    | "/api/studio/chat"
     | "/artifacts/$artifactId"
     | "/diagrams/$diagramId"
     | "/examples/$exampleId"
     | "/projects/$projectId"
+    | "/api/studio/chat"
     | "/api/studio/projects"
     | "/api/v1/generate"
     | "/artifacts/$artifactId/edit"
@@ -288,11 +288,11 @@ export interface FileRouteTypes {
     | "/codemode-export-harness"
     | "/mcp"
     | "/projects"
-    | "/api/studio/chat"
     | "/artifacts/$artifactId"
     | "/diagrams/$diagramId"
     | "/examples/$exampleId"
     | "/projects_/$projectId"
+    | "/api/studio/chat"
     | "/api/studio/projects"
     | "/api/v1/generate"
     | "/artifacts_/$artifactId/edit"
@@ -314,11 +314,11 @@ export interface RootRouteChildren {
   CodemodeExportHarnessRoute: typeof CodemodeExportHarnessRoute;
   McpRoute: typeof McpRoute;
   ProjectsRoute: typeof ProjectsRoute;
-  ApiStudioChatRoute: typeof ApiStudioChatRoute;
   ArtifactsArtifactIdRoute: typeof ArtifactsArtifactIdRoute;
   DiagramsDiagramIdRoute: typeof DiagramsDiagramIdRoute;
   ExamplesExampleIdRoute: typeof ExamplesExampleIdRoute;
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute;
+  ApiStudioChatRoute: typeof ApiStudioChatRoute;
   ApiStudioProjectsRoute: typeof ApiStudioProjectsRouteWithChildren;
   ApiV1GenerateRoute: typeof ApiV1GenerateRoute;
   ArtifactsArtifactIdEditRoute: typeof ArtifactsArtifactIdEditRoute;
@@ -362,13 +362,6 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ProjectsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/api/studio/chat": {
-      id: "/api/studio/chat";
-      path: "/api/studio/chat";
-      fullPath: "/api/studio/chat";
-      preLoaderRoute: typeof ApiStudioChatRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
     "/artifacts/$artifactId": {
       id: "/artifacts/$artifactId";
       path: "/artifacts/$artifactId";
@@ -395,6 +388,13 @@ declare module "@tanstack/react-router" {
       path: "/projects/$projectId";
       fullPath: "/projects/$projectId";
       preLoaderRoute: typeof ProjectsProjectIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/api/studio/chat": {
+      id: "/api/studio/chat";
+      path: "/api/studio/chat";
+      fullPath: "/api/studio/chat";
+      preLoaderRoute: typeof ApiStudioChatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/api/studio/projects": {
@@ -543,11 +543,11 @@ const rootRouteChildren: RootRouteChildren = {
   CodemodeExportHarnessRoute: CodemodeExportHarnessRoute,
   McpRoute: McpRoute,
   ProjectsRoute: ProjectsRoute,
-  ApiStudioChatRoute: ApiStudioChatRoute,
   ArtifactsArtifactIdRoute: ArtifactsArtifactIdRoute,
   DiagramsDiagramIdRoute: DiagramsDiagramIdRoute,
   ExamplesExampleIdRoute: ExamplesExampleIdRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,
+  ApiStudioChatRoute: ApiStudioChatRoute,
   ApiStudioProjectsRoute: ApiStudioProjectsRouteWithChildren,
   ApiV1GenerateRoute: ApiV1GenerateRoute,
   ArtifactsArtifactIdEditRoute: ArtifactsArtifactIdEditRoute,

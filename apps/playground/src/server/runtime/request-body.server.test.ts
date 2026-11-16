@@ -10,14 +10,15 @@ function streamRequest(stream: ReadableStream<Uint8Array>, headers: HeadersInit 
 		duplex: "half",
 		headers,
 	};
-	return new Request("https://studio.test/api/chat", init);
+	return new Request("https://studio.test/api/studio/chat", init);
 }
 
 describe("bounded JSON reader", () => {
 	it("counts UTF-8 bytes and accepts the exact boundary", async () => {
 		const body = JSON.stringify({ text: "é" });
 		const size = new TextEncoder().encode(body).byteLength;
-		const request = () => new Request("https://studio.test/api/chat", { method: "POST", body });
+		const request = () =>
+			new Request("https://studio.test/api/studio/chat", { method: "POST", body });
 		expect(await Effect.runPromise(readBoundedJson(request(), size))).toEqual({
 			_tag: "Body",
 			body: { text: "é" },
@@ -63,7 +64,7 @@ describe("bounded JSON reader", () => {
 		expect(cancelled).toBe(true);
 	});
 	it("keeps invalid JSON separate from transport failures", async () => {
-		const malformed = new Request("https://studio.test/api/chat", {
+		const malformed = new Request("https://studio.test/api/studio/chat", {
 			method: "POST",
 			body: "{",
 		});

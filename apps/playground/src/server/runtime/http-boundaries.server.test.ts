@@ -86,7 +86,7 @@ describe("HTTP runtime boundaries", () => {
 			body: stream,
 			duplex: "half",
 		};
-		const request = new Request("https://studio.test/api/chat", init);
+		const request = new Request("https://studio.test/api/studio/chat", init);
 		const response = await runPlaygroundEffect(handler(request), boundary(request));
 		expect(response.status).toBe(400);
 		expect(await response.json()).toEqual({
@@ -206,7 +206,7 @@ describe("request spans", () => {
 	});
 
 	it("gives every span of a request, deferred work and streams included, its IDs", async () => {
-		const request = new Request("https://studio.test/api/chat", {
+		const request = new Request("https://studio.test/api/studio/chat", {
 			headers: {
 				"cf-ray": "8f1a2b3c4d5e6f71-DFW",
 				"content-type": "application/json",
@@ -251,7 +251,7 @@ describe("request spans", () => {
 	it("records a streamed response once it ends, without holding the response", async () => {
 		const encoder = new TextEncoder();
 		const chunks = ["data: one\n\n", "data: two\n\n"];
-		const request = new Request("https://studio.test/api/chat", { method: "POST" });
+		const request = new Request("https://studio.test/api/studio/chat", { method: "POST" });
 		const { boundary: exporting, pending, sends } = exportingBoundary(request);
 		const response = await runPlaygroundEffect(
 			Effect.succeed(

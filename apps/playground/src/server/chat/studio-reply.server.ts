@@ -14,47 +14,70 @@ export function studioRejectedReply(issues: readonly CodeModeIssue[]): string {
 	return `I couldn't save a diagram for this request.${shown ? ` The last attempt was rejected: ${shown}` : ""}${reasons.length > 3 ? ` (${reasons.length - 3} more issues.)` : ""} Try simplifying or rephrasing the request.`;
 }
 
-
-function textParts(text:string): Response.AnyPart[] {
- const id = crypto.randomUUID();
- return [Response.makePart("text-start",{id}),Response.makePart("text-delta",{id,delta:text}),Response.makePart("text-end",{id})];
+function textParts(text: string): Response.AnyPart[] {
+	const id = crypto.randomUUID();
+	return [
+		Response.makePart("text-start", { id }),
+		Response.makePart("text-delta", { id, delta: text }),
+		Response.makePart("text-end", { id }),
+	];
 }
 /** Studio policy over the native Chat loop. Chat alone owns history and tool rounds. */
-export function studioReplyStream<E,R>(options:{
- readonly run: () => Stream.Stream<Response.AnyPart,E,R>;
- readonly outcome: Effect.Effect<StudioTurnOutcome>;
-}): Stream.Stream<Response.AnyPart,E,R> {
- return Stream.suspend(() => {
-   let told = false;
-   let ranOut = false;
-   const relay = () => Stream.suspend(() => {
-     let held:Response.AnyPart[] = [];
-     let text = "";
-     let calledTool = false;
-     return options.run().pipe(Stream.mapEffect((part) => Effect.gen(function* () {
-       if (part.type === "text-start" || part.type === "text-delta" || part.type === "text-end") {
-         held.push(part);
-         if (part.type === "text-delta") text += part.delta;
-         return [];
-       }
-       if (part.type === "tool-call") calledTool = true;
-       if (part.type !== "finish") return [part];
-       ranOut = part.reason === "length" && !calledTool && text.trim() === "";
-       const turn = yield* options.outcome;
-       const reject = !calledTool && held.length > 0 && turn.attempts > 0 && !turn.saved;
-       const released = reject ? textParts(studioRejectedReply(turn.rejected)) : held;
-       told ||= reject;
-       held = []; text = ""; calledTool = false;
-       return [...released,part];
-     })),Stream.flattenIterable);
-   });
-   return relay().pipe(
-     Stream.concat(Stream.suspend(() => ranOut ? relay() : Stream.empty)),
-     Stream.concat(Stream.unwrap(Effect.map(options.outcome,(turn) => {
-       const closing = turn.attempts > 0 && !turn.saved && !told
-         ? studioRejectedReply(turn.rejected) : ranOut && !turn.saved ? STUDIO_RAN_OUT_REPLY : undefined;
-       return closing ? Stream.fromIterable(textParts(closing)) : Stream.empty;
-     }))),
-   );
- });
+export function studioReplyStream<E, R>(options: {
+	readonly run: () => Stream.Stream<Response.AnyPart, E, R>;
+	readonly outcome: Effect.Effect<StudioTurnOutcome>;
+}): Stream.Stream<Response.AnyPart, E, R> {
+	return Stream.suspend(() => {
+		let told = false;
+		let ranOut = false;
+		const relay = () =>
+			Stream.suspend(() => {
+				let held: Response.AnyPart[] = [];
+				let text = "";
+				let calledTool = false;
+				return options.run().pipe(
+					Stream.mapEffect((part) =>
+						Effect.gen(function* () {
+							if (
+								part.type === "text-start" ||
+								part.type === "text-delta" ||
+								part.type === "text-end"
+							) {
+								held.push(part);
+								if (part.type === "text-delta") text += part.delta;
+								return [];
+							}
+							if (part.type === "tool-call") calledTool = true;
+							if (part.type !== "finish") return [part];
+							ranOut = part.reason === "length" && !calledTool && text.trim() === "";
+							const turn = yield* options.outcome;
+							const reject = !calledTool && held.length > 0 && turn.attempts > 0 && !turn.saved;
+							const released = reject ? textParts(studioRejectedReply(turn.rejected)) : held;
+							told ||= reject;
+							held = [];
+							text = "";
+							calledTool = false;
+							return [...released, part];
+						}),
+					),
+					Stream.flattenIterable,
+				);
+			});
+		return relay().pipe(
+			Stream.concat(Stream.suspend(() => (ranOut ? relay() : Stream.empty))),
+			Stream.concat(
+				Stream.unwrap(
+					Effect.map(options.outcome, (turn) => {
+						const closing =
+							turn.attempts > 0 && !turn.saved && !told
+								? studioRejectedReply(turn.rejected)
+								: ranOut && !turn.saved
+									? STUDIO_RAN_OUT_REPLY
+									: undefined;
+						return closing ? Stream.fromIterable(textParts(closing)) : Stream.empty;
+					}),
+				),
+			),
+		);
+	});
 }

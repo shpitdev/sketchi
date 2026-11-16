@@ -3,8 +3,6 @@
 	"private": true,
 	"type": "module",
 	"dependencies": {
-		"@ai-sdk/openai": "4.0.104",
-		"@ai-sdk/react": "4.0.163",
 		"@cloudflare/playwright": "1.3.6",
 		"@effect/ai-openai": "4.1.4",
 		"@effect/atom-react": "catalog:",
@@ -23,11 +21,11 @@
 		"@streamdown/cjk": "1.0.4",
 		"@streamdown/code": "2.0.0",
 		"@streamdown/math": "1.0.3",
-		"ai": "7.0.159",
 		"katex": "0.19.1",
 		"lucide-react": "1.65.0",
 		"motion": "14.9.0",
 		"nanoid": "6.0.2",
+		"partial-json": "0.1.7",
 		"streamdown": "2.7.1",
 		"use-stick-to-bottom": "1.1.6"
 	},

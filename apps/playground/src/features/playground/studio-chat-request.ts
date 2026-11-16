@@ -153,7 +153,9 @@ export function studioChatRequestMessages<Message extends ChatMessage>(
 	const pinned = latestSave >= 0 ? savedBuildOnly(exchanges[latestSave] ?? []) : [];
 	const fits = (kept: readonly Message[][]) => {
 		const flat = kept.flat();
-		return toAgUiMessages(flat).length <= MAX_CHAT_MESSAGES && size(flat) <= MAX_CHAT_TOTAL_CHARACTERS;
+		return (
+			toAgUiMessages(flat).length <= MAX_CHAT_MESSAGES && size(flat) <= MAX_CHAT_TOTAL_CHARACTERS
+		);
 	};
 	let kept: Message[][] = [];
 	let oldest = exchanges.length;
