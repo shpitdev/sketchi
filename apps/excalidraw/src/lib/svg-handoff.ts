@@ -2,7 +2,7 @@ import type {
 	NativeFillStyle,
 	NativeRoughness,
 	SvgToExcalidrawOptions,
-} from "@sketchi/svg-excalidraw";
+} from "@sketchi/drawing/svg";
 
 export interface SvgHandoff {
 	readonly options: SvgToExcalidrawOptions;

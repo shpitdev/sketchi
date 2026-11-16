@@ -15,7 +15,7 @@ label incomplete geometry as native-editable.
 
 ## Decision
 
-`parseSvg` is the only parser exported by `@sketchi/svg-excalidraw`. The spike
+`parseSvg` is the only parser exported by `@sketchi/drawing/svg`. The spike
 parser and spike export barrel are deleted; there is no compatibility alias or
 parallel normalization path.
 

@@ -1,9 +1,9 @@
-import { fnv1a32 } from "@sketchi/drawing";
+import { fnv1a32 } from "../hash.js";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 
-import { flattenPrimitive, isNonRenderingPrimitive } from "./flatten";
-import { withoutClosingPoint } from "./geometry";
-import { parseLength, type SvgViewport } from "./length";
+import { flattenPrimitive, isNonRenderingPrimitive } from "./flatten.js";
+import { withoutClosingPoint } from "./geometry.js";
+import { parseLength, type SvgViewport } from "./length.js";
 import {
 	cascadedDimensions,
 	computeElementStyle,
@@ -16,14 +16,14 @@ import {
 	type PaintContext,
 	type SvgAttributes,
 	type SvgElementDescriptor,
-} from "./style";
+} from "./style.js";
 import {
 	IDENTITY_MATRIX,
 	multiplyMatrices,
 	parseNumberList,
 	parseTransform,
 	transformedStrokeScale,
-} from "./transform";
+} from "./transform.js";
 import {
 	type CanonicalShape,
 	type CanonicalSvgDocument,
@@ -37,7 +37,7 @@ import {
 	type SvgParseOptions,
 	type SvgParseResult,
 	type SvgPrimitiveName,
-} from "./types";
+} from "./types.js";
 
 interface SvgNode {
 	readonly attributes: SvgAttributes;

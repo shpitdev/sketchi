@@ -7,5 +7,5 @@
     "rootDir": "../..",
     "tsBuildInfoFile": "dist/tsconfig.spec.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "vitest.config.ts"]
+  "include": ["src/**/*.ts", "vitest.config.ts", "vitest.svg.config.ts", "vitest.corpus.config.ts"]
 }

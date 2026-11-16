@@ -1,7 +1,7 @@
 import earcut from "earcut";
 import ClipperLib from "clipper-lib";
 
-import type { FilledRegion, Point } from "./types";
+import type { FilledRegion, Point } from "./types.js";
 
 const EPSILON = 1e-7;
 // clipper-lib uses JavaScript numbers for integer predicates. Local coordinates

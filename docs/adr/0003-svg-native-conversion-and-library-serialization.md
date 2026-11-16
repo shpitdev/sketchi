@@ -67,7 +67,7 @@ do not justify destructive simplification or rejection.
 
 Fast unit and browser tests exercise representative supported and blocked
 fixtures, direct conversion invariants, library round-trips, and cross-runtime
-determinism. The separate `svg-excalidraw:corpus-renderer` Nx target restores
+determinism. The separate `drawing:corpus-renderer` Nx target restores
 and renders every native-capable corpus input through Excalidraw at roughness 0,
 then compares it to an independently rasterized source SVG. Exports are padded
 by the largest element stroke width because Excalidraw geometry bounds exclude

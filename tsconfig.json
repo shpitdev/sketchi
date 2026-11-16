@@ -18,9 +18,6 @@
       "path": "./packages/social-card"
     },
     {
-      "path": "./packages/svg-excalidraw"
-    },
-    {
       "path": "./packages/editor"
     },
     {

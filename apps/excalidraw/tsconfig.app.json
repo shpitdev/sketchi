@@ -7,9 +7,6 @@
   "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.tsx"],
   "references": [
     {
-      "path": "../../packages/svg-excalidraw/tsconfig.lib.json"
-    },
-    {
       "path": "../../packages/diagrams/tsconfig.lib.json"
     },
     {

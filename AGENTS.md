@@ -130,7 +130,7 @@ These larger suites remain local proof when their inputs change:
 - `pnpm nx affected -t test-browser --base=origin/main` (browser-mode suites in a
   Browserbase remote browser; needs `BROWSERBASE_API_KEY` and
   `BROWSERBASE_PROJECT_ID`; never run in CI)
-- `pnpm nx run svg-excalidraw:corpus-renderer`
+- `pnpm nx run drawing:corpus-renderer`
 - `pnpm nx run diagrams:gantt-fuzz` (300 plans per Gantt fuzz; the gate runs 4)
 - `pnpm nx run diagrams:chart-fuzz` (300 chart seeds; the gate runs 1–12 plus decimal seed 27)
 - `pnpm nx run diagrams:mindmap-fuzz` (2,000 mindmap seeds; the gate runs 8)

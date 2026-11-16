@@ -3,8 +3,8 @@ import {
 	decomposeNonzeroRings,
 	keyholeBridgeIsSafe,
 	regionsFromRings,
-} from "./geometry";
-import type { CanonicalSvgDocument, SvgCapabilityReport, SvgDiagnostic } from "./types";
+} from "./geometry.js";
+import type { CanonicalSvgDocument, SvgCapabilityReport, SvgDiagnostic } from "./types.js";
 
 const BLOCKING_DIAGNOSTICS = new Set([
 	"adaptive-flattening-depth-exceeded",

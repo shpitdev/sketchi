@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const corpusRoot = resolve(process.cwd(), "packages/icons/catalog/svg");
-const fixturesRoot = resolve(process.cwd(), "packages/svg-excalidraw/tests/fixtures");
+const fixturesRoot = resolve(process.cwd(), "packages/drawing/src/svg/tests/fixtures");
 
 function corpusFixture(relativePath: string): {
 	readonly source: string;

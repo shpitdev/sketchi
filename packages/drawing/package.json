@@ -16,10 +16,23 @@
 		"./artifacts": {
 			"types": "./dist/artifacts.d.ts",
 			"default": "./dist/artifacts.js"
+		},
+		"./svg": {
+			"types": "./dist/svg/index.d.ts",
+			"default": "./dist/svg/index.js"
 		}
 	},
 	"dependencies": {
+		"@excalidraw/excalidraw": "0.18.1",
+		"clipper-lib": "6.4.2",
+		"earcut": "3.2.4",
 		"effect": "catalog:",
-		"fractional-indexing": "4.0.0"
+		"fast-xml-parser": "5.11.2",
+		"fractional-indexing": "4.0.0",
+		"svg-pathdata": "9.0.0"
+	},
+	"devDependencies": {
+		"@types/clipper-lib": "6.4.0",
+		"sharp": "0.35.5"
 	}
 }

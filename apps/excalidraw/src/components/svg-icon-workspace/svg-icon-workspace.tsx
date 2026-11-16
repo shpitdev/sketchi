@@ -6,7 +6,7 @@ import {
 	serializeExcalidrawLibrary,
 	type SvgDiagnostic,
 	type SvgToExcalidrawResult,
-} from "@sketchi/svg-excalidraw";
+} from "@sketchi/drawing/svg";
 import { useAtomValue } from "@effect/atom-react";
 import { Cause, Option } from "effect";
 import { AsyncResult } from "effect/reactivity";

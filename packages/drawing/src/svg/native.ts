@@ -1,4 +1,4 @@
-import { fnv1a32 } from "@sketchi/drawing";
+import { fnv1a32 } from "../hash.js";
 import { type ExcalidrawLinearElement } from "@excalidraw/excalidraw/element/types";
 import { generateKeyBetween } from "fractional-indexing";
 
@@ -9,7 +9,7 @@ import {
 	keyholeBridge,
 	regionsFromRings,
 	triangulateRegion,
-} from "./geometry";
+} from "./geometry.js";
 import {
 	type CanonicalShape,
 	type CanonicalSvgDocument,
@@ -20,7 +20,7 @@ import {
 	type ProvisionalPointBudget,
 	type NativeFillStyle,
 	type NativeRoughness,
-} from "./types";
+} from "./types.js";
 
 export const PROVISIONAL_POINT_BUDGET: ProvisionalPointBudget = {
 	perElement: 256,

@@ -7,6 +7,7 @@ export default defineConfig({
 			"packages/*/vitest.config.ts",
 			"packages/diagrams/vitest.family.config.ts",
 			"packages/diagrams/vitest.graph.config.ts",
+			"packages/drawing/vitest.svg.config.ts",
 			"packages/*/vitest.config.mts",
 			"packages/*/*/vitest.config.ts",
 			"packages/*/*/vitest.config.mts",

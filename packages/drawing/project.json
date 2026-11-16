@@ -15,8 +15,27 @@
 		"test": {
 			"executor": "nx:run-commands",
 			"outputs": ["{workspaceRoot}/coverage/packages/drawing"],
+			"inputs": [
+				"default",
+				"^production",
+				"testEnvironment",
+				"{workspaceRoot}/packages/icons/catalog/svg/**/*.svg"
+			],
 			"options": {
-				"command": "vitest run --config packages/drawing/vitest.config.ts"
+				"commands": [
+					"vitest run --config packages/drawing/vitest.config.ts",
+					"vitest run --config packages/drawing/vitest.svg.config.ts"
+				],
+				"parallel": false
+			}
+		},
+		"corpus-renderer": {
+			"executor": "nx:run-commands",
+			"outputs": ["{workspaceRoot}/.memory/svg-native-corpus"],
+			"inputs": ["default", "^production", "{workspaceRoot}/packages/icons/catalog/svg/**/*.svg"],
+			"dependsOn": ["^build"],
+			"options": {
+				"command": "SVG_NATIVE_CORPUS_REPORT=.memory/svg-native-corpus/native-renderer.json vitest run --config packages/drawing/vitest.corpus.config.ts"
 			}
 		},
 		"typecheck": {

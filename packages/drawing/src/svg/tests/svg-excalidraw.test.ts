@@ -1,12 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 
-import { inspectSvgCapabilities } from "../src/lib/capabilities";
-import { convertSvgToExcalidraw } from "../src/lib/convert";
-import * as flatten from "../src/lib/flatten";
-import { serializeExcalidrawLibrary } from "../src/lib/library";
-import { parseSvg } from "../src/lib/parse";
-import type { CanonicalSvgDocument } from "../src/lib/types";
+import { inspectSvgCapabilities } from "../capabilities";
+import { convertSvgToExcalidraw } from "../convert";
+import * as flatten from "../flatten";
+import { serializeExcalidrawLibrary } from "../library";
+import { parseSvg } from "../parse";
+import type { CanonicalSvgDocument } from "../types";
 import { corpusFixtures } from "./corpus-fixtures";
 
 type ParseOptions = NonNullable<Parameters<typeof parseSvg>[1]>;

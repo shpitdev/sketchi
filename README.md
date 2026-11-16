@@ -70,11 +70,10 @@ prompt ─▶ model candidate ─▶ typed diagram ─▶ deterministic layout �
 | ----------------------------- | ----------------------------------------------------------------------- |
 | `packages/diagrams`          | family contracts, layout, readout, shared graph, build and generation    |
 | `packages/cloudflare`        | concrete shared AI Gateway binding adapter                             |
-| `packages/drawing` | Excalidraw conversion and real-scene validation                         |
+| `packages/drawing` | Excalidraw conversion, real-scene validation and SVG import             |
 | `packages/diagram/scenarios`  | maintained scenarios and the scenario CLI                               |
 | `packages/editor`         | native React drawing editor; family compositions live in tools/storybook   |
 | `packages/icons/*`            | the icon catalog and search, community icons, and hand-drawn logos      |
-| `packages/svg-excalidraw`     | SVG to native Excalidraw elements and libraries                         |
 | `packages/studio/projects`    | Studio project and diagram persistence                                  |
 | `packages/observability`      | span telemetry for every Worker request                                 |
 | `packages/ui`                 | shadcn primitives and tokens for the Tailwind apps                      |

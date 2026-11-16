@@ -456,9 +456,6 @@ importers:
       '@sketchi/editor':
         specifier: workspace:*
         version: link:../../packages/editor
-      '@sketchi/svg-excalidraw':
-        specifier: workspace:*
-        version: link:../../packages/svg-excalidraw
       effect:
         specifier: 'catalog:'
         version: 4.1.4
@@ -708,12 +705,34 @@ importers:
 
   packages/drawing:
     dependencies:
+      '@excalidraw/excalidraw':
+        specifier: 0.18.1
+        version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      clipper-lib:
+        specifier: 6.4.2
+        version: 6.4.2
+      earcut:
+        specifier: 3.2.4
+        version: 3.2.4
       effect:
         specifier: 'catalog:'
         version: 4.1.4
+      fast-xml-parser:
+        specifier: 5.11.2
+        version: 5.11.2
       fractional-indexing:
         specifier: 4.0.0
         version: 4.0.0
+      svg-pathdata:
+        specifier: 9.0.0
+        version: 9.0.0
+    devDependencies:
+      '@types/clipper-lib':
+        specifier: 6.4.0
+        version: 6.4.0
+      sharp:
+        specifier: 0.35.5
+        version: 0.35.5(@types/node@26.6.6)
 
   packages/editor:
     dependencies:
@@ -822,37 +841,6 @@ importers:
       '@sketchi/ui':
         specifier: workspace:*
         version: link:../ui
-
-  packages/svg-excalidraw:
-    dependencies:
-      '@excalidraw/excalidraw':
-        specifier: 0.18.1
-        version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@sketchi/drawing':
-        specifier: workspace:*
-        version: link:../drawing
-      clipper-lib:
-        specifier: 6.4.2
-        version: 6.4.2
-      earcut:
-        specifier: 3.2.4
-        version: 3.2.4
-      fast-xml-parser:
-        specifier: 5.11.2
-        version: 5.11.2
-      fractional-indexing:
-        specifier: 4.0.0
-        version: 4.0.0
-      svg-pathdata:
-        specifier: 9.0.0
-        version: 9.0.0
-    devDependencies:
-      '@types/clipper-lib':
-        specifier: 6.4.0
-        version: 6.4.0
-      sharp:
-        specifier: 0.35.5
-        version: 0.35.5(@types/node@26.6.6)
 
   packages/ui:
     dependencies:
