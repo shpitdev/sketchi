@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 
 import "@sketchi/editor/styles.css";
-import "../../styles/app.css";
+import "../styles/app.css";
 
 afterEach(cleanup);
 
