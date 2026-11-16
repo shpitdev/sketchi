@@ -18,6 +18,7 @@ const VERSION_HEADER = "mcp-protocol-version";
 // Streamable HTTP: a client that sends no version header speaks 2025-03-26.
 const DEFAULT_PROTOCOL_VERSION = "2025-03-26";
 
+const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 const decodeMethod = Schema.decodeUnknownOption(
 	Schema.fromJsonString(Schema.Struct({ method: Schema.String })),
 );
@@ -98,19 +99,21 @@ export const serveStatelessMcp = Effect.fn("cloudflare.mcp.stateless")(function*
 		Effect.promise(() => handler.fetch(outgoing, { replay }));
 	const prime = (message: object, session?: string) => {
 		const origin = request.headers.get("origin");
-		return call(
-			new Request(request.url, {
-				method: "POST",
-				headers: {
-					"content-type": "application/json",
-					accept: "application/json, text/event-stream",
-					...(origin === null ? {} : { origin }),
-					...(session === undefined ? {} : { [SESSION_HEADER]: session }),
-				},
-				body: JSON.stringify({ jsonrpc: "2.0", ...message }),
-				signal: request.signal,
-			}),
-			true,
+		return Effect.flatMap(encodeJson({ jsonrpc: "2.0", ...message }), (body) =>
+			call(
+				new Request(request.url, {
+					method: "POST",
+					headers: {
+						"content-type": "application/json",
+						accept: "application/json, text/event-stream",
+						...(origin === null ? {} : { origin }),
+						...(session === undefined ? {} : { [SESSION_HEADER]: session }),
+					},
+					body,
+					signal: request.signal,
+				}),
+				true,
+			),
 		);
 	};
 	return yield* Effect.gen(function* () {
