@@ -186,7 +186,7 @@ The tree above is the series target. Effect still owns application internals and
 
 **Final 810 structural disposition:** all 15 families are accepted; the target tree is not complete. Fable's final architecture review finds the agreed split scope sound, conditional on final uncached verification and an accurate scope summary. Assign these remaining moves to coherent follow-ups from main, not more implementation in 810:
 
-- Drawing ownership: fold `packages/svg-excalidraw` into `drawing/svg` and organise the flat drawing geometry into its planned folders.
+- Drawing ownership: fold `packages/svg-excalidraw` into `drawing/svg` and organise the flat drawing geometry into its planned folders. Done in the drawing follow-up: SVG import is `drawing/src/svg` (`@sketchi/drawing/svg`, with `drawing:corpus-renderer`) and shared geometry is `drawing/src/geometry`.
 - Canvas ownership: create `diagrams/src/canvas/`; canvas, patch, artifact and icon operations remain in `build/code-mode/`, including the large `runtime.ts`.
 - App/tool structure: rename `apps/playground` and `apps/excalidraw`, and relocate `apps/native-conversion-storybook` alongside the existing Storybook tooling.
 - Family test ownership: move `tools/drawing-tests` into the owning family folders, preserving their assertions and proof.
