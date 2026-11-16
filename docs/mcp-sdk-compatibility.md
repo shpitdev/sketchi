@@ -1,7 +1,7 @@
 # MCP SDK compatibility
 
-Sketchi's two deployed MCP servers are inbound and authless, and neither uses
-the MCP SDK:
+In the checked-in source, Sketchi's two MCP servers are inbound and authless,
+and neither uses the MCP SDK:
 
 - Studio (`apps/studio/src/features/mcp/mcp.server.ts`) registers `docs`,
   `search` and `execute` on Effect's `McpServer` from `effect/ai`.
