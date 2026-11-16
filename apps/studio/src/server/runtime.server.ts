@@ -297,10 +297,9 @@ function recordStreamedBody(
 					controller.error(error);
 				}
 			},
-			cancel(reason) {
-				end(false);
-				return reader.cancel(reason);
-			},
+			// The source's cancel resolves once its work has stopped and ended its spans, so the
+			// request's scope cannot close before them.
+			cancel: (reason) => reader.cancel(reason).finally(() => end(false)),
 		},
 		{ highWaterMark: 0 },
 	);

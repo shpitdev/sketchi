@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 import type { TelemetrySpanRow } from "@sketchi/observability";
-import { Effect } from "effect";
+import { Effect, Stream } from "effect";
 
 import {
 	PlaygroundBindings,
@@ -142,6 +142,84 @@ describe("Playground request runtime", () => {
 			}
 			const parts = rows.map((row) => `${row.span_id}:${row.part_index}`);
 			assert.strictEqual(new Set(parts).size, parts.length);
+		}),
+	);
+
+	// A client that leaves mid-stream, or a model call past its deadline, ends spans inside the
+	// streamed body after the handler returned; they must still reach the request's rows.
+	it.effect.each([
+		["the client cancels the body", "cancel"],
+		["the request is aborted", "abort"],
+		["the model call misses its deadline", "deadline"],
+	] as const)("keeps a stream's failed and interrupted spans when %s", ([, ending]) =>
+		Effect.promise(async () => {
+			const pending: Promise<unknown>[] = [];
+			const rows: TelemetrySpanRow[] = [];
+			const late: unknown[][] = [];
+			const aborted = new AbortController();
+			const model =
+				ending === "deadline"
+					? Effect.never.pipe(
+							Effect.withSpan("test.model.attempt"),
+							Effect.timeoutOrElse({
+								duration: "1 millis",
+								orElse: () => Effect.fail(new Error("model deadline")),
+							}),
+						)
+					: Effect.never;
+			const handler = Effect.gen(function* () {
+				const { request } = yield* PlaygroundRequestMetadata;
+				const context = yield* Effect.context<never>();
+				const events = Stream.make("data: one\n\n").pipe(
+					Stream.concat(Stream.fromEffect(model.pipe(Effect.withSpan("test.model")))),
+					Stream.encodeText,
+				);
+				return new Response(
+					Stream.toReadableStreamWith(events, context, { signal: request.signal }),
+					{
+						headers: { "content-type": "text/event-stream" },
+					},
+				);
+			}).pipe(Effect.withSpan("test.chat"));
+			const consoleError = console.error;
+			console.error = (...args: unknown[]) => void late.push(args);
+			try {
+				const response = await runPlaygroundEffect(handler, {
+					env: {
+						TELEMETRY_SPANS: {
+							send: (batch) => {
+								rows.push(...(batch as TelemetrySpanRow[]));
+								return Promise.resolve();
+							},
+						},
+					},
+					platform: { waitUntilPromise: (promise) => void pending.push(promise) },
+					request: new Request("https://studio.test/api/studio/chat", { signal: aborted.signal }),
+				});
+				const reader = response.body!.getReader();
+				await reader.read();
+				if (ending === "cancel") await reader.cancel("client left");
+				else if (ending === "abort") {
+					aborted.abort();
+					await reader.read();
+				} else await reader.read().catch(() => undefined);
+				await Promise.all(pending);
+			} finally {
+				console.error = consoleError;
+			}
+			const named = (name: string) => rows.find((row) => row.name === name);
+			assert.deepStrictEqual(
+				late.map(([message, detail]) => [message, (detail as { name?: string })?.name]),
+				[],
+			);
+			assert.strictEqual(
+				named("test.model")?.outcome,
+				ending === "deadline" ? "failure" : "interrupted",
+			);
+			if (ending === "deadline")
+				assert.strictEqual(named("test.model.attempt")?.outcome, "interrupted");
+			assert.isDefined(named("playground.response.stream"));
+			assert.isDefined(named("playground.request"));
 		}),
 	);
 });
