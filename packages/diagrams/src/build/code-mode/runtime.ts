@@ -232,13 +232,23 @@ export function observeCodeModeBoundary<
 	A extends ObservableCodeModeResult,
 	E extends { readonly status: string },
 	R,
->(operation: string, input: unknown, effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> {
+>(
+	operation: string,
+	input: unknown,
+	effect: Effect.Effect<A, E, R>,
+	options: {
+		/** Preparation observes rejections; its successful continuation owns the build metrics. */
+		readonly recordSuccess?: boolean;
+	} = {},
+): Effect.Effect<A, E, R> {
 	const observed = Effect.gen(function* () {
 		const startedAt = yield* Clock.currentTimeMillis;
 		const outcomeResult = yield* Effect.result(effect);
 		const result = Result.isSuccess(outcomeResult)
 			? outcomeResult.success
 			: { ok: false, status: outcomeResult.failure.status };
+		if (result.ok && options.recordSuccess === false)
+			return yield* Effect.fromResult(outcomeResult);
 		const finishedAt = yield* Clock.currentTimeMillis;
 		const outcome = result.ok ? "success" : "failure";
 		const failureCategory = result.ok ? undefined : (result.status ?? "unknown_failure");
