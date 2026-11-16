@@ -23,7 +23,6 @@
 		}
 	},
 	"dependencies": {
-		"@excalidraw/excalidraw": "0.18.1",
 		"clipper-lib": "6.4.2",
 		"earcut": "3.2.4",
 		"effect": "catalog:",
@@ -32,6 +31,7 @@
 		"svg-pathdata": "9.0.0"
 	},
 	"devDependencies": {
+		"@excalidraw/excalidraw": "0.18.1",
 		"@types/clipper-lib": "6.4.0",
 		"sharp": "0.35.5"
 	}

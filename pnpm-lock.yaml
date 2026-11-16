@@ -705,9 +705,6 @@ importers:
 
   packages/drawing:
     dependencies:
-      '@excalidraw/excalidraw':
-        specifier: 0.18.1
-        version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       clipper-lib:
         specifier: 6.4.2
         version: 6.4.2
@@ -727,6 +724,9 @@ importers:
         specifier: 9.0.0
         version: 9.0.0
     devDependencies:
+      '@excalidraw/excalidraw':
+        specifier: 0.18.1
+        version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@types/clipper-lib':
         specifier: 6.4.0
         version: 6.4.0
