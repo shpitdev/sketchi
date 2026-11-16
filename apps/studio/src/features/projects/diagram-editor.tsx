@@ -16,6 +16,11 @@ import { drawingDraft } from "./drawing-drafts";
 
 export type DrawingSaveStatus = "error" | "saved" | "saving" | "unsaved";
 
+interface LatestScene {
+	readonly scene: ExcalidrawScene;
+	readonly signature: string;
+}
+
 const SAVE_LABELS: Record<DrawingSaveStatus, string> = {
 	error: "Save failed, retry",
 	saved: "Saved",
@@ -36,7 +41,12 @@ export function useDrawingSession({
 }) {
 	const registry = useContext(RegistryContext);
 	const [session] = useState(() => {
-		const latest = Atom.make<ExcalidrawScene | undefined>(draft);
+		// Excalidraw edits its elements in place and hands the same objects to every
+		// change, so a held scene always reads as current. Each scene keeps the
+		// signature it had when it arrived.
+		const latest = Atom.make<LatestScene | undefined>(
+			draft && { scene: draft, signature: drawingSignature(draft) },
+		);
 		const savedSignature = Atom.make<string | null>(draft ? "" : null);
 		const persistedDraft = drawingDraft(diagramId);
 		const save = projectsRuntime
@@ -45,18 +55,16 @@ export function useDrawingSession({
 					Effect.gen(function* () {
 						const scene = get(latest);
 						if (!scene) return;
-						const signature = drawingSignature(scene);
+						const { signature } = scene;
 						if (signature === get(savedSignature)) return;
 						const id = yield* Schema.decodeUnknownEffect(StudioRecordIdSchema)(diagramId);
 						const api = yield* StudioApi;
 						yield* api.projects.save({
 							params: { diagramId: id },
-							payload: drawingFromScene(scene),
+							payload: drawingFromScene(scene.scene),
 						});
 						get.set(savedSignature, signature);
-						const current = get(latest);
-						if (current && drawingSignature(current) === signature)
-							get.set(persistedDraft, undefined);
+						if (get(latest)?.signature === signature) get.set(persistedDraft, undefined);
 					}),
 				),
 			)
@@ -66,13 +74,12 @@ export function useDrawingSession({
 			(context, scene: ExcalidrawScene) => {
 				const previous = context.get(latest);
 				const signature = drawingSignature(scene);
+				context.set(latest, { scene, signature });
 				if (context.get(savedSignature) === null) {
 					context.set(savedSignature, signature);
-					context.set(latest, scene);
 					return;
 				}
-				context.set(latest, scene);
-				if (previous && drawingSignature(previous) === signature) return;
+				if (previous?.signature === signature) return;
 				context.set(
 					persistedDraft,
 					!context.get(save).waiting && signature === context.get(savedSignature)
@@ -89,7 +96,7 @@ export function useDrawingSession({
 			const persisted = get(savedSignature);
 			const result = get(save);
 			if (result.waiting) return "saving";
-			if (!scene || drawingSignature(scene) === persisted) return "saved";
+			if (!scene || scene.signature === persisted) return "saved";
 			return AsyncResult.isFailure(result) ? "error" : "unsaved";
 		});
 		return { latest, persistedDraft, save, change, status };
@@ -100,7 +107,7 @@ export function useDrawingSession({
 	const status = useAtomValue(session.status);
 	const download = useCallback(
 		(fileName: string) => {
-			const scene = registry.get(session.latest);
+			const scene = registry.get(session.latest)?.scene;
 			if (!scene) return;
 			const file = createExcalidrawFile(scene, { source: window.location.origin });
 			downloadBlob(
