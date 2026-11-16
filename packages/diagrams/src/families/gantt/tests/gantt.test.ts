@@ -123,7 +123,6 @@ describe("Code Mode native Gantt chart", () => {
 		).not.toContain("__sketchi_node_label__");
 	});
 
-
 	it("builds a successor that starts before its predecessor finishes, with a warning", async () => {
 		const built = await build({
 			...plan,
