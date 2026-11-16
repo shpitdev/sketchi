@@ -4,7 +4,7 @@ import {
 	type CanvasNodeIcon,
 	type CanvasShapeElement,
 	type CanvasSpec,
-} from "./scene.js";
+} from "../scene.js";
 import {
 	AXIS_ALIGNED_EPSILON,
 	segmentCrossesBoundsInterior,

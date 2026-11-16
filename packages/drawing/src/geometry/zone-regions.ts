@@ -1,4 +1,4 @@
-import { type CanvasShapeElement, type CanvasSpec, type CanvasTextElement } from "./scene.js";
+import { type CanvasShapeElement, type CanvasSpec, type CanvasTextElement } from "../scene.js";
 import { GROUP_OUTLINE_CLEARANCE } from "./group-regions.js";
 import {
 	AXIS_ALIGNED_EPSILON,

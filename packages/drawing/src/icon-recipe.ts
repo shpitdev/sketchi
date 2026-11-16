@@ -9,7 +9,7 @@
  */
 
 import { type IconRecipeSchema } from "./recipe-schema.js";
-import { excalifontInkBox, type InkBox } from "./excalifont-ink.js";
+import { excalifontInkBox, type InkBox } from "./geometry/excalifont-ink.js";
 
 export const ICON_RECIPE_GRID = 24;
 
