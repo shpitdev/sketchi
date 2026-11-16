@@ -5,6 +5,11 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "@effect/vitest";
+import { Effect, Fiber } from "effect";
+import { FetchHttpClient } from "effect/http";
+import { TestClock } from "effect/testing";
+
+import { publishIcon } from "../src/community-client.js";
 
 const binary = resolve(process.cwd(), "apps/cli/dist/sketchi.js");
 const testParent = resolve(process.cwd(), ".memory/cli-icon-tests");
@@ -181,4 +186,63 @@ describe("sketchi icon draw", () => {
 		expect(kept.code).toBe(0);
 		expect(kept.stdout).toContain("not published: Not allowed.");
 	});
+
+	it("stops retrying rate-limited draws and publishes at their caps", async () => {
+		const root = await workspace();
+		await writeFile(join(root, "acme.svg"), SVG);
+		const limited = (wait: string) =>
+			serve((_seen, response) => {
+				response.statusCode = 429;
+				response.setHeader("retry-after", wait);
+				response.end(JSON.stringify({ error: { code: "rate_limited", message: "Slow down." } }));
+			});
+		// Three retries after the first attempt, and none when the server asks for more than 90 s.
+		for (const [wait, attempts] of [
+			["0", 4],
+			["91", 1],
+		] as const) {
+			const draws = await limited(wait);
+			const result = await runCli(
+				["icon", "draw", "acme.svg", "--endpoint", `${draws.origin}/draw`],
+				root,
+			);
+			expect(result.code).not.toBe(0);
+			expect(draws.seen).toHaveLength(attempts);
+		}
+
+		const draws = await serve(({ body }, response) =>
+			response.end(JSON.stringify(drawn(String(body["name"])))),
+		);
+		const store = await limited("0");
+		const kept = await runCli(
+			["icon", "draw", "acme.svg", "--publish", "--endpoint", `${draws.origin}/draw`],
+			root,
+			{ SKETCHI_COMMUNITY_ENDPOINT: `${store.origin}/api/community` },
+		);
+		expect(kept.code).toBe(0);
+		expect(store.seen).toHaveLength(4);
+		expect(kept.stdout).toContain("not published");
+	});
+
+	it.effect("times out a stalled publish and aborts its request", () =>
+		Effect.gen(function* () {
+			let signal: AbortSignal | null | undefined;
+			const stalled: typeof globalThis.fetch = (_input, init) => {
+				signal = init?.signal;
+				return new Promise<Response>(() => undefined);
+			};
+			const fiber = yield* Effect.flip(
+				publishIcon("https://icons.example/api/community", {
+					name: "acme",
+					recipe: drawn("acme").recipe,
+					judge: { recognizable: true },
+				}).pipe(Effect.provideService(FetchHttpClient.Fetch, stalled)),
+			).pipe(Effect.forkChild);
+			yield* Effect.promise(() => new Promise<void>((settled) => setImmediate(settled)));
+			yield* TestClock.adjust("30 seconds");
+			const failure = yield* Fiber.join(fiber);
+			expect(failure.code).toBe("publish_failed");
+			expect(signal?.aborted).toBe(true);
+		}),
+	);
 });
