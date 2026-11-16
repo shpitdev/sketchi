@@ -131,13 +131,16 @@ function throughGateway(
 	reply: (operation: "icon-author" | "icon-judge", signal: AbortSignal) => Promise<Response>,
 ) {
 	const dispatches = { "icon-author": 0, "icon-judge": 0 };
-	const judgeQueries: unknown[] = [];
+	const queries: Record<"icon-author" | "icon-judge", unknown[]> = {
+		"icon-author": [],
+		"icon-judge": [],
+	};
 	const run: CloudflareAiGateway["run"] = (request, options) => {
 		const operation = options?.gateway?.metadata?.["sketchiOperation"] as
 			| "icon-author"
 			| "icon-judge";
 		dispatches[operation]++;
-		if (operation === "icon-judge") judgeQueries.push(request.query);
+		queries[operation].push(request.query);
 		return reply(operation, options!.signal!);
 	};
 	const models = IconDrawModelsGateway.pipe(
@@ -156,7 +159,7 @@ function throughGateway(
 			),
 		),
 	);
-	return { layer: Layer.mergeAll(imaging, catalog, models), dispatches, judgeQueries };
+	return { layer: Layer.mergeAll(imaging, catalog, models), dispatches, queries };
 }
 
 const authorWire = (reply: unknown) =>
@@ -195,6 +198,14 @@ const judgeWire = (text: string) =>
 		},
 	});
 const unavailable = () => Response.json({ error: { message: "capacity" } }, { status: 503 });
+/** A reply whose body breaks while it is read. */
+const brokenBody = (status = 200) =>
+	new Response(
+		new ReadableStream({
+			start: (controller) => controller.error(new Error("connection reset")),
+		}),
+		{ status, headers: { "content-type": "application/json" } },
+	);
 
 /** Runs a draw to completion on the test clock. */
 const settle = <A, E>(effect: Effect.Effect<A, E>) =>
@@ -294,9 +305,15 @@ describe("drawIcon", () => {
 					outputTokens: 40,
 				});
 				// Every image in the lineup goes at low detail, the judge's main spend.
-				const images = JSON.stringify(judged.judgeQueries[0]).match(/"detail":"[a-z]+"/g);
+				const images = JSON.stringify(judged.queries["icon-judge"][0]).match(/"detail":"[a-z]+"/g);
 				expect(images).toEqual(Array.from({ length: 6 }, () => '"detail":"low"'));
-				expect(judged.judgeQueries[0]).toMatchObject({ text: { format: { type: "json_schema" } } });
+				expect(judged.queries["icon-judge"][0]).toMatchObject({
+					text: { format: { type: "json_schema" } },
+				});
+				// The reply schema joins the provider's own output settings rather than replacing them.
+				expect(judged.queries["icon-author"][0]).toMatchObject({
+					output_config: { effort: "low", format: { type: "json_schema" } },
+				});
 
 				const unreadable = drawThenAccept("a logo");
 				const blank = yield* settle(draw(unreadable.layer));
@@ -361,10 +378,31 @@ describe("drawIcon spend bounds", () => {
 			expect(judged.success.judge).toMatchObject({ recognizable: false });
 			expect(judgeDown.dispatches["icon-judge"]).toBe(3);
 
+			// A reply whose body breaks is a failed call to retry, not an unreadable pick.
+			const judgeBroken = throughGateway(async (operation) =>
+				operation === "icon-author"
+					? authorWire(
+							judgeBroken.dispatches["icon-author"] === 1
+								? { accept: false, recipe: draft }
+								: accept,
+						)
+					: brokenBody(),
+			);
+			const broken = yield* settle(draw(judgeBroken.layer));
+			if (broken._tag !== "Success") throw new Error("draw failed");
+			expect(broken.success.judge.error).toBeDefined();
+			expect(judgeBroken.dispatches["icon-judge"]).toBe(3);
+
 			const authorDown = throughGateway(async () => unavailable());
 			const failed = yield* settle(draw(authorDown.layer));
 			expect(failed._tag).toBe("Failure");
 			expect(authorDown.dispatches).toEqual({ "icon-author": 3, "icon-judge": 0 });
+
+			// The status arrives before the body breaks, so a rejected request is not retried.
+			const authorRejected = throughGateway(async () => brokenBody(400));
+			const rejected = yield* settle(draw(authorRejected.layer));
+			expect(rejected._tag).toBe("Failure");
+			expect(authorRejected.dispatches).toEqual({ "icon-author": 1, "icon-judge": 0 });
 		}),
 	);
 
@@ -395,18 +433,24 @@ describe("drawIcon spend bounds", () => {
 			yield* TestClock.adjust("1000 seconds");
 			expect((yield* Fiber.join(fiber))._tag).toBe("Failure");
 
-			// The judge's 30 s deadline ends its stalled call the same way; the drawing comes back, marked.
+			// The judge's 30 s deadline ends a reply whose body stalls after its headers the same
+			// way; the drawing comes back, marked.
 			let judgeAborted = false;
 			const authorReplies = [{ accept: false, recipe: draft }, accept];
 			const judgeStalled = throughGateway((operation, signal) =>
-				operation === "icon-author"
-					? Promise.resolve(authorWire(authorReplies.shift()))
-					: new Promise((_resolve, reject) =>
-							signal.addEventListener("abort", () => {
-								judgeAborted = true;
-								reject(new Error("aborted"));
-							}),
-						),
+				Promise.resolve(
+					operation === "icon-author"
+						? authorWire(authorReplies.shift())
+						: new Response(
+								new ReadableStream({
+									start: (controller) =>
+										signal.addEventListener("abort", () => {
+											judgeAborted = true;
+											controller.error(new Error("aborted"));
+										}),
+								}),
+							),
+				),
 			);
 			const judging = yield* Effect.forkChild(
 				draw(judgeStalled.layer, 1_000_000).pipe(
