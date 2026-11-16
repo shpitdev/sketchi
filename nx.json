@@ -120,6 +120,7 @@
 			"{workspaceRoot}/packages/diagrams/vitest*.ts",
 			"{workspaceRoot}/packages/diagrams/tsconfig*.json",
 			"{workspaceRoot}/packages/diagrams/project.json",
+			"{workspaceRoot}/packages/diagrams/test/**/*",
 			"{workspaceRoot}/packages/diagrams/src/*.ts",
 			"{workspaceRoot}/packages/diagrams/src/build/**/*",
 			"{workspaceRoot}/packages/diagrams/src/generate/**/*"

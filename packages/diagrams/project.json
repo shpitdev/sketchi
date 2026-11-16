@@ -315,8 +315,11 @@
 				"testEnvironment",
 				"^production",
 				"{projectRoot}/src/graph/**/*",
+				"{projectRoot}/src/families/class/**/*",
+				"{projectRoot}/src/families/er/**/*",
 				"{projectRoot}/src/families/flowchart/**/*",
-				"{projectRoot}/src/families/state-machine/**/*"
+				"{projectRoot}/src/families/state-machine/**/*",
+				"{projectRoot}/src/families/timeline/**/*"
 			],
 			"dependsOn": ["^build"],
 			"cache": true,
