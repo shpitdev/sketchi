@@ -1,22 +1,6 @@
 import { type CodeModeIssue } from "../build/result.js";
 import { cleanToolString } from "../clean-text.js";
-import { isStructurallyValidChartMark } from "../families/chart/render.js";
-import { isStructurallyValidClassBox } from "../families/class/render.js";
-import {
-	isStructurallyValidErOptional,
-	isStructurallyValidErTable,
-} from "../families/er/render.js";
-import { isStructurallyValidGanttMark } from "../families/gantt/render.js";
-import { isStructurallyValidJourneyMark } from "../families/journey/render.js";
-import { isStructurallyValidQuadrantMark } from "../families/quadrant/render.js";
-import { isStructurallyValidSankeyMark } from "../families/sankey/render.js";
-import {
-	isStructurallyValidSequenceActivation,
-	isStructurallyValidSequenceLifeline,
-} from "../families/sequence/render.js";
-import { isStructurallyValidTimelineMarker } from "../families/timeline/render.js";
-import { isStructurallyValidVennSet } from "../families/venn/render.js";
-import { isStructurallyValidStateMarker } from "../graph/compose.js";
+import { families } from "../family.js";
 
 import {
 	CANVAS_LIMITS,
@@ -93,6 +77,14 @@ export function undrawableCanvasIconIssues(scene: CanvasInput): CodeModeIssue[] 
 			},
 		];
 	});
+}
+
+function hasCanvasRole(
+	scene: CanvasInput,
+	node: Extract<CanvasInput["elements"][number], { readonly type: "node" }>,
+	role: string,
+): boolean {
+	return families.some((family) => family.canvasRoles[role]?.(scene, node) === true);
 }
 
 /** The drawable scene an authored canvas describes, or null when a point list is malformed. */
@@ -174,30 +166,8 @@ export function normalizeCanvasInput(scene: CanvasInput): CanvasSpec | null {
 				...(element.roughness !== undefined ? { roughness: element.roughness } : {}),
 				...(element.strokeStyle ? { strokeStyle: element.strokeStyle } : {}),
 				...(element.strokeWidth !== undefined ? { strokeWidth: element.strokeWidth } : {}),
-				...((element.rendererRole === "sequence-lifeline" &&
-					isStructurallyValidSequenceLifeline(scene, element)) ||
-				(element.rendererRole === "sequence-activation" &&
-					isStructurallyValidSequenceActivation(scene, element)) ||
-				(element.rendererRole === "timeline-marker" &&
-					isStructurallyValidTimelineMarker(element)) ||
-				(element.rendererRole === "chart-mark" && isStructurallyValidChartMark(element)) ||
-				(element.rendererRole === "journey-mark" && isStructurallyValidJourneyMark(element)) ||
-				(element.rendererRole === "quadrant-mark" && isStructurallyValidQuadrantMark(element)) ||
-				(element.rendererRole === "gantt-mark" && isStructurallyValidGanttMark(element)) ||
-				(element.rendererRole === "state-marker" && isStructurallyValidStateMarker(element)) ||
-				(element.rendererRole === "er-table" && isStructurallyValidErTable(element)) ||
-				(element.rendererRole === "er-optional" && isStructurallyValidErOptional(element)) ||
-				(element.rendererRole === "class-box" && isStructurallyValidClassBox(element)) ||
-				(element.rendererRole === "venn-set" && isStructurallyValidVennSet(element)) ||
-				(element.rendererRole === "sankey-mark" && isStructurallyValidSankeyMark(element)) ||
-				((element.rendererRole === "swimlane" || element.rendererRole === "swimlane-header") &&
-					element.shape === "rectangle" &&
-					!element.icon) ||
-				// A zone's logo sits in its header.
-				(element.rendererRole === "zone" && element.shape === "rectangle") ||
-				((element.rendererRole === "wireframe-widget" ||
-					element.rendererRole === "wireframe-region") &&
-					!element.icon)
+				...(element.rendererRole !== undefined &&
+				hasCanvasRole(scene, element, element.rendererRole)
 					? { rendererRole: element.rendererRole }
 					: {}),
 				...(element.textColor ? { textColor: element.textColor } : {}),

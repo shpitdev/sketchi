@@ -52,6 +52,31 @@ import * as wireframeFamily from "./families/wireframe/document.js";
 import { wireframeBuild } from "./families/wireframe/build.js";
 import { renderFlowchartDiagram } from "./families/flowchart/render.js";
 import { flowchartFixture } from "./families/flowchart/fixtures/index.js";
+import { isStructurallyValidChartMark } from "./families/chart/render.js";
+import { isStructurallyValidClassBox } from "./families/class/render.js";
+import { isStructurallyValidErOptional, isStructurallyValidErTable } from "./families/er/render.js";
+import { isStructurallyValidGanttMark } from "./families/gantt/render.js";
+import { isStructurallyValidJourneyMark } from "./families/journey/render.js";
+import { isStructurallyValidQuadrantMark } from "./families/quadrant/render.js";
+import { isStructurallyValidSankeyMark } from "./families/sankey/render.js";
+import {
+	isStructurallyValidSequenceActivation,
+	isStructurallyValidSequenceLifeline,
+} from "./families/sequence/render.js";
+import { isStructurallyValidTimelineMarker } from "./families/timeline/render.js";
+import { isStructurallyValidVennSet } from "./families/venn/render.js";
+import { isStructurallyValidStateMarker } from "./graph/compose.js";
+import type { CanvasInput } from "./canvas/input.js";
+
+type CanvasNodeInput = Extract<CanvasInput["elements"][number], { readonly type: "node" }>;
+/**
+ * The renderer roles a family's drawing gives canvas nodes. A hand-edited node keeps its role only
+ * while the family's check still finds the structure that role draws.
+ */
+export type CanvasRoles = Readonly<
+	Record<string, (scene: CanvasInput, node: CanvasNodeInput) => boolean>
+>;
+const NO_CANVAS_ROLES: CanvasRoles = {};
 
 function canonical<S extends Schema.Top & { readonly Type: { readonly type: string } }, E, RE>(
 	schema: S,
@@ -143,6 +168,7 @@ function family<
 		};
 		readonly validationError: Schema.Top;
 		readonly docs: unknown;
+		readonly canvasRoles?: CanvasRoles;
 	},
 >(
 	definition: F & {
@@ -160,6 +186,7 @@ function family<
 		spec: build.document,
 		request: build.request,
 		contracts: { input: build.input, output: build.result },
+		canvasRoles: definition.canvasRoles ?? NO_CANVAS_ROLES,
 		studioInput: build.toolInput,
 		counts: definition.canonical.counts,
 		prepare: build.prepare,
@@ -185,6 +212,12 @@ const flowchartDescriptor = family({
 	operation: "buildFlowchart",
 	label: "Flowchart",
 	path: "/api/v1/flowcharts/build",
+	canvasRoles: {
+		swimlane: (_scene, node) => node.shape === "rectangle" && !node.icon,
+		"swimlane-header": (_scene, node) => node.shape === "rectangle" && !node.icon,
+		// A zone's logo sits in its header.
+		zone: (_scene, node) => node.shape === "rectangle",
+	},
 	canonical: canonical(
 		flowchartFamily.FlowchartDiagram,
 		flowchartFixture.type,
@@ -212,6 +245,10 @@ const sequenceDiagramDescriptor = family({
 	operation: "buildSequenceDiagram",
 	label: "Sequence diagram",
 	path: "/api/v1/sequences/build",
+	canvasRoles: {
+		"sequence-lifeline": isStructurallyValidSequenceLifeline,
+		"sequence-activation": isStructurallyValidSequenceActivation,
+	},
 	build: sequenceBuild,
 	...fromBuild(sequenceBuild),
 	fixture: sequenceFixture,
@@ -222,6 +259,7 @@ const timelineDescriptor = family({
 	operation: "buildTimeline",
 	label: "Timeline",
 	path: "/api/v1/timelines/build",
+	canvasRoles: { "timeline-marker": (_scene, node) => isStructurallyValidTimelineMarker(node) },
 	build: timelineBuild,
 	...fromBuild(timelineBuild),
 	fixture: timelineFamily.timelineFixture,
@@ -232,6 +270,7 @@ const chartDescriptor = family({
 	operation: "buildChart",
 	label: "Chart",
 	path: "/api/v1/charts/build",
+	canvasRoles: { "chart-mark": (_scene, node) => isStructurallyValidChartMark(node) },
 	build: chartBuild,
 	...fromBuild(chartBuild),
 	fixture: chartFamily.chartFixture,
@@ -242,6 +281,7 @@ const stateMachineDescriptor = family({
 	operation: "buildStateMachine",
 	label: "State machine",
 	path: "/api/v1/state-machines/build",
+	canvasRoles: { "state-marker": (_scene, node) => isStructurallyValidStateMarker(node) },
 	build: stateMachineBuild,
 	// Canonical State validation materializes omitted composite entries for CLI/generator callers.
 	canonical: canonical(
@@ -261,6 +301,7 @@ const ganttDescriptor = family({
 	operation: "buildGantt",
 	label: "Gantt chart",
 	path: "/api/v1/gantts/build",
+	canvasRoles: { "gantt-mark": (_scene, node) => isStructurallyValidGanttMark(node) },
 	build: ganttBuild,
 	...fromBuild(ganttBuild),
 	fixture: ganttFamily.ganttFixture,
@@ -271,6 +312,10 @@ const erDiagramDescriptor = family({
 	operation: "buildErDiagram",
 	label: "ER diagram",
 	path: "/api/v1/er-diagrams/build",
+	canvasRoles: {
+		"er-table": (_scene, node) => isStructurallyValidErTable(node),
+		"er-optional": (_scene, node) => isStructurallyValidErOptional(node),
+	},
 	build: erBuild,
 	...fromBuild(erBuild),
 	fixture: erFamily.erFixture,
@@ -281,6 +326,7 @@ const classDiagramDescriptor = family({
 	operation: "buildClassDiagram",
 	label: "Class diagram",
 	path: "/api/v1/class-diagrams/build",
+	canvasRoles: { "class-box": (_scene, node) => isStructurallyValidClassBox(node) },
 	build: classBuild,
 	...fromBuild(classBuild),
 	fixture: classFamily.classFixture,
@@ -301,6 +347,7 @@ const vennDiagramDescriptor = family({
 	operation: "buildVennDiagram",
 	label: "Venn diagram",
 	path: "/api/v1/venn-diagrams/build",
+	canvasRoles: { "venn-set": (_scene, node) => isStructurallyValidVennSet(node) },
 	build: vennBuild,
 	...fromBuild(vennBuild),
 	fixture: vennFamily.vennFixture,
@@ -311,6 +358,7 @@ const journeyMapDescriptor = family({
 	operation: "buildJourneyMap",
 	label: "Journey map",
 	path: "/api/v1/journey-maps/build",
+	canvasRoles: { "journey-mark": (_scene, node) => isStructurallyValidJourneyMark(node) },
 	build: journeyBuild,
 	...fromBuild(journeyBuild),
 	fixture: journeyFamily.journeyFixture,
@@ -321,6 +369,7 @@ const sankeyDescriptor = family({
 	operation: "buildSankey",
 	label: "Sankey diagram",
 	path: "/api/v1/sankey-diagrams/build",
+	canvasRoles: { "sankey-mark": (_scene, node) => isStructurallyValidSankeyMark(node) },
 	build: sankeyBuild,
 	...fromBuild(sankeyBuild),
 	fixture: sankeyFamily.sankeyFixture,
@@ -331,6 +380,10 @@ const wireframeDescriptor = family({
 	operation: "buildWireframe",
 	label: "Wireframe",
 	path: "/api/v1/wireframes/build",
+	canvasRoles: {
+		"wireframe-widget": (_scene, node) => !node.icon,
+		"wireframe-region": (_scene, node) => !node.icon,
+	},
 	build: wireframeBuild,
 	...fromBuild(wireframeBuild),
 	fixture: wireframeFamily.wireframeFixture,
@@ -341,6 +394,7 @@ const quadrantChartDescriptor = family({
 	operation: "buildQuadrantChart",
 	label: "Quadrant chart",
 	path: "/api/v1/quadrant-charts/build",
+	canvasRoles: { "quadrant-mark": (_scene, node) => isStructurallyValidQuadrantMark(node) },
 	build: quadrantBuild,
 	...fromBuild(quadrantBuild),
 	fixture: quadrantFamily.quadrantFixture,
