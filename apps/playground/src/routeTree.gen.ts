@@ -19,19 +19,13 @@ import { Route as ExamplesExampleIdRouteImport } from "./routes/examples/$exampl
 import { Route as ProjectsProjectIdRouteImport } from "./routes/projects_/$projectId";
 import { Route as ApiStudioChatRouteImport } from "./routes/api/studio/chat";
 import { Route as ApiStudioProjectsRouteImport } from "./routes/api/studio/projects";
-import { Route as ApiV1GenerateRouteImport } from "./routes/api/v1/generate";
 import { Route as ArtifactsArtifactIdEditRouteImport } from "./routes/artifacts_/$artifactId/edit";
 import { Route as DiagramsDiagramIdEditRouteImport } from "./routes/diagrams_/$diagramId/edit";
 import { Route as ApiStudioDiagramsDiagramIdRouteImport } from "./routes/api/studio/diagrams/$diagramId";
 import { Route as ApiStudioProjectsFromArtifactRouteImport } from "./routes/api/studio/projects/from-artifact";
 import { Route as ApiStudioProjectsProjectIdRouteImport } from "./routes/api/studio/projects_/$projectId";
-import { Route as ApiV1FamilyBuildRouteImport } from "./routes/api/v1/$family/build";
-import { Route as ApiV1ArtifactsArtifactIdRouteImport } from "./routes/api/v1/artifacts/$artifactId";
-import { Route as ApiV1CanvasesCreateRouteImport } from "./routes/api/v1/canvases/create";
-import { Route as ApiV1FlowchartsEditRouteImport } from "./routes/api/v1/flowcharts.edit";
 import { Route as ApiV1IconsDrawRouteImport } from "./routes/api/v1/icons/draw";
 import { Route as ApiStudioDiagramsDiagramIdDrawingRouteImport } from "./routes/api/studio/diagrams/$diagramId/drawing";
-import { Route as ApiV1ArtifactsArtifactIdPatchRouteImport } from "./routes/api/v1/artifacts/$artifactId/patch";
 
 const IndexRoute = IndexRouteImport.update({
   id: "/",
@@ -83,11 +77,6 @@ const ApiStudioProjectsRoute = ApiStudioProjectsRouteImport.update({
   path: "/api/studio/projects",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ApiV1GenerateRoute = ApiV1GenerateRouteImport.update({
-  id: "/api/v1/generate",
-  path: "/api/v1/generate",
-  getParentRoute: () => rootRouteImport,
-} as any);
 const ArtifactsArtifactIdEditRoute = ArtifactsArtifactIdEditRouteImport.update({
   id: "/artifacts_/$artifactId/edit",
   path: "/artifacts/$artifactId/edit",
@@ -116,27 +105,6 @@ const ApiStudioProjectsProjectIdRoute =
     path: "/api/studio/projects/$projectId",
     getParentRoute: () => rootRouteImport,
   } as any);
-const ApiV1FamilyBuildRoute = ApiV1FamilyBuildRouteImport.update({
-  id: "/api/v1/$family/build",
-  path: "/api/v1/$family/build",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiV1ArtifactsArtifactIdRoute =
-  ApiV1ArtifactsArtifactIdRouteImport.update({
-    id: "/api/v1/artifacts/$artifactId",
-    path: "/api/v1/artifacts/$artifactId",
-    getParentRoute: () => rootRouteImport,
-  } as any);
-const ApiV1CanvasesCreateRoute = ApiV1CanvasesCreateRouteImport.update({
-  id: "/api/v1/canvases/create",
-  path: "/api/v1/canvases/create",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiV1FlowchartsEditRoute = ApiV1FlowchartsEditRouteImport.update({
-  id: "/api/v1/flowcharts/edit",
-  path: "/api/v1/flowcharts/edit",
-  getParentRoute: () => rootRouteImport,
-} as any);
 const ApiV1IconsDrawRoute = ApiV1IconsDrawRouteImport.update({
   id: "/api/v1/icons/draw",
   path: "/api/v1/icons/draw",
@@ -147,12 +115,6 @@ const ApiStudioDiagramsDiagramIdDrawingRoute =
     id: "/drawing",
     path: "/drawing",
     getParentRoute: () => ApiStudioDiagramsDiagramIdRoute,
-  } as any);
-const ApiV1ArtifactsArtifactIdPatchRoute =
-  ApiV1ArtifactsArtifactIdPatchRouteImport.update({
-    id: "/patch",
-    path: "/patch",
-    getParentRoute: () => ApiV1ArtifactsArtifactIdRoute,
   } as any);
 
 export interface FileRoutesByFullPath {
@@ -166,19 +128,13 @@ export interface FileRoutesByFullPath {
   "/projects/$projectId": typeof ProjectsProjectIdRoute;
   "/api/studio/chat": typeof ApiStudioChatRoute;
   "/api/studio/projects": typeof ApiStudioProjectsRouteWithChildren;
-  "/api/v1/generate": typeof ApiV1GenerateRoute;
   "/artifacts/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
   "/diagrams/$diagramId/edit": typeof DiagramsDiagramIdEditRoute;
   "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRouteWithChildren;
   "/api/studio/projects/from-artifact": typeof ApiStudioProjectsFromArtifactRoute;
   "/api/studio/projects/$projectId": typeof ApiStudioProjectsProjectIdRoute;
-  "/api/v1/$family/build": typeof ApiV1FamilyBuildRoute;
-  "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
-  "/api/v1/canvases/create": typeof ApiV1CanvasesCreateRoute;
-  "/api/v1/flowcharts/edit": typeof ApiV1FlowchartsEditRoute;
   "/api/v1/icons/draw": typeof ApiV1IconsDrawRoute;
   "/api/studio/diagrams/$diagramId/drawing": typeof ApiStudioDiagramsDiagramIdDrawingRoute;
-  "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
@@ -191,19 +147,13 @@ export interface FileRoutesByTo {
   "/projects/$projectId": typeof ProjectsProjectIdRoute;
   "/api/studio/chat": typeof ApiStudioChatRoute;
   "/api/studio/projects": typeof ApiStudioProjectsRouteWithChildren;
-  "/api/v1/generate": typeof ApiV1GenerateRoute;
   "/artifacts/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
   "/diagrams/$diagramId/edit": typeof DiagramsDiagramIdEditRoute;
   "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRouteWithChildren;
   "/api/studio/projects/from-artifact": typeof ApiStudioProjectsFromArtifactRoute;
   "/api/studio/projects/$projectId": typeof ApiStudioProjectsProjectIdRoute;
-  "/api/v1/$family/build": typeof ApiV1FamilyBuildRoute;
-  "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
-  "/api/v1/canvases/create": typeof ApiV1CanvasesCreateRoute;
-  "/api/v1/flowcharts/edit": typeof ApiV1FlowchartsEditRoute;
   "/api/v1/icons/draw": typeof ApiV1IconsDrawRoute;
   "/api/studio/diagrams/$diagramId/drawing": typeof ApiStudioDiagramsDiagramIdDrawingRoute;
-  "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
@@ -217,19 +167,13 @@ export interface FileRoutesById {
   "/projects_/$projectId": typeof ProjectsProjectIdRoute;
   "/api/studio/chat": typeof ApiStudioChatRoute;
   "/api/studio/projects": typeof ApiStudioProjectsRouteWithChildren;
-  "/api/v1/generate": typeof ApiV1GenerateRoute;
   "/artifacts_/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
   "/diagrams_/$diagramId/edit": typeof DiagramsDiagramIdEditRoute;
   "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRouteWithChildren;
   "/api/studio/projects/from-artifact": typeof ApiStudioProjectsFromArtifactRoute;
   "/api/studio/projects_/$projectId": typeof ApiStudioProjectsProjectIdRoute;
-  "/api/v1/$family/build": typeof ApiV1FamilyBuildRoute;
-  "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
-  "/api/v1/canvases/create": typeof ApiV1CanvasesCreateRoute;
-  "/api/v1/flowcharts/edit": typeof ApiV1FlowchartsEditRoute;
   "/api/v1/icons/draw": typeof ApiV1IconsDrawRoute;
   "/api/studio/diagrams/$diagramId/drawing": typeof ApiStudioDiagramsDiagramIdDrawingRoute;
-  "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
@@ -244,19 +188,13 @@ export interface FileRouteTypes {
     | "/projects/$projectId"
     | "/api/studio/chat"
     | "/api/studio/projects"
-    | "/api/v1/generate"
     | "/artifacts/$artifactId/edit"
     | "/diagrams/$diagramId/edit"
     | "/api/studio/diagrams/$diagramId"
     | "/api/studio/projects/from-artifact"
     | "/api/studio/projects/$projectId"
-    | "/api/v1/$family/build"
-    | "/api/v1/artifacts/$artifactId"
-    | "/api/v1/canvases/create"
-    | "/api/v1/flowcharts/edit"
     | "/api/v1/icons/draw"
-    | "/api/studio/diagrams/$diagramId/drawing"
-    | "/api/v1/artifacts/$artifactId/patch";
+    | "/api/studio/diagrams/$diagramId/drawing";
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/"
@@ -269,19 +207,13 @@ export interface FileRouteTypes {
     | "/projects/$projectId"
     | "/api/studio/chat"
     | "/api/studio/projects"
-    | "/api/v1/generate"
     | "/artifacts/$artifactId/edit"
     | "/diagrams/$diagramId/edit"
     | "/api/studio/diagrams/$diagramId"
     | "/api/studio/projects/from-artifact"
     | "/api/studio/projects/$projectId"
-    | "/api/v1/$family/build"
-    | "/api/v1/artifacts/$artifactId"
-    | "/api/v1/canvases/create"
-    | "/api/v1/flowcharts/edit"
     | "/api/v1/icons/draw"
-    | "/api/studio/diagrams/$diagramId/drawing"
-    | "/api/v1/artifacts/$artifactId/patch";
+    | "/api/studio/diagrams/$diagramId/drawing";
   id:
     | "__root__"
     | "/"
@@ -294,19 +226,13 @@ export interface FileRouteTypes {
     | "/projects_/$projectId"
     | "/api/studio/chat"
     | "/api/studio/projects"
-    | "/api/v1/generate"
     | "/artifacts_/$artifactId/edit"
     | "/diagrams_/$diagramId/edit"
     | "/api/studio/diagrams/$diagramId"
     | "/api/studio/projects/from-artifact"
     | "/api/studio/projects_/$projectId"
-    | "/api/v1/$family/build"
-    | "/api/v1/artifacts/$artifactId"
-    | "/api/v1/canvases/create"
-    | "/api/v1/flowcharts/edit"
     | "/api/v1/icons/draw"
-    | "/api/studio/diagrams/$diagramId/drawing"
-    | "/api/v1/artifacts/$artifactId/patch";
+    | "/api/studio/diagrams/$diagramId/drawing";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
@@ -320,15 +246,10 @@ export interface RootRouteChildren {
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute;
   ApiStudioChatRoute: typeof ApiStudioChatRoute;
   ApiStudioProjectsRoute: typeof ApiStudioProjectsRouteWithChildren;
-  ApiV1GenerateRoute: typeof ApiV1GenerateRoute;
   ArtifactsArtifactIdEditRoute: typeof ArtifactsArtifactIdEditRoute;
   DiagramsDiagramIdEditRoute: typeof DiagramsDiagramIdEditRoute;
   ApiStudioDiagramsDiagramIdRoute: typeof ApiStudioDiagramsDiagramIdRouteWithChildren;
   ApiStudioProjectsProjectIdRoute: typeof ApiStudioProjectsProjectIdRoute;
-  ApiV1FamilyBuildRoute: typeof ApiV1FamilyBuildRoute;
-  ApiV1ArtifactsArtifactIdRoute: typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
-  ApiV1CanvasesCreateRoute: typeof ApiV1CanvasesCreateRoute;
-  ApiV1FlowchartsEditRoute: typeof ApiV1FlowchartsEditRoute;
   ApiV1IconsDrawRoute: typeof ApiV1IconsDrawRoute;
 }
 
@@ -404,13 +325,6 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiStudioProjectsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/api/v1/generate": {
-      id: "/api/v1/generate";
-      path: "/api/v1/generate";
-      fullPath: "/api/v1/generate";
-      preLoaderRoute: typeof ApiV1GenerateRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
     "/artifacts_/$artifactId/edit": {
       id: "/artifacts_/$artifactId/edit";
       path: "/artifacts/$artifactId/edit";
@@ -446,34 +360,6 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiStudioProjectsProjectIdRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/api/v1/$family/build": {
-      id: "/api/v1/$family/build";
-      path: "/api/v1/$family/build";
-      fullPath: "/api/v1/$family/build";
-      preLoaderRoute: typeof ApiV1FamilyBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/artifacts/$artifactId": {
-      id: "/api/v1/artifacts/$artifactId";
-      path: "/api/v1/artifacts/$artifactId";
-      fullPath: "/api/v1/artifacts/$artifactId";
-      preLoaderRoute: typeof ApiV1ArtifactsArtifactIdRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/canvases/create": {
-      id: "/api/v1/canvases/create";
-      path: "/api/v1/canvases/create";
-      fullPath: "/api/v1/canvases/create";
-      preLoaderRoute: typeof ApiV1CanvasesCreateRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/flowcharts/edit": {
-      id: "/api/v1/flowcharts/edit";
-      path: "/api/v1/flowcharts/edit";
-      fullPath: "/api/v1/flowcharts/edit";
-      preLoaderRoute: typeof ApiV1FlowchartsEditRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
     "/api/v1/icons/draw": {
       id: "/api/v1/icons/draw";
       path: "/api/v1/icons/draw";
@@ -487,13 +373,6 @@ declare module "@tanstack/react-router" {
       fullPath: "/api/studio/diagrams/$diagramId/drawing";
       preLoaderRoute: typeof ApiStudioDiagramsDiagramIdDrawingRouteImport;
       parentRoute: typeof ApiStudioDiagramsDiagramIdRoute;
-    };
-    "/api/v1/artifacts/$artifactId/patch": {
-      id: "/api/v1/artifacts/$artifactId/patch";
-      path: "/patch";
-      fullPath: "/api/v1/artifacts/$artifactId/patch";
-      preLoaderRoute: typeof ApiV1ArtifactsArtifactIdPatchRouteImport;
-      parentRoute: typeof ApiV1ArtifactsArtifactIdRoute;
     };
   }
 }
@@ -524,20 +403,6 @@ const ApiStudioDiagramsDiagramIdRouteWithChildren =
     ApiStudioDiagramsDiagramIdRouteChildren,
   );
 
-interface ApiV1ArtifactsArtifactIdRouteChildren {
-  ApiV1ArtifactsArtifactIdPatchRoute: typeof ApiV1ArtifactsArtifactIdPatchRoute;
-}
-
-const ApiV1ArtifactsArtifactIdRouteChildren: ApiV1ArtifactsArtifactIdRouteChildren =
-  {
-    ApiV1ArtifactsArtifactIdPatchRoute: ApiV1ArtifactsArtifactIdPatchRoute,
-  };
-
-const ApiV1ArtifactsArtifactIdRouteWithChildren =
-  ApiV1ArtifactsArtifactIdRoute._addFileChildren(
-    ApiV1ArtifactsArtifactIdRouteChildren,
-  );
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CodemodeExportHarnessRoute: CodemodeExportHarnessRoute,
@@ -549,15 +414,10 @@ const rootRouteChildren: RootRouteChildren = {
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,
   ApiStudioChatRoute: ApiStudioChatRoute,
   ApiStudioProjectsRoute: ApiStudioProjectsRouteWithChildren,
-  ApiV1GenerateRoute: ApiV1GenerateRoute,
   ArtifactsArtifactIdEditRoute: ArtifactsArtifactIdEditRoute,
   DiagramsDiagramIdEditRoute: DiagramsDiagramIdEditRoute,
   ApiStudioDiagramsDiagramIdRoute: ApiStudioDiagramsDiagramIdRouteWithChildren,
   ApiStudioProjectsProjectIdRoute: ApiStudioProjectsProjectIdRoute,
-  ApiV1FamilyBuildRoute: ApiV1FamilyBuildRoute,
-  ApiV1ArtifactsArtifactIdRoute: ApiV1ArtifactsArtifactIdRouteWithChildren,
-  ApiV1CanvasesCreateRoute: ApiV1CanvasesCreateRoute,
-  ApiV1FlowchartsEditRoute: ApiV1FlowchartsEditRoute,
   ApiV1IconsDrawRoute: ApiV1IconsDrawRoute,
 };
 export const routeTree = rootRouteImport

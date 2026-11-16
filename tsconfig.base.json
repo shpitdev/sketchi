@@ -137,7 +137,7 @@
               "apps/playground/src/features/mcp/sandbox.server.ts",
               "apps/playground/src/features/mcp/session.server.ts",
               "apps/playground/src/features/mcp/mcp-docs.server.ts",
-              "apps/playground/src/features/build/api.server.ts",
+              "apps/playground/src/features/build/http.server.ts",
               "apps/playground/src/features/build/capabilities.server.ts",
               "apps/playground/src/server/runtime/runtime.server.ts",
               "apps/playground/src/features/chat/studio-family-tools.server.ts",
@@ -213,7 +213,7 @@
             "include": [
               "packages/icons/draw/src/lib/author-model.ts",
               "packages/icons/draw/src/lib/models.ts",
-              "packages/icons/draw/src/lib/google-judge.ts"
+              "packages/icons/draw/src/lib/judge-model.ts"
             ],
             "options": {
               "diagnosticSeverity": {

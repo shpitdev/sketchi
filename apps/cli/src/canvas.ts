@@ -1,10 +1,8 @@
 import { formatContractSchemaError } from "@sketchi/diagrams/build/input";
-import {
-	CreateCanvasRequest,
-	CreateCanvasResultSchema,
-} from "@sketchi/diagrams/canvas/create-contract";
+import { CreateCanvasRequest } from "@sketchi/diagrams/canvas/create-contract";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Schema, SchemaIssue, Result } from "effect";
+import { FetchHttpClient } from "effect/http";
 
 import { type BuiltDiagram, type StoredDiagram } from "./contracts.js";
 import { validateStorageId } from "./document.js";
@@ -12,7 +10,8 @@ import { CliCanvasError, CliInputError, CliValidationError } from "./errors.js";
 import { type InputSource } from "./terminal/effect-cli.js";
 import { InputReader } from "./terminal/input.js";
 import { DiagramStore } from "./store/service.js";
-import { API_REQUEST_TIMEOUT, MAX_API_RESPONSE_BYTES, readBoundedText } from "./response-body.js";
+import { decodeCreateCanvas, diagramsClient } from "./diagrams-client.js";
+import { API_REQUEST_TIMEOUT, boundedResponse, MAX_API_RESPONSE_BYTES } from "./response-body.js";
 
 export const DEFAULT_CANVAS_ENDPOINT = "https://playground.sketchi.app/api/v1/canvases/create";
 export const SKETCHI_CANVAS_ENDPOINT_ENV = "SKETCHI_CANVAS_ENDPOINT";
@@ -48,9 +47,6 @@ function schemaDetails(error: Schema.SchemaError): ReadonlyArray<string> {
 }
 
 const decodeCanvasSpec = Schema.decodeUnknownEffect(CreateCanvasRequest.fields.spec, {
-	errors: "all",
-});
-const decodeCreateCanvasResult = Schema.decodeUnknownEffect(CreateCanvasResultSchema, {
 	errors: "all",
 });
 
@@ -153,54 +149,48 @@ function rejectedCanvas(
 
 const requestCanvas = Effect.fn("sketchi.cli.canvas.request")(
 	function* (input: CreateCanvasInput) {
-		const response = yield* Effect.tryPromise({
-			try: (signal) =>
-				globalThis.fetch(input.endpoint, {
-					method: "POST",
-					headers: {
-						"content-type": "application/json",
-						"x-sketchi-client": "sketchi-cli",
+		const client = yield* diagramsClient(input.endpoint);
+		const response = yield* client.canvas
+			.createCanvas({
+				payload: {
+					spec: input.spec,
+					options: {
+						artifactFormats: ["scene", "excalidraw"],
+						inlineArtifacts: ["excalidraw"],
 					},
-					body: JSON.stringify({
-						spec: input.spec,
-						options: {
-							artifactFormats: ["scene", "excalidraw"],
-							inlineArtifacts: ["excalidraw"],
-						},
-					}),
-					signal,
-				}),
-			catch: networkFailure,
-		});
-		const text = yield* readBoundedText(
+				},
+				responseMode: "response-only",
+			})
+			.pipe(Effect.mapError(networkFailure));
+		const bounded = yield* boundedResponse(
 			response,
 			MAX_API_RESPONSE_BYTES,
 			malformedResponse,
 			networkFailure,
 		);
-		const parsed: unknown = yield* Effect.try({
-			try: () => JSON.parse(text),
-			catch: () => malformedResponse(),
-		});
-		const result = yield* decodeCreateCanvasResult(parsed).pipe(
-			Effect.mapError((error) =>
-				response.ok ? malformedResponse(schemaDetails(error)) : endpointFailure(response.status),
-			),
+		return yield* decodeCreateCanvas(bounded).pipe(
+			Effect.catch((error) => {
+				if (!("httpStatus" in error)) {
+					const ok = response.status >= 200 && response.status < 300;
+					return Effect.fail(
+						ok
+							? malformedResponse(Schema.isSchemaError(error) ? schemaDetails(error) : [])
+							: endpointFailure(response.status),
+					);
+				}
+				const { body, httpStatus } = error;
+				switch (body.status) {
+					case "export_failed":
+					case "render_failed":
+					case "storage_failed":
+						return Effect.fail(serverCanvasFailure(body.status, httpStatus, body.issues));
+					case "invalid_canvas":
+					case "invalid_input":
+					case "limit_exceeded":
+						return Effect.fail(rejectedCanvas(body.status, httpStatus, body.issues));
+				}
+			}),
 		);
-		if (!result.ok) {
-			switch (result.status) {
-				case "export_failed":
-				case "render_failed":
-				case "storage_failed":
-					return yield* serverCanvasFailure(result.status, response.status, result.issues);
-				case "invalid_canvas":
-				case "invalid_input":
-				case "limit_exceeded":
-					return yield* rejectedCanvas(result.status, response.status, result.issues);
-			}
-		}
-		if (!response.ok) return yield* endpointFailure(response.status);
-		return result;
 	},
 	Effect.timeoutOrElse({
 		duration: API_REQUEST_TIMEOUT,
@@ -214,6 +204,8 @@ const requestCanvas = Effect.fn("sketchi.cli.canvas.request")(
 				}),
 			),
 	}),
+	// @effect-diagnostics-next-line strictEffectProvide:off -- The canvas command is the outgoing network entry point and owns its Fetch transport.
+	Effect.provide(FetchHttpClient.layer),
 );
 
 export const createCanvasDiagram = Effect.fn("sketchi.cli.canvas.create")(function* (

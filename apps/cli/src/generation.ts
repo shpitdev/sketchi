@@ -1,20 +1,20 @@
 import { CanvasSpec } from "@sketchi/drawing";
-import { PublishedCoverageIssue } from "@sketchi/diagrams/families/flowchart/issues";
-import { ApplyDiagramPatchRequest } from "@sketchi/diagrams/canvas/patch-contract";
+import { type ApplyDiagramPatchRequest } from "@sketchi/diagrams/canvas/patch-contract";
 import { type CanonicalDiagramDocument, type DIAGRAM_TYPES } from "@sketchi/diagrams/family";
 
-import { PublishedBuildIssue } from "@sketchi/diagrams/build/result";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Result, Schema } from "effect";
+import { FetchHttpClient } from "effect/http";
 
 import { type BuiltDiagram, type StoredDiagram } from "./contracts.js";
 import { decodeCanonicalDiagramDocument, documentId, validateStorageId } from "./document.js";
 import { CliGenerationError, CliValidationError } from "./errors.js";
 import { DiagramPatcher } from "./patch.js";
+import { decodeGenerate, diagramsClient } from "./diagrams-client.js";
 import {
+	boundedResponse,
 	GENERATE_REQUEST_TIMEOUT,
 	MAX_API_RESPONSE_BYTES,
-	readBoundedText,
 } from "./response-body.js";
 import { DiagramStore } from "./store/service.js";
 
@@ -86,28 +86,19 @@ function invalidGeneratedDocument(): CliGenerationError {
 	});
 }
 
-const EndpointErrorBody = Schema.Struct({
-	status: Schema.optionalKey(Schema.String),
-	issues: Schema.optionalKey(
-		Schema.Array(
-			Schema.Struct({
-				message: Schema.optionalKey(Schema.String),
-				hint: Schema.optionalKey(Schema.String),
-			}),
-		),
-	),
-});
+interface EndpointErrorBody {
+	readonly status?: string;
+	readonly issues?: ReadonlyArray<{ readonly message?: string; readonly hint?: string }>;
+}
 
-const decodeErrorBody = Schema.decodeUnknownEffect(Schema.fromJsonString(EndpointErrorBody));
-
-function endpointIssueDetails(body: typeof EndpointErrorBody.Type): string[] {
+function endpointIssueDetails(body: EndpointErrorBody): string[] {
 	return (body.issues ?? []).flatMap((entry) => [
 		...(entry.message ? [entry.message] : []),
 		...(entry.hint ? [entry.hint] : []),
 	]);
 }
 
-function endpointFailure(status: number, body: typeof EndpointErrorBody.Type): CliGenerationError {
+function endpointFailure(status: number, body: EndpointErrorBody): CliGenerationError {
 	const firstIssue = body.issues?.[0];
 	const details = [`http_status:${String(status)}`, ...endpointIssueDetails(body)];
 
@@ -147,35 +138,6 @@ function endpointFailure(status: number, body: typeof EndpointErrorBody.Type): C
 	}
 }
 
-const PresentValue = Schema.Unknown.check(Schema.makeFilter((value) => value !== undefined));
-
-const GenerateApiSuccess = Schema.Struct({
-	ok: Schema.Literal(true),
-	issues: Schema.optionalKey(
-		Schema.Array(Schema.Union([PublishedBuildIssue, PublishedCoverageIssue])),
-	),
-	diagram: Schema.Struct({
-		document: PresentValue,
-		scene: PresentValue,
-		excalidraw: PresentValue,
-		/** Colors and shapes the request asked for, applied to the stored scene as a patch. */
-		patch: Schema.optionalKey(
-			Schema.Struct({ operations: ApplyDiagramPatchRequest.fields.operations }),
-		),
-		/** A flowchart revision's edits, which the server applied to the document sent. */
-		edits: Schema.optionalKey(Schema.Array(Schema.Unknown)),
-	}),
-	generation: Schema.Struct({
-		attempts: Schema.optionalKey(Schema.Number),
-		durationMs: Schema.optionalKey(Schema.Number),
-		model: Schema.NonEmptyString,
-		provider: Schema.NonEmptyString,
-		usage: Schema.optionalKey(Schema.Struct({ outputTokens: Schema.optionalKey(Schema.Number) })),
-	}),
-});
-
-const decodeSuccessBody = Schema.decodeUnknownEffect(Schema.fromJsonString(GenerateApiSuccess));
-
 function timeoutFailure(): CliGenerationError {
 	return CliGenerationError.make({
 		code: "generation_timeout",
@@ -211,43 +173,43 @@ const requestGeneration = Effect.fn("sketchi.cli.generate.request")(
 			readonly base?: { readonly document: CanonicalDiagramDocument; readonly id: string };
 		},
 	) {
-		const response = yield* Effect.tryPromise({
-			try: (signal) =>
-				globalThis.fetch(input.endpoint, {
-					method: "POST",
-					headers: {
-						"content-type": "application/json",
-						"x-sketchi-client": "sketchi-cli",
-					},
-					body: JSON.stringify({
-						prompt: input.prompt,
-						...(input.type ? { type: input.type } : {}),
-						// The API keeps a revision on the base's explicit id, so the base always names
-						// the stored record's id, even for a record made without one.
-						...(input.base
-							? {
-									base: {
-										type: input.base.document.type,
-										spec: { ...input.base.document.spec, id: input.base.id },
-									},
-								}
-							: {}),
-					}),
-					signal,
-				}),
-			catch: () => networkFailure(),
-		});
-		const text = yield* readBoundedText(
+		const client = yield* diagramsClient(input.endpoint);
+		const response = yield* client.generate
+			.generate({
+				payload: {
+					prompt: input.prompt,
+					...(input.type ? { type: input.type } : {}),
+					// The API keeps a revision on the base's explicit id, so the base always names
+					// the stored record's id, even for a record made without one.
+					...(input.base
+						? {
+								base: {
+									type: input.base.document.type,
+									spec: { ...input.base.document.spec, id: input.base.id },
+								},
+							}
+						: {}),
+				},
+				responseMode: "response-only",
+			})
+			.pipe(Effect.mapError(() => networkFailure()));
+		const bounded = yield* boundedResponse(
 			response,
 			MAX_API_RESPONSE_BYTES,
 			malformedResponse,
 			networkFailure,
 		);
-		if (!response.ok) {
-			const body = yield* decodeErrorBody(text).pipe(Effect.mapError(malformedResponse));
-			return yield* endpointFailure(response.status, body);
-		}
-		const success = yield* decodeSuccessBody(text).pipe(Effect.mapError(malformedResponse));
+		const success = yield* decodeGenerate(bounded).pipe(
+			Effect.catch((error) =>
+				Effect.fail(
+					"httpStatus" in error
+						? endpointFailure(error.httpStatus, error.body)
+						: response.status >= 200 && response.status < 300
+							? malformedResponse()
+							: endpointFailure(response.status, {}),
+				),
+			),
+		);
 		const { usage, ...generation } = success.generation;
 		return {
 			...success.diagram,
@@ -260,6 +222,8 @@ const requestGeneration = Effect.fn("sketchi.cli.generate.request")(
 		duration: GENERATE_REQUEST_TIMEOUT,
 		orElse: () => Effect.fail(timeoutFailure()),
 	}),
+	// @effect-diagnostics-next-line strictEffectProvide:off -- Generate and revise are the outgoing network entry points and own their Fetch transport.
+	Effect.provide(FetchHttpClient.layer),
 );
 
 /**

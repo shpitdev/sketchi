@@ -13,7 +13,19 @@
         "status": "accepted",
         "buildId": "build-http-flowchart",
         "normalizedSpec": {
-          "id": "flowchart-http"
+          "id": "flowchart-http",
+          "title": "HTTP compatibility",
+          "direction": "TB",
+          "nodes": {
+            "start": "Start",
+            "done": "Done"
+          },
+          "edges": [
+            [
+              "start",
+              "done"
+            ]
+          ]
         },
         "quality": {
           "accepted": true,
@@ -145,7 +157,12 @@
         "status": "accepted",
         "buildId": "build-http-mindmap",
         "normalizedSpec": {
-          "id": "mindmap-http"
+          "id": "mindmap-http",
+          "title": "HTTP compatibility",
+          "root": {
+            "label": "HTTP compatibility"
+          },
+          "type": "mindmap"
         },
         "quality": {
           "accepted": true,

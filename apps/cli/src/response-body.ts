@@ -1,4 +1,5 @@
-import { Effect, Stream } from "effect";
+import { Effect, Option, Stream } from "effect";
+import { HttpClientResponse } from "effect/http";
 
 export const MAX_API_RESPONSE_BYTES = 16 * 1024 * 1024;
 export const API_REQUEST_TIMEOUT = "90 seconds";
@@ -59,4 +60,23 @@ export const readBoundedText = Effect.fn("sketchi.cli.response.readBoundedText")
 		try: () => new TextDecoder("utf-8", { fatal: true }).decode(bytes),
 		catch: onError,
 	});
+});
+
+/**
+ * A client response with its body read under the CLI's byte cap, ready for the generated decoder.
+ * FetchHttpClient reads bodies without a cap.
+ */
+export const boundedResponse = Effect.fn("sketchi.cli.response.bounded")(function* <E>(
+	response: HttpClientResponse.HttpClientResponse,
+	limit: number,
+	onError: () => E,
+	onReadError: () => E = onError,
+) {
+	const web = HttpClientResponse.toWeb(response);
+	if (Option.isNone(web)) return yield* Effect.fail(onError());
+	const text = yield* readBoundedText(web.value, limit, onError, onReadError);
+	return HttpClientResponse.fromWeb(
+		response.request,
+		new Response(text, { status: response.status, headers: response.headers }),
+	);
 });

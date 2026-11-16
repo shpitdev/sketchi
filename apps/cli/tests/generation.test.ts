@@ -11,7 +11,7 @@ import { exitCodeForFailure } from "../src/errors.js";
 import { DEFAULT_GENERATE_ENDPOINT, generateDiagram } from "../src/generation.js";
 import { DiagramPatcher } from "../src/patch.js";
 import { DiagramStore } from "../src/store/service.js";
-import { flowchartInput, sequenceInput } from "./fixtures.js";
+import { flowchartInput, sequenceInput, swappableFetch } from "./fixtures.js";
 
 const builderLayer = DiagramBuilderLive.pipe(
 	Layer.provide(
@@ -68,6 +68,10 @@ function stored(diagram: BuiltDiagram): StoredDiagram {
 }
 
 function capturingStoreLayer(created: BuiltDiagram[]) {
+	return Layer.merge(swappableFetch, capturingStore(created));
+}
+
+function capturingStore(created: BuiltDiagram[]) {
 	return Layer.succeed(DiagramStore, {
 		create: Effect.fn("sketchi.cli.storage.testCreate")(function* (diagram) {
 			created.push(diagram);
@@ -261,6 +265,8 @@ describe("prompt-assisted generation over the public generate API", () => {
 						issues: [
 							{
 								code: "invalid_generated_document",
+								severity: "error",
+								stage: "generation",
 								message: "The generated diagram failed validation.",
 								hint: "Refine the prompt.",
 							},
@@ -323,6 +329,7 @@ describe("prompt-assisted generation over the public generate API", () => {
 					{
 						ok: true,
 						status: "generated",
+						issues: [],
 						diagram: {
 							document: { type: "flowchart", spec: { id: "x" } },
 							scene: {},

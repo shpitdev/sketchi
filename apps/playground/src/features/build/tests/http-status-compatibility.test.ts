@@ -1,12 +1,7 @@
-import { familyForType } from "@sketchi/diagrams/family";
+import { MAX_BUILD_REQUEST_BYTES as MAX_CODE_MODE_BUILD_REQUEST_BYTES } from "@sketchi/diagrams/http-api";
 import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
-import {
-	handleFamilyBuildRequest,
-	handleGetArtifactRequest as handleGetArtifactRequestEffect,
-	handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
-	MAX_CODE_MODE_BUILD_REQUEST_BYTES,
-} from "../api.server";
+import { serveDiagramsApi } from "../http.server";
 
 const runtimeResults = vi.hoisted(() => {
 	let buildFlowchartResult: unknown;
@@ -34,6 +29,14 @@ const runtimeResults = vi.hoisted(() => {
 	};
 });
 
+vi.mock("@sketchi/diagrams/build/code-mode/builds", () => ({
+	bindBuild: (operation: string) => () =>
+		Effect.succeed(
+			operation === "buildMindmap"
+				? runtimeResults.getBuildMindmap()
+				: runtimeResults.getBuildFlowchart(),
+		),
+}));
 vi.mock("@sketchi/diagrams/canvas/artifact", () => ({
 	getArtifact: () => Effect.succeed(runtimeResults.getGetArtifact()),
 }));
@@ -56,48 +59,19 @@ function testBoundary(env: StudioEnv, request: Request) {
 	};
 }
 
-function handleBuildFlowchartRequest(env: StudioEnv, request: Request) {
-	const family = familyForType("flowchart");
-	return runPlaygroundEffect(
-		handleFamilyBuildRequest(
-			{
-				...family,
-				build: () => () =>
-					Effect.succeed(runtimeResults.getBuildFlowchart() as typeof family.contracts.output.Type),
-			},
-			request,
-		),
-		testBoundary(env, request),
-	);
+function serve(env: StudioEnv, request: Request) {
+	return runPlaygroundEffect(serveDiagramsApi(request), testBoundary(env, request));
 }
 
-function handleBuildMindmapRequest(env: StudioEnv, request: Request) {
-	const family = familyForType("mindmap");
-	return runPlaygroundEffect(
-		handleFamilyBuildRequest(
-			{
-				...familyForType("mindmap"),
-				build: () => () =>
-					Effect.succeed(runtimeResults.getBuildMindmap() as typeof family.contracts.output.Type),
-			},
-			request,
-		),
-		testBoundary(env, request),
-	);
+const handleBuildFlowchartRequest = serve;
+const handleBuildMindmapRequest = serve;
+
+function handleGetArtifactRequest(env: StudioEnv, request: Request, _artifactId: string) {
+	return serve(env, request);
 }
 
-function handleGetArtifactRequest(env: StudioEnv, request: Request, artifactId: string) {
-	return runPlaygroundEffect(
-		handleGetArtifactRequestEffect(request, artifactId),
-		testBoundary(env, request),
-	);
-}
-
-function handlePatchArtifactRequest(env: StudioEnv, request: Request, artifactId: string) {
-	return runPlaygroundEffect(
-		handlePatchArtifactRequestEffect(request, artifactId),
-		testBoundary(env, request),
-	);
+function handlePatchArtifactRequest(env: StudioEnv, request: Request, _artifactId: string) {
+	return serve(env, request);
 }
 
 function issue(input: {
@@ -147,7 +121,22 @@ function acceptedBuild(operation: "flowchart" | "mindmap") {
 		ok: true,
 		status: "accepted",
 		buildId: `build-http-${operation}`,
-		normalizedSpec: { id: `${operation}-http` },
+		// The smallest valid normalized document: an accepted body is encoded through its schema.
+		normalizedSpec:
+			operation === "flowchart"
+				? {
+						id: "flowchart-http",
+						title: "HTTP compatibility",
+						direction: "TB",
+						nodes: { start: "Start", done: "Done" },
+						edges: [["start", "done"]],
+					}
+				: {
+						id: "mindmap-http",
+						type: "mindmap",
+						title: "HTTP compatibility",
+						root: { label: "HTTP compatibility" },
+					},
 		quality: {
 			accepted: true,
 			score: 10,

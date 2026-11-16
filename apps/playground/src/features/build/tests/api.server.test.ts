@@ -1,14 +1,10 @@
-import { familyForType } from "@sketchi/diagrams/family";
+import {
+	MAX_BUILD_REQUEST_BYTES as MAX_CODE_MODE_BUILD_REQUEST_BYTES,
+	MAX_CANVAS_REQUEST_BYTES,
+} from "@sketchi/diagrams/http-api";
 import { type TelemetrySpanRow } from "@sketchi/observability";
 import { describe, expect, it } from "vitest";
-import {
-	handleCreateCanvasRequest as handleCreateCanvasRequestEffect,
-	handleFamilyBuildRequest,
-	handleGetArtifactRequest as handleGetArtifactRequestEffect,
-	handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
-	MAX_CANVAS_REQUEST_BYTES,
-	MAX_CODE_MODE_BUILD_REQUEST_BYTES,
-} from "../api.server";
+import { serveDiagramsApi } from "../http.server";
 
 import {
 	type CodeModeObjectBucket,
@@ -32,36 +28,21 @@ function testBoundary(env: StudioEnv, request: Request) {
 	};
 }
 
-function handleBuildFlowchartRequest(env: StudioEnv, request: Request) {
-	return runPlaygroundEffect(
-		handleFamilyBuildRequest(familyForType("flowchart"), request),
-		testBoundary(env, request),
-	);
+/** Every route goes through the native diagrams API, as the Worker serves it. */
+function serve(env: StudioEnv, request: Request) {
+	return runPlaygroundEffect(serveDiagramsApi(request), testBoundary(env, request));
 }
 
-function handleBuildMindmapRequest(env: StudioEnv, request: Request) {
-	return runPlaygroundEffect(
-		handleFamilyBuildRequest(familyForType("mindmap"), request),
-		testBoundary(env, request),
-	);
+const handleBuildFlowchartRequest = serve;
+const handleBuildMindmapRequest = serve;
+const handleCreateCanvasRequest = serve;
+
+function handleGetArtifactRequest(env: StudioEnv, request: Request, _artifactId: string) {
+	return serve(env, request);
 }
 
-function handleCreateCanvasRequest(env: StudioEnv, request: Request) {
-	return runPlaygroundEffect(handleCreateCanvasRequestEffect(request), testBoundary(env, request));
-}
-
-function handleGetArtifactRequest(env: StudioEnv, request: Request, artifactId: string) {
-	return runPlaygroundEffect(
-		handleGetArtifactRequestEffect(request, artifactId),
-		testBoundary(env, request),
-	);
-}
-
-function handlePatchArtifactRequest(env: StudioEnv, request: Request, artifactId: string) {
-	return runPlaygroundEffect(
-		handlePatchArtifactRequestEffect(request, artifactId),
-		testBoundary(env, request),
-	);
+function handlePatchArtifactRequest(env: StudioEnv, request: Request, _artifactId: string) {
+	return serve(env, request);
 }
 
 function approvalSpec() {

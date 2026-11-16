@@ -1,23 +1,15 @@
-import {
-	Array as Arr,
-	String as Str,
-	Option as Opt,
-	Record as Rec,
-	Effect,
-	Result,
-	Schema,
-} from "effect";
+import { Array as Arr, String as Str, Option as Opt, Effect, Result, Schema } from "effect";
 import "@tanstack/react-start/server-only";
 import {
 	buildCanonicalDocument,
 	canonicalDocumentFromDiagram,
 } from "@sketchi/diagrams/build/code-mode/documents";
-import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
 import {
 	decodeFlowchartDocument,
 	flowchartDiagramFromDocument,
 } from "@sketchi/diagrams/families/flowchart/document";
 import {
+	DIAGRAM_TYPES,
 	familyForType,
 	type CanonicalDiagramDocument,
 	type FamilyBuildResult,
@@ -31,23 +23,35 @@ import { type DiagramGenerationError } from "@sketchi/diagrams/generate/errors";
 import { type DiagramGenerationType } from "@sketchi/diagrams/generate/intent";
 import { isSupportedGenerationModel } from "@sketchi/diagrams/generate/models";
 import { type DiagramStyle } from "@sketchi/diagrams/generate/styling";
+import {
+	GenerateRequest,
+	MAX_GENERATE_PROMPT_LENGTH,
+	MAX_GENERATE_REQUEST_BYTES,
+	type GenerateAccepted,
+	type GenerateIssue,
+	GenerateWarning,
+	type GenerateRejected,
+	type GenerateResult,
+} from "@sketchi/diagrams/generate/contract";
+import { listAlternatives } from "@sketchi/diagrams/generate/messages";
+import { type DiagramPatchOperation } from "@sketchi/diagrams/canvas/patch-contract";
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { buildResponse } from "@sketchi/diagrams/build/operation";
 import { CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
 import { applyDiagramPatch } from "@sketchi/diagrams/canvas/patch";
-import {
-	codeModeUsageResponseHeaders,
-	PlaygroundCodeModeUsage,
-} from "../../features/build/usage-events.server";
-import { PlaygroundBindings, PlaygroundClock } from "../runtime/context.server";
-import { resultHttpStatus } from "../runtime/http-status.server";
-import { readBoundedJson } from "../runtime/request-body.server";
-import { decodeGenerateRequest, GENERATE_REQUEST_COPY, type GenerateBaseSchema } from "./request";
+import { type JsonBody } from "../../features/build/json-body.server";
+import { PlaygroundBindings, PlaygroundRequestMetadata } from "../runtime/context.server";
 import { PlaygroundGeneration } from "./service.server";
-// Room for a pasted roster, DDL schema or task list of the largest diagrams the
-// family limits allow: 25 tables of DDL with their usual columns run past 8,000.
-export const MAX_GENERATE_REQUEST_BYTES = 64 * 1024;
-export const MAX_GENERATE_PROMPT_LENGTH = 20000;
+
+const decodeGenerateRequest = Schema.decodeUnknownResult(GenerateRequest, { errors: "all" });
+const GENERATE_REQUEST_COPY = {
+	invalidInput: `The generate request must include a string prompt and an optional type of ${listAlternatives(DIAGRAM_TYPES)}.`,
+	invalidBase: "The base diagram is not a valid Sketchi document.",
+	requestValidBase:
+		"Send the stored document's type and spec unchanged, or omit base for a new diagram.",
+	unsupportedModel: "The requested model is not supported.",
+	requestSupportedModel: "Omit the model to use the default.",
+} as const;
 type BuildResult = FamilyBuildResult;
 type BuiltArtifact = Extract<
 	BuildResult,
@@ -55,63 +59,9 @@ type BuiltArtifact = Extract<
 		readonly ok: true;
 	}
 >["artifact"];
-type GenerateFailureStatus =
-	| "invalid_input"
-	| "provider_failed"
-	| "generation_timeout"
-	| "limit_exceeded"
-	| "unsupported_model"
-	| "malformed_output"
-	| "invalid_generated_document"
-	| "quality_failed"
-	| "render_failed"
-	| "export_failed"
-	| "storage_failed";
-interface GenerateIssue {
-	readonly code: string;
-	readonly severity: "error";
-	readonly stage: "input" | "generation" | "build";
-	readonly message: string;
-	readonly hint: string;
-}
-interface GenerateFailure {
-	readonly ok: false;
-	readonly status: GenerateFailureStatus;
-	readonly issues: ReadonlyArray<GenerateIssue>;
-}
-interface GenerateSuccess {
-	readonly issues: ReadonlyArray<CodeModeIssue>;
-	readonly ok: true;
-	readonly status: "generated";
-	readonly diagram: {
-		readonly document: {
-			readonly type: DiagramGenerationType;
-			readonly spec: unknown;
-		};
-		readonly scene: unknown;
-		readonly excalidraw: unknown;
-		/**
-		 * Colors and shapes the request asked for, as patch operations for the caller to apply to the
-		 * scene above, as an MCP agent applies them with applyDiagramPatch.
-		 */
-		readonly patch?: {
-			readonly operations: ReadonlyArray<unknown>;
-		};
-		/** A flowchart revision's edits, which made the document from the base the caller sent. */
-		readonly edits?: ReadonlyArray<unknown>;
-	};
-	readonly generation: {
-		readonly attempts?: number;
-		readonly durationMs?: number;
-		readonly model: string;
-		readonly provider: string;
-		readonly usage?: {
-			readonly inputTokens?: number;
-			readonly outputTokens?: number;
-		};
-	};
-}
-type GenerateResult = GenerateSuccess | GenerateFailure;
+type GenerateFailureStatus = GenerateRejected["status"];
+type GenerateFailure = GenerateRejected;
+const isGenerateWarning = Schema.is(GenerateWarning);
 function issue(
 	code: string,
 	stage: GenerateIssue["stage"],
@@ -125,11 +75,6 @@ function failure(
 	issues: ReadonlyArray<GenerateIssue>,
 ): GenerateFailure {
 	return { ok: false, status, issues };
-}
-function jsonResponse(body: unknown, status: number, extraHeaders: HeadersInit = {}): Response {
-	const headers = new Headers(extraHeaders);
-	headers.set("Cache-Control", "no-store");
-	return Response.json(body, { status, headers });
 }
 function generationErrorFailure(error: DiagramGenerationError): GenerateFailure {
 	switch (error._tag) {
@@ -309,7 +254,7 @@ function inlineArtifact(artifact: BuiltArtifact, format: "scene" | "excalidraw")
  * The stored document a revision starts from, as the canonical diagram JSON the model reads, or
  * undefined when its spec is not a valid document of its type.
  */
-function baseDiagram(base: typeof GenerateBaseSchema.Type):
+function baseDiagram(base: NonNullable<GenerateRequest["base"]>):
 	| {
 			readonly diagram: Readonly<Record<string, unknown>>;
 			readonly id?: string;
@@ -334,48 +279,47 @@ function baseDiagram(base: typeof GenerateBaseSchema.Type):
 	};
 }
 /** The patch operations that draw the styles a response asked for. */
-function styleOperations(styles: ReadonlyArray<DiagramStyle>): unknown[] {
-	return Arr.flatMap(styles, (style) => {
+function styleOperations(styles: ReadonlyArray<DiagramStyle>): DiagramPatchOperation[] {
+	return Arr.flatMap(styles, (style): DiagramPatchOperation[] => {
 		const targets = [...style.targets];
 		const selector = { nodeIds: targets, edgeIds: targets, labels: targets };
-		const colors: Record<string, string> = {
+		const colors = {
 			...(style.fillColor ? { fillColor: style.fillColor } : {}),
 			...(style.strokeColor ? { strokeColor: style.strokeColor } : {}),
 			...(style.textColor ? { textColor: style.textColor } : {}),
 		};
 		return [
-			...(!Rec.isEmptyRecord(colors) ? [{ op: "setStyle", selector, style: colors }] : []),
+			...(style.fillColor || style.strokeColor || style.textColor
+				? [{ op: "setStyle" as const, selector, style: colors }]
+				: []),
 			...(style.shape
-				? [{ op: "setShape", selector: { nodeIds: targets, labels: targets }, shape: style.shape }]
+				? [
+						{
+							op: "setShape" as const,
+							selector: { nodeIds: targets, labels: targets },
+							shape: style.shape,
+						},
+					]
 				: []),
 		];
 	});
 }
-export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate")(function* (
-	request: Request,
-) {
-	const clock = yield* PlaygroundClock;
+/** What one generate request answered, and the request as usage records it. */
+export interface GenerateOutcome {
+	readonly requestBody: unknown;
+	readonly result: GenerateResult;
+}
+
+/**
+ * Generates one diagram from a read request body. The HTTP host owns transport and usage capture;
+ * this owns the request's validation, the model call and the build that draws its answer.
+ */
+export const generateDiagram = Effect.fn("playground.generate")(function* (bounded: JsonBody) {
 	const generation = yield* PlaygroundGeneration;
-	const usage = yield* PlaygroundCodeModeUsage;
 	const env = yield* PlaygroundBindings;
-	const usageContext = yield* usage.createContext;
-	const startedAt = yield* clock.nowMillis;
+	const metadata = yield* PlaygroundRequestMetadata;
 	const finish = (requestBody: unknown, result: GenerateResult) =>
-		Effect.gen(function* () {
-			const status = resultHttpStatus(result);
-			const finishedAt = yield* clock.nowMillis;
-			yield* usage.capture({
-				context: usageContext,
-				durationMs: finishedAt - startedAt,
-				operation: "generateDiagram",
-				requestBody,
-				responseBody: result,
-				statusCode: status,
-				surface: "api",
-			});
-			return jsonResponse(result, status, codeModeUsageResponseHeaders(usageContext));
-		});
-	const bounded = yield* readBoundedJson(request, MAX_GENERATE_REQUEST_BYTES);
+		Effect.succeed<GenerateOutcome>({ requestBody, result });
 	if (bounded._tag === "TooLarge") {
 		return yield* finish(
 			{ omitted: true },
@@ -471,8 +415,8 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 		...(base ? { base: base.diagram } : {}),
 	};
 	const candidateResult = yield* withTelemetryCorrelation(generation.generate(generationInput), {
-		attemptId: usageContext.attemptId,
-		runId: usageContext.runId,
+		attemptId: metadata.attemptId,
+		runId: metadata.runId,
 	}).pipe(
 		Effect.match({
 			onFailure: (error) => ({ ok: false as const, error }),
@@ -551,7 +495,7 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 	const excalidraw = inlineArtifact(buildResult.artifact, "excalidraw");
 	// A flowchart's node colors and diamonds are in its document, and its drawing is never patched:
 	// what styles are left (an edge color, a text color, another shape) is reported, not drawn.
-	const unstyled: CodeModeIssue[] =
+	const unstyled: GenerateWarning[] =
 		type === "flowchart" && candidate.styles?.length
 			? [
 					{
@@ -600,7 +544,7 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 						fillNamedLogos: true,
 					})),
 				);
-	const styleIssues: CodeModeIssue[] =
+	const styleIssues: GenerateWarning[] =
 		styled === undefined || styled.ok
 			? []
 			: [
@@ -626,11 +570,11 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 			]),
 		);
 	}
-	const success: GenerateSuccess = {
+	const success: GenerateAccepted = {
 		ok: true,
 		status: "generated",
 		issues: [
-			...Arr.map(candidate.warnings ?? [], (warning): CodeModeIssue => ({
+			...Arr.map(candidate.warnings ?? [], (warning): GenerateWarning => ({
 				code: warning.code,
 				severity: warning.severity,
 				stage: "input",
@@ -638,7 +582,13 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 				message: warning.message,
 				hint: warning.hint,
 			})),
-			...Arr.filter(buildResult.issues, (entry) => entry.severity === "warning"),
+			// A build warning outside the published codes would make the body undecodable by
+			// installed CLIs, so only published warnings travel.
+			...Arr.filter(
+				buildResult.issues,
+				(entry): entry is GenerateWarning =>
+					entry.severity === "warning" && isGenerateWarning(entry),
+			),
 			...styleIssues,
 			...unstyled,
 		],

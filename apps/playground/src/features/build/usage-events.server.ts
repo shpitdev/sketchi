@@ -120,7 +120,15 @@ const createCodeModeUsageContext = Effect.fn("playground.codeModeUsage.createCon
 	},
 );
 
-export function codeModeUsageResponseHeaders(context: CodeModeUsageContext): HeadersInit {
+/** The usage event an HTTP request records, and when the request started. */
+export class CurrentCodeModeUsage extends Context.Service<
+	CurrentCodeModeUsage,
+	CodeModeUsageContext & { readonly startedAt: number }
+>()("@sketchi/playground/CurrentCodeModeUsage") {}
+
+export function codeModeUsageResponseHeaders(
+	context: CodeModeUsageContext,
+): Readonly<Record<string, string>> {
 	return {
 		"x-sketchi-attempt-id": context.attemptId,
 		"x-sketchi-event-id": context.eventId,
