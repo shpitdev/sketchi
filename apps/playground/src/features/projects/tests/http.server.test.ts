@@ -4,7 +4,11 @@ import { vi } from "vitest";
 
 import { HttpServerRequest, HttpServerResponse } from "effect/http";
 import { makeIsoDateString, makeStudioRecordId } from "../contracts";
-import { makeStudioObjectStoreLayer, MemoryStudioObjectBucket } from "../bucket.server";
+import {
+	makeStudioObjectStoreLayer,
+	MemoryStudioObjectBucket,
+	type StudioObjectBucketBody,
+} from "../bucket.server";
 import {
 	makeStudioRecordFactoryLayer,
 	StudioProjectsLive,
@@ -171,26 +175,27 @@ describe("Studio project HTTP runtime edge", () => {
 		});
 	});
 
-	it("propagates request cancellation without committing records", async () => {
-		const bucket = new MemoryStudioObjectBucket();
+	it("removes the records a cancelled Create already wrote and keeps unrelated objects", async () => {
 		const controller = new AbortController();
-		let sourceInterrupted = false;
-		let sourceLoadStarted: (() => void) | undefined;
-		const sourceStarted = new Promise<void>((resolve) => {
-			sourceLoadStarted = resolve;
-		});
-		const sourceArtifacts: StudioSourceArtifactStoreShape = {
-			load: () =>
-				Effect.sync(() => sourceLoadStarted?.()).pipe(
-					Effect.andThen(Effect.never),
-					Effect.onInterrupt(() =>
-						Effect.sync(() => {
-							sourceInterrupted = true;
-						}),
-					),
-				),
-		};
-		const { server } = createTestServer(bucket, sourceArtifacts);
+		const secondWriteStarted = Promise.withResolvers<void>();
+		const releaseSecondWrite = Promise.withResolvers<void>();
+		let writes = 0;
+		class StallingBucket extends MemoryStudioObjectBucket {
+			override async put(key: string, value: StudioObjectBucketBody) {
+				const metadata = await super.put(key, value);
+				writes += 1;
+				if (writes === 2) {
+					// R2 cannot abort a put, so the request is cancelled while this one is in flight.
+					secondWriteStarted.resolve();
+					await releaseSecondWrite.promise;
+				}
+				return metadata;
+			}
+		}
+		const bucket = new StallingBucket();
+		bucket.objects.set("unrelated.json", "preserved");
+		const { server, sourceArtifacts } = createTestServer(bucket);
+		sourceArtifacts.artifacts.set("artifact-cancelled", { diagramId: "flow", title: "Cancelled" });
 		const response = server.handleCreateFromArtifactRequest(
 			postRequest(
 				"https://studio.test/api/studio/projects/from-artifact",
@@ -200,12 +205,14 @@ describe("Studio project HTTP runtime edge", () => {
 			),
 		);
 
-		await sourceStarted;
+		await secondWriteStarted.promise;
+		expect(bucket.objects.size).toBe(3);
 		controller.abort();
+		releaseSecondWrite.resolve();
 
 		await expect(response).rejects.toThrow("All fibers interrupted without error");
-		expect(sourceInterrupted).toBe(true);
-		expect(bucket.objects.size).toBe(0);
+		expect(writes).toBe(2);
+		expect([...bucket.objects]).toEqual([["unrelated.json", "preserved"]]);
 	});
 });
 
