@@ -109,13 +109,21 @@ const repairResult: BuildFlowchartResult = {
 
 describe("Studio build_flowchart host", () => {
 	it("accepts a structured repair result and rejects missing issue fields", async () => {
-        expect(Schema.is(StudioBuildFlowchartOutputSchema)(repairResult)).toBe(true);
-        expect(Schema.is(StudioBuildFlowchartOutputSchema)({ok:false,status:"invalid_flowchart",issues:[{}]})).toBe(false);
+		expect(Schema.is(StudioBuildFlowchartOutputSchema)(repairResult)).toBe(true);
+		expect(
+			Schema.is(StudioBuildFlowchartOutputSchema)({
+				ok: false,
+				status: "invalid_flowchart",
+				issues: [{}],
+			}),
+		).toBe(false);
 	});
 
 	it("keeps declared lanes and groups through Studio's tool schema and builds them", async () => {
 		const properties = (
-			Tool.getJsonSchemaFromSchema(StudioBuildFlowchartInputSchema) as { properties: { spec: { properties: Record<string, unknown> } } }
+			Tool.getJsonSchemaFromSchema(StudioBuildFlowchartInputSchema) as {
+				properties: { spec: { properties: Record<string, unknown> } };
+			}
 		).properties.spec.properties;
 		expect(Object.keys(properties)).toEqual(expect.arrayContaining(["groups", "lanes"]));
 
@@ -350,16 +358,16 @@ describe("Studio build_flowchart host", () => {
 
 	it("gives the model a rejection's every issue, its element and hint, and nothing else", () => {
 		expect(studioModelResult(repairResult)).toEqual({
-				ok: false,
-				status: "invalid_flowchart",
-				issues: repairResult.issues.map(({ code, severity, stage, ref, message, hint }) => ({
-					code,
-					severity,
-					stage,
-					ref,
-					message,
-					...(hint ? { hint } : {}),
-				})),
+			ok: false,
+			status: "invalid_flowchart",
+			issues: repairResult.issues.map(({ code, severity, stage, ref, message, hint }) => ({
+				code,
+				severity,
+				stage,
+				ref,
+				message,
+				...(hint ? { hint } : {}),
+			})),
 		});
 	});
 

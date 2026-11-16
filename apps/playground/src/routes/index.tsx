@@ -223,14 +223,14 @@ function StudioRoute() {
 		(text: string) => {
 			const trimmed = text.trim();
 			if (trimmed && !busy) {
-				void sendMessage({ text: trimmed });
+				sendMessage({ text: trimmed });
 			}
 		},
 		[busy, sendMessage],
 	);
 
 	const handleStop = useCallback(() => {
-		void stop();
+		stop();
 	}, [stop]);
 
 	const handleSubmit = useCallback(
@@ -297,7 +297,11 @@ function StudioRoute() {
 				<p aria-atomic="true" className={error ? "studio__error" : "sr-only"} role="alert">
 					{error ?? null}
 				</p>
-				{error ? <button className="studio__artifact-link" onClick={retry} type="button">Try again</button> : null}
+				{error ? (
+					<button className="studio__artifact-link" onClick={retry} type="button">
+						Try again
+					</button>
+				) : null}
 
 				<div className="studio__body">
 					{!isEmpty ? (

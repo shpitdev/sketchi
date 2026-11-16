@@ -137,7 +137,7 @@ describe("Playground request runtime", () => {
 					};
 				}),
 				requestBoundary(
-					new Request("https://studio.test/api/chat", {
+					new Request("https://studio.test/api/studio/chat", {
 						signal: controller.signal,
 					}),
 				),

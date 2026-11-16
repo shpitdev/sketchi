@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import { generateText, jsonSchema, tool } from "ai";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
+import { Tool, Toolkit } from "effect/ai";
 
 import type { CloudflareAiGateway } from "@sketchi/cloudflare/ai-gateway";
 
@@ -49,8 +49,8 @@ function studioModel(runs: GatewayCall[]) {
 			attemptId: "attempt_1",
 			method: "POST",
 			origin: "https://studio.test",
-			path: "/api/chat",
-			request: new Request("https://studio.test/api/chat"),
+			path: "/api/studio/chat",
+			request: new Request("https://studio.test/api/studio/chat"),
 			runId: "run_1",
 			traceId: "trace_1",
 		}),
@@ -62,21 +62,13 @@ describe("Studio model", () => {
 		Effect.gen(function* () {
 			const runs: GatewayCall[] = [];
 			const model = yield* studioModel(runs);
-			const result = yield* Effect.promise(() =>
-				generateText({
-					model,
-					prompt: "Draw the release review.",
-					temperature: 0.4,
-					tools: {
-						build_flowchart: tool({
-							inputSchema: jsonSchema<{ title: string }>({
-								type: "object",
-								properties: { title: { type: "string" } },
-							}),
-						}),
-					},
-				}),
-			);
+			const result = yield* model.generateText({
+				prompt: "Draw the release review.",
+				toolkit: Toolkit.make(
+					Tool.make("build_flowchart", { parameters: Schema.Struct({ title: Schema.String }) }),
+				),
+				disableToolCallResolution: true,
+			});
 			expect(result.text).toBe("Here it is.");
 			expect(runs).toHaveLength(1);
 			const [run] = runs;
@@ -102,7 +94,7 @@ describe("Studio model", () => {
 			const runs: GatewayCall[] = [];
 			const model = yield* studioModel(runs);
 			for (const _ of [1, 2]) {
-				yield* Effect.promise(() => generateText({ model, prompt: "Draw the release review." }));
+				yield* model.generateText({ prompt: "Draw the release review." });
 			}
 			expect(runs).toHaveLength(2);
 			expect(runs[1]?.data.query).toEqual(runs[0]?.data.query);
