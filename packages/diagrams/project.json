@@ -158,8 +158,7 @@
 				"testEnvironment",
 				"^production",
 				"{projectRoot}/src/families/flowchart/**/*",
-				"{projectRoot}/src/graph/**/*",
-				"{projectRoot}/src/families/sequence/**/*"
+				"{projectRoot}/src/graph/**/*"
 			],
 			"dependsOn": ["^build"],
 			"cache": true,
@@ -406,7 +405,7 @@
 		"er-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "ER_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/er/er-fuzz.test.ts"
+				"command": "ER_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/er/tests/er-fuzz.test.ts"
 			},
 			"inputs": ["default", "^production", "testEnvironment"],
 			"dependsOn": ["^build"],
@@ -426,7 +425,7 @@
 		"sequence-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "SEQUENCE_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/sequence/sequence-fuzz.test.ts"
+				"command": "SEQUENCE_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/sequence/tests/sequence-fuzz.test.ts"
 			},
 			"inputs": [
 				"diagramTestShared",
