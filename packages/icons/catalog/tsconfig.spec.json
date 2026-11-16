@@ -6,5 +6,5 @@
     "rootDir": "../../..",
     "tsBuildInfoFile": "dist/tsconfig.spec.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "src/generated/*.json"]
+  "include": ["src/**/*.ts", "src/generated/*.json", "tests/**/*.ts"]
 }

@@ -6,6 +6,6 @@ export default defineConfig({
 			reportsDirectory: new URL("../../../coverage/packages/icons/catalog", import.meta.url)
 				.pathname,
 		},
-		include: ["packages/icons/catalog/src/**/*.test.ts"],
+		include: ["packages/icons/catalog/tests/**/*.test.ts"],
 	},
 });
