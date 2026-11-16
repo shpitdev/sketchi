@@ -12,8 +12,8 @@ import {
 } from "@sketchi/diagrams/build";
 import { CANVAS_LIMITS } from "@sketchi/drawing";
 
-import { type StudioEnv } from "../../../server/bindings/studio-env.server";
-import { runPlaygroundEffect } from "../../../server/runtime/runtime.server";
+import { type StudioEnv } from "../../../server/studio-env.server";
+import { runPlaygroundEffect } from "../../../server/runtime.server";
 import { USAGE_EVENT_ATTRIBUTE, USAGE_ISSUES_ATTRIBUTE } from "../usage-events.server";
 
 function testBoundary(env: StudioEnv, request: Request) {

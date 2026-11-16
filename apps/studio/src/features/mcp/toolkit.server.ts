@@ -8,7 +8,7 @@ import {
 	PlaygroundClock,
 	PlaygroundIds,
 	PlaygroundRequestMetadata,
-} from "../../server/runtime/context.server";
+} from "../../server/context.server";
 import { PlaygroundCodeModeUsage } from "../build/usage-events.server";
 import {
 	CodeModeDocsRequestSchema,

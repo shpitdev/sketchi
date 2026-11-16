@@ -9,9 +9,9 @@ export const Route = createFileRoute("/api/studio/projects")({
 					{ runPlaygroundEffect },
 					{ handleStudioProjectsRequest },
 				] = await Promise.all([
-					import("@/server/bindings/cloudflare-bindings.server"),
-					import("@/server/runtime/runtime.server"),
-					import("@/server/studio/projects.server"),
+					import("@/server/cloudflare-bindings.server"),
+					import("@/server/runtime.server"),
+					import("@/features/projects/host.server"),
 				]);
 
 				return runPlaygroundEffect(

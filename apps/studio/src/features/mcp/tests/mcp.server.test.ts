@@ -9,7 +9,7 @@ import {
 	PlaygroundClockLive,
 	PlaygroundIdsLive,
 	PlaygroundRequestMetadata,
-} from "../../../server/runtime/context.server";
+} from "../../../server/context.server";
 import { StudioBuildHostLive } from "../../build/capabilities.server";
 import { PlaygroundCodeModeUsageLive } from "../../build/usage-events.server";
 import { generateCodeModeTypes } from "../mcp-docs/types";

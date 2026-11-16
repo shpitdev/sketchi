@@ -5,10 +5,19 @@ import { cn } from "@sketchi/ui/lib/utils";
 import { BookOpen } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { SKETCHI_REPO_URL, SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
+/**
+ * The Sketchi web home — "the true home-home". Every brand mark in the Studio
+ * app links here so clicking the logo always returns to sketchi.app.
+ *
+ * This is the public product host, never the Worker hostname that happens to
+ * serve it: a platform move must not break links we have already shipped.
+ */
+const SKETCHI_WEB_HOME_URL = "https://sketchi.app";
+
+const SKETCHI_REPO_URL = "https://github.com/shpitdev/sketchi";
 
 /**
- * The header every Playground route shares: the Sketchi lockup on the left,
+ * The header every Studio route shares: the Sketchi lockup on the left,
  * then the route's own links and actions, then Docs and GitHub as the same
  * icon links the site and Icons headers use. On phones a route with actions
  * moves them to a second row so the lockup and Docs/GitHub share the first.

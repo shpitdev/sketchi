@@ -17,9 +17,9 @@ import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { type StudioEnv } from "../../bindings/studio-env.server";
-import { runPlaygroundEffect } from "../../runtime/runtime.server";
-import { serveDiagramsApi } from "../../../features/build/http.server";
+import { type StudioEnv } from "../../../server/studio-env.server";
+import { runPlaygroundEffect } from "../../../server/runtime.server";
+import { serveDiagramsApi } from "../../build/http.server";
 
 /** A model's flowchart answer: the flowchart document. */
 const flowchartAnswer = {

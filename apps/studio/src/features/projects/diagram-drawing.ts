@@ -1,15 +1,11 @@
 import { convertSceneToExcalidraw, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect, Array, Record, Schema } from "effect";
 import { HttpApiClient } from "effect/http-api";
-import { StudioHttpApi } from "../projects/http-api";
+import { StudioHttpApi } from "./http-api";
 import { Atom } from "effect/reactivity";
-import { StudioRecordIdSchema } from "../projects/contracts";
-import type {
-	StudioDiagramSummary,
-	StudioDrawing,
-	StudioProjectSummary,
-} from "../projects/contracts";
-import { StudioApi, projectsRuntime } from "../projects/client";
+import { StudioRecordIdSchema } from "./contracts";
+import type { StudioDiagramSummary, StudioDrawing, StudioProjectSummary } from "./contracts";
+import { StudioApi, projectsRuntime } from "./client";
 import { loadArtifactReview } from "../artifacts/artifact-view-client";
 import { readDrawingDraft } from "./drawing-drafts";
 

@@ -3,7 +3,7 @@ import "@tanstack/react-start/server-only";
 import { DynamicWorkerExecutor } from "@cloudflare/codemode";
 import { ICON_DRAW_BUDGET_MS } from "@sketchi/icon-draw";
 import { Context, Effect, Layer, Schema } from "effect";
-import { PlaygroundBindings } from "../../server/runtime/context.server";
+import { PlaygroundBindings } from "../../server/context.server";
 
 export interface SandboxResult {
 	readonly result: unknown;

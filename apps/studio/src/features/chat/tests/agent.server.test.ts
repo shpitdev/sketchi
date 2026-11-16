@@ -16,7 +16,7 @@ import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/obser
 import { Deferred, Effect, Schema, Stream } from "effect";
 import { AgUiSchema, LanguageModel, Response as AiResponse } from "effect/ai";
 
-import { runPlaygroundEffect } from "../../../server/runtime/runtime.server";
+import { runPlaygroundEffect } from "../../../server/runtime.server";
 import { handleStudioAgentRequest } from "../agent.server";
 import { toAgUiMessages, type ChatMessage } from "../chat-message";
 import { PlaygroundAiModel } from "../model.server";

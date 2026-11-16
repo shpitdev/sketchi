@@ -34,12 +34,12 @@ import { type ArtifactBundle, type PartialArtifactBundle } from "@sketchi/drawin
 import { normalizeCode } from "@cloudflare/codemode";
 import { CodeModeSandbox, CodeModeExecutionError, type SandboxFunctions } from "./sandbox.server";
 import { withTelemetryCorrelation } from "@sketchi/observability";
-import { drawIconForAgent } from "../../server/icons/draw.server";
+import { drawIconForAgent } from "../icons/draw.server";
 import {
 	PlaygroundBindings,
 	PlaygroundClock,
 	PlaygroundRequestMetadata,
-} from "../../server/runtime/context.server";
+} from "../../server/context.server";
 import { PNG_EXPORT_TIMEOUT_MS } from "../render/browser-render-pool.server";
 import { SKETCHI_EXECUTE_CODE_DESCRIPTION } from "./mcp-docs.server";
 import { PlaygroundCodeModeUsage } from "../build/usage-events.server";

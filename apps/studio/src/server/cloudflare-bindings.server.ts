@@ -2,7 +2,7 @@ import "@tanstack/react-start/server-only";
 
 import { env, waitUntil } from "cloudflare:workers";
 
-import type { PlaygroundRequestBoundary } from "../runtime/runtime.server";
+import type { PlaygroundRequestBoundary } from "./runtime.server";
 
 export function getPlaygroundRequestBoundary(request: Request): PlaygroundRequestBoundary {
 	return {

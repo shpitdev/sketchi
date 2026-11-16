@@ -7,7 +7,7 @@ import {
 	MCP_SESSION_HEADER,
 	MCP_SESSION_IDLE_MS,
 } from "@sketchi/cloudflare/mcp-session";
-import type { StudioEnv } from "../../server/bindings/studio-env.server";
+import type { StudioEnv } from "../../server/studio-env.server";
 import { makeStudioMcpHandler } from "./mcp.server";
 
 export class StudioMcpSession extends DurableObject<StudioEnv> {

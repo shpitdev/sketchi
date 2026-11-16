@@ -14,14 +14,14 @@ import { Context, Effect, Layer, Predicate, Scheduler } from "effect";
 import { SecureRandom } from "effect/crypto";
 import { McpProtocol, McpSchema, McpServer } from "effect/ai";
 import { HttpMiddleware, HttpRouter, HttpServer, HttpServerRequest } from "effect/http";
-import type { StudioEnv } from "../../server/bindings/studio-env.server";
+import type { StudioEnv } from "../../server/studio-env.server";
 import {
 	PlaygroundBindings,
 	PlaygroundClockLive,
 	PlaygroundIdsLive,
 	PlaygroundRequestMetadata,
-} from "../../server/runtime/context.server";
-import { correlationIdHeader } from "../../server/runtime/correlation.server";
+} from "../../server/context.server";
+import { correlationIdHeader } from "../../server/correlation.server";
 import { StudioBuildHostLive, StudioBuildRequestLive } from "../build/capabilities.server";
 import { PlaygroundCodeModeUsageLive } from "../build/usage-events.server";
 import { SKETCHI_CODE_MODE_VERSION, formatCodeModeDocs } from "./mcp-docs.server";

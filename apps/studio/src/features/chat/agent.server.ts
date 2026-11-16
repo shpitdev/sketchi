@@ -11,7 +11,7 @@ import {
 import { chatMessageViews, messageText } from "./chat-message";
 import { PlaygroundAiModel } from "./model.server";
 import { logosNamedIn, logosWithSlugs } from "../build/icon-catalog.server";
-import { readBoundedJson } from "../../server/runtime/request-body.server";
+import { readBoundedJson } from "../../server/request-body.server";
 import { makeStudioFamilyTools } from "./studio-family-tools.server";
 import {
 	makeStudioBuildTurn,

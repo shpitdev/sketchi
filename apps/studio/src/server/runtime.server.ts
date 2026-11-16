@@ -20,15 +20,15 @@ import {
 } from "@sketchi/observability";
 import { correlationIdHeader } from "./correlation.server";
 import { RequestBodyReadError } from "./request-body.server";
-import type { StudioEnv } from "../bindings/studio-env.server";
-import { PlaygroundAiModelLive } from "../../features/chat/model.server";
+import type { StudioEnv } from "./studio-env.server";
+import { PlaygroundAiModelLive } from "../features/chat/model.server";
+import { StudioBuildHostLive, StudioBuildRequestLive } from "../features/build/capabilities.server";
+import { PlaygroundGenerationLive } from "../features/generate/service.server";
+import { PlaygroundCodeModeUsageLive } from "../features/build/usage-events.server";
 import {
-	StudioBuildHostLive,
-	StudioBuildRequestLive,
-} from "../../features/build/capabilities.server";
-import { PlaygroundGenerationLive } from "../generation/service.server";
-import { PlaygroundCodeModeUsageLive } from "../../features/build/usage-events.server";
-import { PlaygroundStudioLayer, PlaygroundStudioLocalBucketLive } from "../studio/projects.server";
+	PlaygroundStudioLayer,
+	PlaygroundStudioLocalBucketLive,
+} from "../features/projects/host.server";
 import {
 	PlaygroundBindings,
 	PlaygroundClockLive,

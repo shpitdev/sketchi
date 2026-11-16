@@ -13,7 +13,7 @@ import {
 	PlaygroundBindings,
 	PlaygroundIds,
 	PlaygroundRequestMetadata,
-} from "../../server/runtime/context.server";
+} from "../../server/context.server";
 import {
 	DEFAULT_ASSET_ORIGIN,
 	PlaygroundBrowserRendering,

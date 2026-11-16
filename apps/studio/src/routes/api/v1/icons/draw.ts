@@ -9,9 +9,9 @@ export const Route = createFileRoute("/api/v1/icons/draw")({
 					{ handleDrawIconRequest },
 					{ runPlaygroundEffect },
 				] = await Promise.all([
-					import("@/server/bindings/cloudflare-bindings.server"),
-					import("@/server/icons/draw.server"),
-					import("@/server/runtime/runtime.server"),
+					import("@/server/cloudflare-bindings.server"),
+					import("@/features/icons/draw.server"),
+					import("@/server/runtime.server"),
 				]);
 
 				return runPlaygroundEffect(

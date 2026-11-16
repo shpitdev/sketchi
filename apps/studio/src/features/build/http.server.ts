@@ -44,9 +44,9 @@ import {
 	type PlaygroundBindings,
 	PlaygroundClock,
 	PlaygroundRequestMetadata,
-} from "../../server/runtime/context.server";
-import { generateDiagram } from "../../server/generation/api.server";
-import { type PlaygroundGeneration } from "../../server/generation/service.server";
+} from "../../server/context.server";
+import { generateDiagram } from "../generate/api.server";
+import { type PlaygroundGeneration } from "../generate/service.server";
 import { readJsonBody } from "./json-body.server";
 import {
 	codeModeUsageResponseHeaders,

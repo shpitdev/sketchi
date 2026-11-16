@@ -4,24 +4,18 @@ import "@tanstack/react-start/server-only";
 import { ArtifactStorage, BuildRuntimeEnvironment } from "@sketchi/diagrams/build";
 import { getArtifact } from "@sketchi/diagrams/canvas/artifact";
 
-import {
-	makeStudioObjectStoreLayer,
-	MemoryStudioObjectBucket,
-} from "../../features/projects/bucket.server";
-import { makeIsoDateString, makeStudioRecordId } from "../../features/projects/contracts";
-import { studioHttp } from "../../features/projects/http.server";
-import {
-	makeStudioRecordFactoryLayer,
-	StudioProjectsLive,
-} from "../../features/projects/service.server";
-import { makeStudioSessionServiceLayer } from "../../features/projects/session.server";
-import { StudioSourceArtifactError } from "../../features/projects/errors.server";
-import { StudioSourceArtifactStore } from "../../features/projects/source-artifacts.server";
+import { makeStudioObjectStoreLayer, MemoryStudioObjectBucket } from "./bucket.server";
+import { makeIsoDateString, makeStudioRecordId } from "./contracts";
+import { studioHttp } from "./http.server";
+import { makeStudioRecordFactoryLayer, StudioProjectsLive } from "./service.server";
+import { makeStudioSessionServiceLayer } from "./session.server";
+import { StudioSourceArtifactError } from "./errors.server";
+import { StudioSourceArtifactStore } from "./source-artifacts.server";
 import { HttpServerRequest, HttpServerResponse } from "effect/http";
 import { Context, Effect, Layer, Schema, Result } from "effect";
 
-import { artifactStoreForBindings } from "../../features/build/capabilities.server";
-import { PlaygroundBindings, PlaygroundClock, PlaygroundIds } from "../runtime/context.server";
+import { artifactStoreForBindings } from "../build/capabilities.server";
+import { PlaygroundBindings, PlaygroundClock, PlaygroundIds } from "../../server/context.server";
 
 export class PlaygroundStudioLocalBucket extends Context.Service<
 	PlaygroundStudioLocalBucket,
