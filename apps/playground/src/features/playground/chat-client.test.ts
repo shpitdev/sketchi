@@ -160,6 +160,11 @@ describe("Studio native chat atoms", () => {
 		],
 		["wrong run", () => streamResponse([start("other"), end("other")])],
 		[
+			"event after run end",
+			(body: AgUiSchema.RunAgentInput) =>
+				streamResponse([start(body.runId), end(body.runId), ...text]),
+		],
+		[
 			"old page response",
 			() => new Response("<!doctype html>", { headers: { "content-type": "text/html" } }),
 		],

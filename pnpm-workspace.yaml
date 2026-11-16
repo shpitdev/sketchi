@@ -6,6 +6,7 @@ packages:
 
 catalog:
   effect: 4.1.4
+  "@effect/ai-openai": 4.1.4
   "@effect/sql-d1": 4.1.4
   "@effect/atom-react": 4.1.4
   "@effect/platform-browser": 4.1.4

@@ -6,6 +6,7 @@ import { HttpClient, HttpClientError, HttpClientResponse } from "effect/http";
 import { DIAGRAM_AGENT_TEMPERATURE, MAX_AGENT_OUTPUT_TOKENS } from "@sketchi/diagrams/build/policy";
 import { aiEnvironment } from "../bindings/ai-env.server";
 import { PlaygroundBindings, PlaygroundRequestMetadata } from "../runtime/context.server";
+import { preserveOutputLimit } from "./response-stream.server";
 
 export class StudioAiModelError extends Schema.TaggedError<
 	StudioAiModelError,
@@ -82,7 +83,17 @@ const createStudioModel = Effect.fn("playground.ai.model")(function* () {
 			max_output_tokens: MAX_AGENT_OUTPUT_TOKENS,
 			temperature: DIAGRAM_AGENT_TEMPERATURE,
 		},
-	}).pipe(Effect.provideService(OpenAiClient.OpenAiClient, client));
+	}).pipe(
+		Effect.provideService(OpenAiClient.OpenAiClient, {
+			...client,
+			createResponseStream: (options) =>
+				client
+					.createResponseStream(options)
+					.pipe(
+						Effect.map(([response, stream]) => [response, preserveOutputLimit(stream)] as const),
+					),
+		}),
+	);
 });
 export const PlaygroundAiModelLive = Layer.succeed(PlaygroundAiModel, {
 	model: createStudioModel(),
