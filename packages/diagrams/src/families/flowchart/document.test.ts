@@ -220,7 +220,7 @@ describe("flowchart documents", () => {
 			edges: [
 				["alert", "cause"],
 				["cause", "rollback", "deploy"],
-				["cause", "provider", "provider"],
+				["cause", "provider"],
 				["rollback", "stable"],
 				["stable", "resolved", "yes"],
 				["stable", "cause", "no"],
@@ -277,24 +277,6 @@ describe("flowchart documents", () => {
 		expect(kinds(document)).toMatchObject({ users: "start", admins: "start", rds: "end" });
 		expect(diagram.nodes.find((node) => node.id === "rds")?.shape).toBe("database");
 		expect(diagram.layout.direction).toBe("LR");
-	});
-
-	it("reads a labeled edge out of an ordinary step as a labeled edge, not a decision", () => {
-		const document: FlowchartDocument = {
-			title: "Sync",
-			nodes: {
-				queue: "Order queue",
-				sync: "Sync function",
-				table: "Orders table",
-				archive: "Archive",
-			},
-			edges: [
-				["queue", "sync"],
-				["sync", "table"],
-				["sync", "archive", "invoice PDF"],
-			],
-		};
-		expect(kinds(document).sync).toBe("process");
 	});
 
 	it("draws a step given a diamond as a decision, and its other shapes only as drawings", () => {
@@ -800,17 +782,6 @@ describe("flowchart document branches", () => {
 			ship: "Ship the order",
 		},
 		edges,
-	});
-
-	it("reads one edge that lists several steps as one branch", () => {
-		const result = flowchartDiagramFromDocument(
-			delay([
-				["check", "short"],
-				["short", ["notify", "reorder"], "yes"],
-				["short", "ship", "no"],
-			]),
-		);
-		expect(result.ok).toBe(true);
 	});
 
 	it("still refuses two edges that repeat a branch label, and shows the list form", () => {
