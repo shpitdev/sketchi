@@ -25,5 +25,5 @@ apps/icons/public/sketchi-icons-with-names.excalidrawlib
 apps/icons/public/card.png
 apps/icons/public/packs/
 apps/icons/public/output/
-apps/playground/public/node-logos/
+apps/studio/public/node-logos/
 .vitest

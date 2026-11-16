@@ -6,7 +6,7 @@ import { Result } from "effect";
 import { ganttScenarios } from "@sketchi/diagram-scenarios";
 import { parseGanttDiagram } from "@sketchi/diagrams/families/gantt/document";
 
-import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index.js";
 
 const ganttFixture = familyForType("gantt").fixture;
 

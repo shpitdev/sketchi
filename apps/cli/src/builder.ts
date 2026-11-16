@@ -1,7 +1,9 @@
-import { buildResponse } from "@sketchi/diagrams/build/operation";
-import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
-import { buildCanonicalDocument } from "@sketchi/diagrams/build/code-mode/documents";
-import { CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
+import {
+	buildResponse,
+	CodeModeArtifactStorage,
+	buildCanonicalDocument,
+	CodeModeRuntimeEnvironment,
+} from "@sketchi/diagrams/build";
 import { type FamilyBuildResult } from "@sketchi/diagrams/family";
 import { Context, Effect, Layer } from "effect";
 

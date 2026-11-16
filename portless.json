@@ -1,12 +1,12 @@
 {
 	"apps": {
-		"apps/excalidraw": {
+		"apps/editor": {
 			"name": "excalidraw.sketchi"
 		},
 		"apps/icons": {
 			"name": "icons.sketchi"
 		},
-		"apps/playground": {
+		"apps/studio": {
 			"name": "playground.sketchi"
 		},
 		"apps/web": {

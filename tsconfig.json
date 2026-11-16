@@ -42,13 +42,13 @@
       "path": "./apps/cli"
     },
     {
-      "path": "./apps/excalidraw"
+      "path": "./apps/editor"
     },
     {
       "path": "./apps/icons"
     },
     {
-      "path": "./apps/playground"
+      "path": "./apps/studio"
     },
     {
       "path": "./apps/web"

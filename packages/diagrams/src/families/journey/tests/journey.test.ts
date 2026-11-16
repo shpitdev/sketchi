@@ -4,12 +4,9 @@ import { type CanvasElement as SceneElement, type CanvasSpec } from "@sketchi/dr
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { describe, expect, it } from "vitest";
 
-import {
-	CodeModeArtifactStorage,
-	makeMemoryArtifactStorage,
-} from "../../../build/code-mode/artifacts.js";
-import { buildJourneyMap } from "../../../build/code-mode/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
+import { buildJourneyMap } from "../../../build/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
 import { buildResponse } from "../../../build/operation.js";
 import {
 	JOURNEY_MAX_STAGE_STEPS,

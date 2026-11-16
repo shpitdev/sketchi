@@ -13,12 +13,9 @@ import {
 	type CodeModeArtifactStorageShape,
 	type CodeModeObjectBucket,
 	type CodeModeObjectBucketObject,
-} from "../../build/code-mode/artifacts.js";
-import { buildFlowchart } from "../../build/code-mode/builds.js";
-import {
-	CodeModeRuntimeEnvironment,
-	type CodeModeRuntimeOptions,
-} from "../../build/code-mode/runtime.js";
+} from "../../build/artifacts.js";
+import { buildFlowchart } from "../../build/builds.js";
+import { CodeModeRuntimeEnvironment, type CodeModeRuntimeOptions } from "../../build/runtime.js";
 import { getArtifact } from "../artifact.js";
 import { type GetArtifactResult } from "../artifact-contract.js";
 import { createCanvas } from "../create.js";

@@ -10,15 +10,12 @@ import {
 } from "../document.js";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
-import {
-	CodeModeArtifactStorage,
-	makeMemoryArtifactStorage,
-} from "../../../build/code-mode/artifacts.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
 import { erBuild } from "../build.js";
 import { buildResponse } from "../../../build/operation.js";
-import { canonicalDocumentFromDiagram } from "../../../build/code-mode/documents.js";
-import { buildErDiagram } from "../../../build/code-mode/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { canonicalDocumentFromDiagram } from "../../../build/documents.js";
+import { buildErDiagram } from "../../../build/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
 
 const storage = makeMemoryArtifactStorage();
 function run<A>(

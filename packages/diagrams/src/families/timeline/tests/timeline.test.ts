@@ -3,13 +3,10 @@ import { Effect, Result } from "effect";
 import { CANVAS_LIMITS } from "@sketchi/drawing";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { buildResponse, type BuildRejection } from "../../../build/operation.js";
-import { buildTimeline } from "../../../build/code-mode/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { buildTimeline } from "../../../build/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
 import { applyDiagramPatch } from "../../../canvas/patch.js";
-import {
-	CodeModeArtifactStorage,
-	makeMemoryArtifactStorage,
-} from "../../../build/code-mode/artifacts.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
 import {
 	orderedTimelineEvents,
 	parseTimelineDiagram,

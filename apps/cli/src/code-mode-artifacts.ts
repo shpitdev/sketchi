@@ -1,10 +1,8 @@
 import { CanvasSpec } from "@sketchi/drawing";
-import { formatContractSchemaError } from "@sketchi/diagrams/build/input";
+import { formatContractSchemaError, type CodeModeIssue } from "@sketchi/diagrams/build/contract";
 
-import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
-import { CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
+import { CodeModeArtifactStorage, CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
-import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { Effect, Schema, Result } from "effect";
 
 import { type PatchedDiagramArtifacts } from "./contracts.js";

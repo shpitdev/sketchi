@@ -5,7 +5,7 @@
 		{
 			"files": [
 				"apps/web/src/**/*.{ts,tsx}",
-				"apps/playground/src/**/*.{ts,tsx}",
+				"apps/studio/src/**/*.{ts,tsx}",
 				"apps/icons/src/**/*.{ts,tsx}"
 			],
 			"rules": {
@@ -42,7 +42,7 @@
 			// Vendored AI Elements compose and restyle primitives the way upstream
 			// does, so registry updates apply cleanly. `not-prose`, `is-user` and
 			// `is-assistant` are upstream marker classes with no CSS of their own.
-			"files": ["apps/playground/src/components/ai-elements/**"],
+			"files": ["apps/studio/src/components/ai-elements/**"],
 			"rules": {
 				"shadcn/no-restyle": "off",
 				"shadcn/no-arbitrary-values": "off",
@@ -56,7 +56,7 @@
 		},
 		{
 			// Starter prompts render a Suggestion button as a two-line card.
-			"files": ["apps/playground/src/features/chat/surface.tsx"],
+			"files": ["apps/studio/src/features/chat/surface.tsx"],
 			"rules": {
 				"shadcn/no-restyle": ["error", { "allow": ["layout", "studio__starter"] }]
 			}
@@ -75,15 +75,15 @@
 			}
 		},
 		{
-			"files": ["apps/playground/src/**/*.{ts,tsx}"],
+			"files": ["apps/studio/src/**/*.{ts,tsx}"],
 			"rules": {
 				"better-tailwindcss/no-conflicting-classes": [
 					"error",
-					{ "cwd": "apps/playground", "entryPoint": "src/styles/app.css" }
+					{ "cwd": "apps/studio", "entryPoint": "src/styles/app.css" }
 				],
 				"better-tailwindcss/no-duplicate-classes": [
 					"error",
-					{ "cwd": "apps/playground", "entryPoint": "src/styles/app.css" }
+					{ "cwd": "apps/studio", "entryPoint": "src/styles/app.css" }
 				]
 			}
 		},

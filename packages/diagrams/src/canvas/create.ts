@@ -3,15 +3,15 @@ import { canvasValidationIssues } from "../build/scene.js";
 import { compileCanvasSpec, getCanvasValidationIssues } from "@sketchi/drawing";
 import { Effect, Result, Schema } from "effect";
 
-import { boundary, type CodeModeWorkflowEffect } from "../build/code-mode/boundary.js";
+import { boundary, type CodeModeWorkflowEffect } from "../build/boundary.js";
 import {
 	exportAndStoreScene,
 	requestedFormats,
 	requestedInlineFormats,
 	scenePartial,
 	withoutIconAssets,
-} from "../build/code-mode/export.js";
-import { catalogForRequest, embedSceneIcons } from "../build/code-mode/icons.js";
+} from "../build/export.js";
+import { catalogForRequest, embedSceneIcons } from "../build/icons.js";
 import {
 	codeModeInputIssues,
 	failureResult,
@@ -19,8 +19,8 @@ import {
 	issue,
 	responseRequestId,
 	workflowFailure,
-} from "../build/code-mode/issues.js";
-import { CodeModeRuntimeEnvironment } from "../build/code-mode/runtime.js";
+} from "../build/issues.js";
+import { CodeModeRuntimeEnvironment } from "../build/runtime.js";
 import {
 	CreateCanvasRejected,
 	CreateCanvasRequest,

@@ -152,10 +152,10 @@ test("every Storybook that renders Excalidraw serves its fonts", () => {
 		);
 	});
 	assert.deepEqual(surfaces.sort(), [
-		"apps/excalidraw/.storybook/main.ts",
-		"apps/native-conversion-storybook/.storybook/main.ts",
+		"apps/editor/.storybook/main.ts",
 		"apps/web/.storybook/main.ts",
 		"packages/editor/.storybook/main.ts",
+		"tools/storybook/native-conversion/.storybook/main.ts",
 	]);
 	for (const path of surfaces) {
 		assert.ok(registersFonts(path), `${path} must register excalidrawFonts`);

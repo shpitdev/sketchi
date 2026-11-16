@@ -6,8 +6,8 @@ Reusable React components and Storybook states for Sketchi diagram review surfac
 flowchart LR
   Packages["diagram packages"] --> Components["review components"]
   Components --> Storybook["Storybook"]
-  Components --> Playground["apps/playground"]
-  Components --> Excalidraw["apps/excalidraw"]
+  Components --> Playground["apps/studio"]
+  Components --> Excalidraw["apps/editor"]
 ```
 
 | Owns                                  | Does not own                   |

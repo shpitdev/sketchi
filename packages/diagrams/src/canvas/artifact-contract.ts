@@ -8,7 +8,7 @@ import {
 	literals,
 	optionalContract,
 	RequiredNonEmptyString,
-} from "../build/code-mode/schema.js";
+} from "../build/schema.js";
 
 export const GetArtifactRequest = Schema.Struct({
 	artifactId: RequiredNonEmptyString,

@@ -1,4 +1,4 @@
-import type { CodeModeIssue } from "@sketchi/diagrams/build/result";
+import type { CodeModeIssue } from "@sketchi/diagrams/build/contract";
 import { applyFlowchartEdits } from "@sketchi/diagrams/families/flowchart/edits";
 import { Effect } from "effect";
 

@@ -7,7 +7,7 @@ import { type MindmapTopic, parseMindmap } from "@sketchi/diagrams/families/mind
 
 import { mindmapScenarios } from "@sketchi/diagram-scenarios";
 
-import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index.js";
 
 const mindmapFixture = familyForType("mindmap").fixture;
 

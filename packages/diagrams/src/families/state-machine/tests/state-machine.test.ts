@@ -3,13 +3,10 @@ import { Effect, Schema } from "effect";
 import { groupRegionIssues, type CanvasSpec } from "@sketchi/drawing";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
-import {
-	CodeModeArtifactStorage,
-	makeMemoryArtifactStorage,
-} from "../../../build/code-mode/artifacts.js";
-import { canonicalDocumentFromDiagram } from "../../../build/code-mode/documents.js";
-import { buildStateMachine } from "../../../build/code-mode/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
+import { canonicalDocumentFromDiagram } from "../../../build/documents.js";
+import { buildStateMachine } from "../../../build/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
 import { applyDiagramPatch } from "../../../canvas/patch.js";
 import { buildResponse } from "../../../build/operation.js";
 import { stateMachineBuild } from "../build.js";

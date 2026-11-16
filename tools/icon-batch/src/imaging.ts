@@ -20,7 +20,7 @@ import { exportScenePng, initializeResvg } from "./excalidraw-export.js";
 
 /**
  * The draw service's raster work in Node: the steps of Studio's harness page
- * (apps/playground/src/features/icons/icon-job.ts) with resvg in place of a
+ * (apps/studio/src/features/icons/icon-job.ts) with resvg in place of a
  * browser canvas. resvg is also what measured the catalog's look-alike
  * features, so a mark's features here match its look-alike entry.
  */

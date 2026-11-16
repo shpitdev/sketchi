@@ -4,7 +4,7 @@ import { type Meta, type StoryObj } from "@storybook/react-vite";
 import { sankeyScenarios } from "@sketchi/diagram-scenarios";
 import { sankeyStressFixtures } from "@sketchi/diagrams/families/sankey/fixtures";
 
-import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index.js";
 
 const sankeyFixture = familyForType("sankey").fixture;
 

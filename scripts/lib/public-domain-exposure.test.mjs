@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { productionProjectConfig } from "./deploy/production.mjs";
+import { workerProjectConfig } from "./worker-apps.mjs";
 
 const repoRoot = new URL("../../", import.meta.url);
 
@@ -24,7 +25,7 @@ test("the approved public-domain map is exact and internal apps stay private", (
 
 test("checked-in Wrangler configs never expose production custom domains", () => {
 	for (const projectId of ["excalidraw", "icons", "playground", "web"]) {
-		const configPath = new URL(`apps/${projectId}/wrangler.jsonc`, repoRoot);
+		const configPath = new URL(workerProjectConfig(projectId).wranglerInputConfigPath, repoRoot);
 		const config = readFileSync(configPath, "utf8");
 		assert.doesNotMatch(config, /(?:excalidraw|icons|playground|studio|www)\.sketchi\.app/);
 		assert.doesNotMatch(config, /"(?:route|routes|custom_domain|domains)"\s*:/);

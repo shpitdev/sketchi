@@ -5,12 +5,9 @@ import { CANVAS_SPEC_VERSION, type CanvasSpec } from "@sketchi/drawing";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-	CodeModeArtifactStorage,
-	makeMemoryArtifactStorage,
-} from "../../../build/code-mode/artifacts.js";
-import { buildOrgChart } from "../../../build/code-mode/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
+import { buildOrgChart } from "../../../build/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
 import { buildResponse } from "../../../build/operation.js";
 import {
 	ORG_CHART_MAX_DEPTH,

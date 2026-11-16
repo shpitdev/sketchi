@@ -1,5 +1,7 @@
-import { CodeModeArtifactStorageMemory } from "@sketchi/diagrams/build/code-mode/artifacts";
-import { makeCodeModeRuntimeEnvironmentLayer } from "@sketchi/diagrams/build/code-mode/runtime";
+import {
+	CodeModeArtifactStorageMemory,
+	makeCodeModeRuntimeEnvironmentLayer,
+} from "@sketchi/diagrams/build";
 import { Cause, Effect, type FileSystem, Layer, Option } from "effect";
 import type { Stdio } from "effect/Stdio";
 

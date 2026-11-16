@@ -433,7 +433,7 @@ importers:
         specifier: 7.0.0
         version: 7.0.0
 
-  apps/excalidraw:
+  apps/editor:
     dependencies:
       '@effect/atom-react':
         specifier: 'catalog:'
@@ -524,7 +524,7 @@ importers:
         specifier: 4.3.3
         version: 4.3.3
 
-  apps/playground:
+  apps/studio:
     dependencies:
       '@cloudflare/playwright':
         specifier: 1.3.6

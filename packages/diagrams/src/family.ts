@@ -3,8 +3,8 @@ import { sequenceFixture } from "./families/sequence/fixtures.js";
 import { sequenceBuild } from "./families/sequence/build.js";
 import { vennBuild } from "./families/venn/build.js";
 import { Effect, Result, Schema } from "effect";
-import type * as Builds from "./build/code-mode/builds.js";
-import type { CodeModeRuntimeEnvironment } from "./build/code-mode/runtime.js";
+import type * as Builds from "./build/builds.js";
+import type { CodeModeRuntimeEnvironment } from "./build/runtime.js";
 import { docs as chartFamilyDocs } from "./families/chart/docs.js";
 import * as chartFamily from "./families/chart/document.js";
 import { chartBuild } from "./families/chart/build.js";
@@ -154,7 +154,7 @@ function family<
 	const S extends string,
 	T extends Schema.Top,
 	P extends Schema.Codec<import("./build/result.js").CodeModeIssue>,
-	R extends import("./build/code-mode/icons.js").BuildIconSource,
+	R extends import("./build/icons.js").BuildIconSource,
 	const F extends {
 		readonly operation: O;
 		readonly label: string;
@@ -507,7 +507,7 @@ export interface FamilyOperation<A> {
 	) => Effect.Effect<
 		A,
 		import("./build/operation.js").BuildRejection<A>,
-		import("./build/code-mode/artifacts.js").CodeModeArtifactStorage | CodeModeRuntimeEnvironment
+		import("./build/artifacts.js").CodeModeArtifactStorage | CodeModeRuntimeEnvironment
 	>;
 }
 

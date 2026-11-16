@@ -4,7 +4,7 @@ import { type Meta, type StoryObj } from "@storybook/react-vite";
 import { wireframeScenarios } from "@sketchi/diagram-scenarios";
 import { wireframeStressFixtures } from "@sketchi/diagrams/families/wireframe/fixtures";
 
-import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index.js";
 
 const wireframeFixture = familyForType("wireframe").fixture;
 

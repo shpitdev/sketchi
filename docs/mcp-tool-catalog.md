@@ -19,10 +19,10 @@ parameter carries each builder's spec and rules, so most first builds need no
 
 ## Where the contract lives
 
-- `apps/playground/src/features/mcp/mcp-docs/catalog.ts`: the tool
+- `apps/studio/src/features/mcp/mcp-docs/catalog.ts`: the tool
   descriptions, docs topics and search entries. The shared drawing rules come
   from `packages/diagrams/src/families/<name>/rules.ts`, which the generate prompt reads too.
-- `apps/playground/src/features/mcp/mcp-docs/code-mode-types.generated.txt`:
+- `apps/studio/src/features/mcp/mcp-docs/code-mode-types.generated.txt`:
   TypeScript declarations for every operation's request and result, generated
   from the package schemas. A test fails when it falls out of date.
 - [CanvasSpec v1](canvas-spec.md): the scene format `createCanvas` takes and

@@ -1,10 +1,10 @@
 const workerProjects = {
 	excalidraw: {
-		buildOutputPath: "dist/apps/excalidraw",
+		buildOutputPath: "dist/apps/editor",
 		projectId: "excalidraw",
-		projectRoot: "apps/excalidraw",
+		projectRoot: "apps/editor",
 		workerName: "sketchi-excalidraw",
-		wranglerInputConfigPath: "apps/excalidraw/wrangler.jsonc",
+		wranglerInputConfigPath: "apps/editor/wrangler.jsonc",
 	},
 	icons: {
 		buildOutputPath: "dist/apps/icons",
@@ -14,11 +14,11 @@ const workerProjects = {
 		wranglerInputConfigPath: "apps/icons/wrangler.jsonc",
 	},
 	playground: {
-		buildOutputPath: "dist/apps/playground",
+		buildOutputPath: "dist/apps/studio",
 		projectId: "playground",
-		projectRoot: "apps/playground",
+		projectRoot: "apps/studio",
 		workerName: "sketchi-studio",
-		wranglerInputConfigPath: "apps/playground/wrangler.jsonc",
+		wranglerInputConfigPath: "apps/studio/wrangler.jsonc",
 	},
 	web: {
 		buildOutputPath: "dist/apps/web",

@@ -1,7 +1,7 @@
 import { type CanvasSpec } from "@sketchi/drawing";
 import { DIAGRAM_TYPES } from "@sketchi/diagrams/family";
 
-import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
+import { type CodeModeIssue } from "@sketchi/diagrams/build/contract";
 import { type ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Schema } from "effect";
 

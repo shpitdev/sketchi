@@ -2,12 +2,9 @@ import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect } from "effect";
 import { expect, it } from "vitest";
 
-import {
-	CodeModeArtifactStorage,
-	makeMemoryArtifactStorage,
-} from "../../../build/code-mode/artifacts.js";
-import { buildSankey } from "../../../build/code-mode/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
+import { buildSankey } from "../../../build/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
 import { buildResponse } from "../../../build/operation.js";
 
 it("builds and exports nodes whose ids and labels name Object members", async () => {

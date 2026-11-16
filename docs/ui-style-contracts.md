@@ -1,6 +1,6 @@
 # UI style contracts
 
-`apps/web`, `apps/playground` and `apps/icons` are Tailwind apps that share one
+`apps/web`, `apps/studio` and `apps/icons` are Tailwind apps that share one
 set of shadcn primitives in `packages/ui` (`@sketchi/ui`). Each app's `components.json` points
 its `ui` and `utils` aliases at that package, so `shadcn add` writes new
 primitives there and both apps import the same file:
@@ -38,7 +38,7 @@ properties in `style`; other inline style properties are rejected.
 [`eslint-plugin-better-tailwindcss`](https://github.com/schoero/eslint-plugin-better-tailwindcss)
 as Oxlint JS plugins, configured in `tools/oxlint/ui-style-policy.json`:
 
-- In `apps/web/src`, `apps/playground/src` and `apps/icons/src`: `no-restyle` (layout only),
+- In `apps/web/src`, `apps/studio/src` and `apps/icons/src`: `no-restyle` (layout only),
   `no-raw-colors`, `no-arbitrary-values` (layout only), `no-inline-styles`,
   `require-static-classes` and `no-unknown-classes`. Plain class selectors in the
   app's stylesheet count as known classes, so a class with no CSS behind it fails.
@@ -51,7 +51,7 @@ as Oxlint JS plugins, configured in `tools/oxlint/ui-style-policy.json`:
 
 Each exception names exact files or classes:
 
-- The vendored AI Elements in `apps/playground/src/components/ai-elements`
+- The vendored AI Elements in `apps/studio/src/components/ai-elements`
   compose primitives the way upstream does so registry updates apply cleanly.
   Only `no-raw-colors` and `no-unknown-classes` run there; the upstream marker
   classes `not-prose`, `is-user` and `is-assistant` are allowed.

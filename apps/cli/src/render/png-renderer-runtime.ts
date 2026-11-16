@@ -1,5 +1,5 @@
 import { Schema, Result } from "effect";
-import { formatContractSchemaError } from "@sketchi/diagrams/build/input";
+import { formatContractSchemaError } from "@sketchi/diagrams/build/contract";
 
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Resvg, initWasm, type ResvgRenderOptions } from "@resvg/resvg-wasm";

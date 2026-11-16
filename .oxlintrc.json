@@ -150,7 +150,7 @@
 		{
 			// Vendored AI Elements registry components stay close to upstream so
 			// registry updates apply cleanly. Their React idioms are upstream's.
-			"files": ["apps/playground/src/components/ai-elements/**"],
+			"files": ["apps/studio/src/components/ai-elements/**"],
 			"rules": {
 				"react/refs": "off",
 				"react/static-components": "off",

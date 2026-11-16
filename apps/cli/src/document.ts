@@ -1,7 +1,7 @@
 import { CanvasSpec } from "@sketchi/drawing";
 import { slug } from "@sketchi/diagrams/clean-text";
 
-import { isCanonicalDocumentType } from "@sketchi/diagrams/build/code-mode/documents";
+import { isCanonicalDocumentType } from "@sketchi/diagrams/build";
 import {
 	DIAGRAM_TYPES,
 	familyForType,

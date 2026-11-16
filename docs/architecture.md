@@ -22,7 +22,7 @@ flowchart LR
   Effect --> Telemetry["Spans: Pipelines → R2 Data Catalog → DuckDB"]
 ```
 
-The four Worker projects are `web`, `playground`, `excalidraw`, and `icons`. `playground` deploys as the durable `sketchi-studio` Worker and
+The four Worker projects are `web`, `playground` (`apps/studio`), `excalidraw` (`apps/editor`), and `icons`. `playground` deploys as the durable `sketchi-studio` Worker and
 owns chat, HTTP build/artifact APIs, MCP, Browser Rendering, and Studio
 persistence. Preview identities and production routes come only
 from `scripts/lib/worker-apps.mjs`.
