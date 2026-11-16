@@ -105,14 +105,12 @@ describe("org charts", () => {
 			],
 		});
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(
-			built.normalizedSpec.people.map((person) => [person.id, person.manager, person.assistant]),
-		).toEqual([
-			["ceo", undefined, undefined],
-			["cto", "ceo", undefined],
-			["cpo", "ceo", undefined],
-			["dev", "cto", undefined],
-			["ea", "ceo", true],
+		expect(built.normalizedSpec.people).toEqual([
+			{ id: "ceo", name: "Ada", title: "CEO" },
+			{ id: "cto", name: "Alan", title: "CTO", department: "Engineering", manager: "ceo" },
+			{ id: "cpo", name: "Radia", title: "CPO", department: "Product", manager: "ceo" },
+			{ id: "dev", name: "Ken", title: "Engineer", manager: "cto" },
+			{ id: "ea", name: "Grace", manager: "ceo", assistant: true },
 		]);
 		expect(built.normalizedSpec.dottedLines).toEqual([
 			{ id: "dev-dotted-cpo", report: "dev", manager: "cpo" },
