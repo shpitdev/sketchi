@@ -2,6 +2,7 @@ import { Deferred, Effect, Schema } from "effect";
 import { MAX_AGENT_STEPS, MAX_DIAGRAM_BUILD_ATTEMPTS } from "@sketchi/diagrams/build/policy";
 import { STUDIO_RAN_OUT_REPLY } from "./studio-reply.server";
 import { it, expect, vi } from "@effect/vitest";
+import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
 import { AgUiSchema } from "effect/ai";
 import { families, familyForType } from "@sketchi/diagrams/family";
 import {
@@ -174,6 +175,7 @@ const wireResponse = (events: unknown[]) =>
 	});
 async function runWire(respond: (round: number) => Response, content = "Draw a flowchart") {
 	const calls: GatewayData[] = [];
+	const { probe, sink } = makeTelemetryTestSink();
 	const storage = makeMemoryArtifactStorage();
 	const write = vi.fn(storage.write);
 	const request = new Request("https://studio.test/api/studio/chat", {
@@ -187,6 +189,7 @@ async function runWire(respond: (round: number) => Response, content = "Draw a f
 	const response = await runPlaygroundEffect(
 		handleStudioAgentRequest(request).pipe(
 			Effect.provideService(CodeModeArtifactStorage, { ...storage, write }),
+			Effect.provide(makeWorkersTelemetryLayer({ resource: { serviceName: "studio-test" }, sink })),
 		),
 		{
 			request,
@@ -204,7 +207,7 @@ async function runWire(respond: (round: number) => Response, content = "Draw a f
 			},
 		},
 	);
-	return { body: await response.text(), calls, write };
+	return { body: await response.text(), calls, write, probe };
 }
 
 function buildResults<A>(body: string, schema: Schema.Codec<A, unknown>) {
@@ -220,6 +223,67 @@ function buildResults<A>(body: string, schema: Schema.Codec<A, unknown>) {
 				: [];
 		});
 }
+
+it.each([
+	{ name: "decode rejection", input: { title: "Missing nodes" }, accepted: false },
+	{ name: "valid success", input: spec, accepted: true },
+])(
+	"records one correlated build outcome for $name on the real handler",
+	async ({ input, accepted }) => {
+		const requestId = "studio-build-telemetry";
+		const { body, probe, write } = await runWire((round) =>
+			wireResponse([
+				...(round === 1 ? toolEvents(JSON.stringify({ requestId, spec: input }), round) : []),
+				terminal(),
+			]),
+		);
+		const results = buildResults(body, familyForType("flowchart").contracts.output);
+		expect(results).toHaveLength(1);
+		expect(results[0]).toMatchObject({
+			ok: accepted,
+			status: accepted ? "accepted" : "invalid_input",
+		});
+		if (!accepted) {
+			expect(results[0]?.issues).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ stage: "input", hint: expect.any(String) }),
+				]),
+			);
+		}
+		expect(write).toHaveBeenCalledTimes(accepted ? 1 : 0);
+		const metrics = probe.metrics.filter(
+			(metric) => metric.attributes.operation === "buildFlowchart",
+		);
+		const requests = metrics.filter((metric) => metric.metric === "sketchi_codemode_requests");
+		expect(requests).toHaveLength(1);
+		expect(requests[0]).toMatchObject({
+			value: 1,
+			attributes: { outcome: accepted ? "success" : "failure" },
+		});
+		const durations = metrics.filter((metric) => metric.metric === "sketchi_codemode_duration_ms");
+		expect(durations).toHaveLength(1);
+		expect(durations[0]?.value).toBeGreaterThanOrEqual(0);
+		const failures = metrics.filter((metric) => metric.metric === "sketchi_codemode_failures");
+		expect(failures).toHaveLength(accepted ? 0 : 1);
+		if (!accepted)
+			expect(failures[0]).toMatchObject({
+				value: 1,
+				attributes: { failure_category: "invalid_input" },
+			});
+		expect(metrics.filter((metric) => metric.metric === "sketchi_codemode_artifacts")).toHaveLength(
+			accepted ? 1 : 0,
+		);
+		const decodes = probe.spans.filter((span) => span.name === "flowchart.decodeRequest");
+		expect(decodes.length).toBeGreaterThan(0);
+		for (const span of decodes) expect(span.attributes["sketchi.request_id"]).toBe(requestId);
+		if (!accepted) {
+			expect(probe.spans.some((span) => span.name === "flowchart.render")).toBe(false);
+			expect(probe.spans.some((span) => span.name === "codeMode.artifacts.exportAndStore")).toBe(
+				false,
+			);
+		}
+	},
+);
 
 // The independent review's prepared inputs: neither passes the raw tool schema.
 const orgChartShorthand = {
