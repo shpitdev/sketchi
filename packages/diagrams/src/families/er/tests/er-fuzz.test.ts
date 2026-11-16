@@ -1,6 +1,6 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { parseErDiagram, type ErCardinality, type ErDiagram } from "./document";
-import { renderDiagram } from "../../family";
+import { parseErDiagram, type ErCardinality, type ErDiagram } from "../document";
+import { renderDiagram } from "../../../family";
 import {
 	candidateRouteQuality,
 	getCanvasValidationIssues,

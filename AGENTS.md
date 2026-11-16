@@ -15,6 +15,33 @@ Convex, Vercel, Bun, or Turborepo stack.
 - Generation cost is product quality. A diagram that reads badly is a failure, and so is one that takes excess tokens, tool calls, retries or wall time to produce. Measure both before claiming an improvement.
 - Diagrams are Excalidraw sketches: keep them simple and readable at a glance. Prefer fewer elements and standard stroke widths to fine detail or thin lines. Size limits are ceilings, not targets: draw what the request needs, and keep each family to the size that still reads as a sketch.
 
+## Tests
+
+A test stays only if it gives clear and obvious value. Keep one layer of
+protection per behaviour, at the outermost point a caller touches. If a fuzz or
+boundary test already fails when the behaviour breaks, inner tests of the same
+thing go.
+
+Keep:
+
+1. Fuzz and property tests for layout and routing: one per family, plus routing and text-fit.
+2. One end-to-end path per family: document in, valid Excalidraw file out.
+3. Data safety: storage, share encryption, ownership, atomic writes, quotas and rate limits.
+4. Contracts other software depends on, one test each: what the released CLI decodes, HTTP status mapping, the MCP tool list.
+5. Spend bounds: retry, timeout and attempt caps on model calls.
+6. A regression test for a real past bug, only when the fuzz or boundary test would not catch it.
+7. One table per family validator: each issue code raised once by a minimal bad input, asserting the code only. Fuzz generates valid input, so nothing else notices a rule going missing.
+
+Do not add:
+
+- Tests that restate a schema, pin wording (prompts, docs, help, error prose) or pin incidental output (coordinates, element counts, ordering nobody relies on).
+- Inner-layer tests of helpers, normalisers or intermediate shapes a kept test already exercises.
+- Per-family copies of a generic check, tests that are mostly mocks, component tests of static labels, or tests of test helpers.
+
+When unsure, leave it out; git history can bring a test back. A family has at
+most `<name>.test.ts`, `<name>-fuzz.test.ts` and `regressions.test.ts`, in a
+`tests/` folder beside its source.
+
 ## Delegated agents
 
 - One Codex primary in the canonical root owns the plan, Herdr coordination,
