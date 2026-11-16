@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { nodeLogoIcons } from "../src/catalog";
 import { GENERIC_PROMPTS } from "../src/generic-prompts";
-import { labelLogos, logoNamedByLabel, logosNamedInText, matchIconsInText } from "../src/text-match";
+import {
+	labelLogos,
+	logoNamedByLabel,
+	logosNamedInText,
+	matchIconsInText,
+} from "../src/text-match";
 
 /** Diagram labels and the logos they name, unmistakable names first. Empty: draw no logo. */
 const LABELS: readonly (readonly [string, readonly string[]])[] = [

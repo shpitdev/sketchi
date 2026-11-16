@@ -277,7 +277,9 @@ describe("drawIcon spend bounds", () => {
 		Effect.gen(function* () {
 			const judgeDown = throughGateway(async (operation) =>
 				operation === "icon-author"
-					? authorWire(judgeDown.dispatches["icon-author"] === 1 ? { accept: false, recipe: draft } : accept)
+					? authorWire(
+							judgeDown.dispatches["icon-author"] === 1 ? { accept: false, recipe: draft } : accept,
+						)
 					: unavailable(),
 			);
 			const judged = yield* settle(draw(judgeDown.layer));
@@ -300,7 +302,7 @@ describe("drawIcon spend bounds", () => {
 					new Promise((_resolve, reject) =>
 						signal.addEventListener("abort", () => {
 							aborted = true;
-							reject(signal.reason);
+							reject(new Error("aborted"));
 						}),
 					),
 			);

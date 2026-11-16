@@ -135,48 +135,47 @@ describe("IconLibrary", () => {
 		expect(screen.getByText("Codex SVG copied.")).toBeTruthy();
 	});
 
+	it("hides select-results on the whole library and states the cap once filtered", () => {
+		render(<IconLibrary data={largeData} />);
+		expect(screen.queryByRole("checkbox", { name: /results$/ })).toBeNull();
+		// Mod+A is the browser's again while there is nothing narrowed to select.
+		expect(fireEvent.keyDown(document, { ctrlKey: true, key: "a" })).toBe(true);
 
-		it("hides select-results on the whole library and states the cap once filtered", () => {
-			render(<IconLibrary data={largeData} />);
-			expect(screen.queryByRole("checkbox", { name: /results$/ })).toBeNull();
-			// Mod+A is the browser's again while there is nothing narrowed to select.
-			expect(fireEvent.keyDown(document, { ctrlKey: true, key: "a" })).toBe(true);
+		fireEvent.change(search(), { target: { value: "icon" } });
+		const selectAll = screen.getByRole("checkbox", { name: "Select 300 of 400 results" });
+		expect(selectAll.parentElement?.textContent).toBe("Select 300");
+		fireEvent.click(selectAll);
+		expect(selectionBar()?.textContent).toContain("300 selected");
+		expect(selectionBar()?.textContent).toContain("Limit 300");
+		expect(screen.getByText("Selected 300, 100 left out at the 300 icon cap.")).toBeTruthy();
+		expect(
+			screen.getByRole("checkbox", { name: "Select all results" }).hasAttribute("disabled"),
+		).toBe(true);
+	});
 
-			fireEvent.change(search(), { target: { value: "icon" } });
-			const selectAll = screen.getByRole("checkbox", { name: "Select 300 of 400 results" });
-			expect(selectAll.parentElement?.textContent).toBe("Select 300");
-			fireEvent.click(selectAll);
-			expect(selectionBar()?.textContent).toContain("300 selected");
-			expect(selectionBar()?.textContent).toContain("Limit 300");
-			expect(screen.getByText("Selected 300, 100 left out at the 300 icon cap.")).toBeTruthy();
-			expect(
-				screen.getByRole("checkbox", { name: "Select all results" }).hasAttribute("disabled"),
-			).toBe(true);
+	// @effect-diagnostics-next-line asyncFunction:off -- React act, hydration and Testing Library await native DOM callbacks at the test host.
+	it("downloads exactly the selection, including icons the filter hides", async () => {
+		let zipped: Blob | undefined;
+		vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+			zipped = blob as Blob;
+			return "blob:zip";
 		});
+		vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+		vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
 
-		// @effect-diagnostics-next-line asyncFunction:off -- React act, hydration and Testing Library await native DOM callbacks at the test host.
-		it("downloads exactly the selection, including icons the filter hides", async () => {
-			let zipped: Blob | undefined;
-			vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
-				zipped = blob as Blob;
-				return "blob:zip";
-			});
-			vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
-			vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+		render(<IconLibrary data={fixtureData} />);
+		fireEvent.click(cardCheckbox("PostgreSQL"));
+		fireEvent.change(search(), { target: { value: "k8s" } });
+		fireEvent.click(cardCheckbox("Kubernetes"));
+		fireEvent.click(screen.getByRole("button", { name: "Download zip" }));
 
-			render(<IconLibrary data={fixtureData} />);
-			fireEvent.click(cardCheckbox("PostgreSQL"));
-			fireEvent.change(search(), { target: { value: "k8s" } });
-			fireEvent.click(cardCheckbox("Kubernetes"));
-			fireEvent.click(screen.getByRole("button", { name: "Download zip" }));
-
-			await waitFor(() => expect(zipped).toBeDefined());
-			const files = unzipSync(new Uint8Array(await (zipped as Blob).arrayBuffer()));
-			expect(Rec.keys<string, Uint8Array>(files).sort()).toEqual([
-				"kubernetes.svg",
-				"postgresql.svg",
-			]);
-			expect(strFromU8(files["postgresql.svg"] as Uint8Array)).toContain("/icons/postgresql.svg");
-			expect(await screen.findByText("Downloaded 2 SVGs as a zip.")).toBeTruthy();
-		});
+		await waitFor(() => expect(zipped).toBeDefined());
+		const files = unzipSync(new Uint8Array(await (zipped as Blob).arrayBuffer()));
+		expect(Rec.keys<string, Uint8Array>(files).sort()).toEqual([
+			"kubernetes.svg",
+			"postgresql.svg",
+		]);
+		expect(strFromU8(files["postgresql.svg"] as Uint8Array)).toContain("/icons/postgresql.svg");
+		expect(await screen.findByText("Downloaded 2 SVGs as a zip.")).toBeTruthy();
+	});
 });
