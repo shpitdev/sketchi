@@ -14,7 +14,8 @@ import type { Plugin } from "vite";
  *
  * Files a surface already ships in its public directory (the vendored
  * Excalifont subsets, byte-identical to the package's) are left to that copy.
- * Vite calls these hooks synchronously, so they use Node's file APIs directly.
+ * The hooks keep plain Node file I/O: an Effect runtime inside Vite's plugin hooks would add
+ * machinery without changing who owns the files.
  */
 const FONT_URL_PREFIX = "/fonts/";
 

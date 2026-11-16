@@ -8,7 +8,7 @@
 // Every request carries `x-sketchi-client: sketchi-sanity` and one `sanity_` run
 // ID, printed at the end with the DuckDB queries that find it.
 import { Clock, Console, DateTime, Effect, Option, Random, Schema } from "effect";
-import { HttpClient, HttpClientRequest } from "effect/http";
+import { HttpClient, HttpClientRequest, type HttpClientResponse } from "effect/http";
 
 import { opsError } from "./process";
 
@@ -37,6 +37,13 @@ interface Context {
 }
 
 const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
+
+/**
+ * The response with its whole body read. Each check's deadline wraps this, not just the request:
+ * a server can send headers at once and then stall the body.
+ */
+const withText = (response: HttpClientResponse.HttpClientResponse) =>
+	response.text.pipe(Effect.map((text) => ({ response, text })));
 
 function headers(context: Context) {
 	return {
@@ -81,7 +88,7 @@ const generate = Effect.fn("ops.sanity.generate")(function* (
 	},
 ) {
 	const client = yield* HttpClient.HttpClient;
-	const response = yield* client
+	const { response, text } = yield* client
 		.execute(
 			HttpClientRequest.post(new URL("/api/v1/generate", context.endpoint)).pipe(
 				HttpClientRequest.setHeaders(headers(context)),
@@ -91,8 +98,7 @@ const generate = Effect.fn("ops.sanity.generate")(function* (
 				}),
 			),
 		)
-		.pipe(Effect.timeout(GENERATE_TIMEOUT));
-	const text = yield* response.text;
+		.pipe(Effect.flatMap(withText), Effect.timeout(GENERATE_TIMEOUT));
 	const body = Option.getOrUndefined(
 		Option.flatMap(decodeJson(text), Schema.decodeUnknownOption(GenerateBody)),
 	);
@@ -149,7 +155,7 @@ const mcpCall = Effect.fn("ops.sanity.mcp")(function* (
 	params: unknown,
 ) {
 	const client = yield* HttpClient.HttpClient;
-	const response = yield* client
+	const { response, text } = yield* client
 		.execute(
 			HttpClientRequest.post(new URL("/mcp", context.endpoint)).pipe(
 				HttpClientRequest.setHeaders({
@@ -159,8 +165,7 @@ const mcpCall = Effect.fn("ops.sanity.mcp")(function* (
 				HttpClientRequest.bodyJsonUnsafe({ jsonrpc: "2.0", id, method, params }),
 			),
 		)
-		.pipe(Effect.timeout(MCP_TIMEOUT));
-	const text = yield* response.text;
+		.pipe(Effect.flatMap(withText), Effect.timeout(MCP_TIMEOUT));
 	if (response.status >= 300) {
 		return yield* opsError(`${method}: HTTP ${response.status}: ${text.slice(0, 200)}`);
 	}
@@ -214,8 +219,12 @@ const mcpExecute = Effect.fn("ops.sanity.mcpExecute")(function* (context: Contex
 	const pngUrl = payload.artifactDelivery?.pngUrl;
 	if (!pngUrl) return yield* opsError("the artifact has no PNG");
 	const client = yield* HttpClient.HttpClient;
-	const png = yield* client.get(pngUrl).pipe(Effect.timeout(MCP_TIMEOUT));
-	const bytes = new Uint8Array(yield* png.arrayBuffer);
+	const { png, bytes } = yield* client.get(pngUrl).pipe(
+		Effect.flatMap((png) =>
+			png.arrayBuffer.pipe(Effect.map((buffer) => ({ png, bytes: new Uint8Array(buffer) }))),
+		),
+		Effect.timeout(MCP_TIMEOUT),
+	);
 	const signature = [0x89, 0x50, 0x4e, 0x47];
 	if (png.status >= 300 || !signature.every((byte, index) => bytes[index] === byte)) {
 		return yield* opsError(`the PNG URL answered HTTP ${png.status} without a PNG`);
