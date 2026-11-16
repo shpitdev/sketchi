@@ -354,7 +354,7 @@ function normalizedRequestRoute(pathname: string): string {
 	}
 	const staticRoutes = new Set([
 		"/",
-		"/api/chat",
+		"/api/studio/chat",
 		"/api/studio/projects",
 		"/api/studio/projects/from-artifact",
 		"/api/v1/flowcharts/build",

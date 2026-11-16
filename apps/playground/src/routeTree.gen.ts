@@ -13,7 +13,7 @@ import { Route as IndexRouteImport } from "./routes/index";
 import { Route as CodemodeExportHarnessRouteImport } from "./routes/codemode-export-harness";
 import { Route as McpRouteImport } from "./routes/mcp";
 import { Route as ProjectsRouteImport } from "./routes/projects";
-import { Route as ApiChatRouteImport } from "./routes/api/chat";
+import { Route as ApiStudioChatRouteImport } from "./routes/api/studio/chat";
 import { Route as ArtifactsArtifactIdRouteImport } from "./routes/artifacts/$artifactId";
 import { Route as DiagramsDiagramIdRouteImport } from "./routes/diagrams/$diagramId";
 import { Route as ExamplesExampleIdRouteImport } from "./routes/examples/$exampleId";
@@ -53,9 +53,9 @@ const ProjectsRoute = ProjectsRouteImport.update({
   path: "/projects",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ApiChatRoute = ApiChatRouteImport.update({
-  id: "/api/chat",
-  path: "/api/chat",
+const ApiStudioChatRoute = ApiStudioChatRouteImport.update({
+  id: "/api/studio/chat",
+  path: "/api/studio/chat",
   getParentRoute: () => rootRouteImport,
 } as any);
 const ArtifactsArtifactIdRoute = ArtifactsArtifactIdRouteImport.update({
@@ -160,7 +160,7 @@ export interface FileRoutesByFullPath {
   "/codemode-export-harness": typeof CodemodeExportHarnessRoute;
   "/mcp": typeof McpRoute;
   "/projects": typeof ProjectsRoute;
-  "/api/chat": typeof ApiChatRoute;
+  "/api/studio/chat": typeof ApiStudioChatRoute;
   "/artifacts/$artifactId": typeof ArtifactsArtifactIdRoute;
   "/diagrams/$diagramId": typeof DiagramsDiagramIdRoute;
   "/examples/$exampleId": typeof ExamplesExampleIdRoute;
@@ -185,7 +185,7 @@ export interface FileRoutesByTo {
   "/codemode-export-harness": typeof CodemodeExportHarnessRoute;
   "/mcp": typeof McpRoute;
   "/projects": typeof ProjectsRoute;
-  "/api/chat": typeof ApiChatRoute;
+  "/api/studio/chat": typeof ApiStudioChatRoute;
   "/artifacts/$artifactId": typeof ArtifactsArtifactIdRoute;
   "/diagrams/$diagramId": typeof DiagramsDiagramIdRoute;
   "/examples/$exampleId": typeof ExamplesExampleIdRoute;
@@ -211,7 +211,7 @@ export interface FileRoutesById {
   "/codemode-export-harness": typeof CodemodeExportHarnessRoute;
   "/mcp": typeof McpRoute;
   "/projects": typeof ProjectsRoute;
-  "/api/chat": typeof ApiChatRoute;
+  "/api/studio/chat": typeof ApiStudioChatRoute;
   "/artifacts/$artifactId": typeof ArtifactsArtifactIdRoute;
   "/diagrams/$diagramId": typeof DiagramsDiagramIdRoute;
   "/examples/$exampleId": typeof ExamplesExampleIdRoute;
@@ -238,7 +238,7 @@ export interface FileRouteTypes {
     | "/codemode-export-harness"
     | "/mcp"
     | "/projects"
-    | "/api/chat"
+    | "/api/studio/chat"
     | "/artifacts/$artifactId"
     | "/diagrams/$diagramId"
     | "/examples/$exampleId"
@@ -263,7 +263,7 @@ export interface FileRouteTypes {
     | "/codemode-export-harness"
     | "/mcp"
     | "/projects"
-    | "/api/chat"
+    | "/api/studio/chat"
     | "/artifacts/$artifactId"
     | "/diagrams/$diagramId"
     | "/examples/$exampleId"
@@ -288,7 +288,7 @@ export interface FileRouteTypes {
     | "/codemode-export-harness"
     | "/mcp"
     | "/projects"
-    | "/api/chat"
+    | "/api/studio/chat"
     | "/artifacts/$artifactId"
     | "/diagrams/$diagramId"
     | "/examples/$exampleId"
@@ -314,7 +314,7 @@ export interface RootRouteChildren {
   CodemodeExportHarnessRoute: typeof CodemodeExportHarnessRoute;
   McpRoute: typeof McpRoute;
   ProjectsRoute: typeof ProjectsRoute;
-  ApiChatRoute: typeof ApiChatRoute;
+  ApiStudioChatRoute: typeof ApiStudioChatRoute;
   ArtifactsArtifactIdRoute: typeof ArtifactsArtifactIdRoute;
   DiagramsDiagramIdRoute: typeof DiagramsDiagramIdRoute;
   ExamplesExampleIdRoute: typeof ExamplesExampleIdRoute;
@@ -362,11 +362,11 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ProjectsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/api/chat": {
-      id: "/api/chat";
-      path: "/api/chat";
-      fullPath: "/api/chat";
-      preLoaderRoute: typeof ApiChatRouteImport;
+    "/api/studio/chat": {
+      id: "/api/studio/chat";
+      path: "/api/studio/chat";
+      fullPath: "/api/studio/chat";
+      preLoaderRoute: typeof ApiStudioChatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/artifacts/$artifactId": {
@@ -543,7 +543,7 @@ const rootRouteChildren: RootRouteChildren = {
   CodemodeExportHarnessRoute: CodemodeExportHarnessRoute,
   McpRoute: McpRoute,
   ProjectsRoute: ProjectsRoute,
-  ApiChatRoute: ApiChatRoute,
+  ApiStudioChatRoute: ApiStudioChatRoute,
   ArtifactsArtifactIdRoute: ArtifactsArtifactIdRoute,
   DiagramsDiagramIdRoute: DiagramsDiagramIdRoute,
   ExamplesExampleIdRoute: ExamplesExampleIdRoute,

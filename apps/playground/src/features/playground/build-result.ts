@@ -8,10 +8,10 @@ import {
 } from "@sketchi/diagrams/families/flowchart/build";
 
 import { Result, Schema } from "effect";
-import { type UIMessage } from "ai";
+import { type ChatMessage } from "@/features/playground/chat-message";
 import { type ReadyPlaygroundArtifact } from "./surface";
 
-type MessagePart = UIMessage["parts"][number];
+type MessagePart = ChatMessage["parts"][number];
 
 /** A canonical build result from any Studio build tool. */
 export type StudioBuildResult =
@@ -314,7 +314,7 @@ export interface PlaygroundBuildState {
 }
 
 export function deriveBuildState(
-	messages: readonly UIMessage[],
+	messages: readonly ChatMessage[],
 	busy: boolean,
 ): PlaygroundBuildState {
 	const toolParts = messages.flatMap((message) => message.parts.filter(isDiagramToolPart));

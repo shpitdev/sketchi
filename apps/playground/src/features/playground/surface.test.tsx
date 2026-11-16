@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { type BuildFlowchartResult } from "@sketchi/diagrams/families/flowchart/build";
 import { getCanvasValidationIssues } from "@sketchi/drawing";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { type UIMessage } from "ai";
+import { type ChatMessage } from "@/features/playground/chat-message";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -281,12 +281,12 @@ describe("playground surface", () => {
 				},
 			],
 			role: "assistant",
-		} satisfies UIMessage;
+		} satisfies ChatMessage;
 		const assistantStatement = {
 			...assistantQuestion,
 			id: "assistant-statement",
 			parts: [{ state: "done", text: "The security scan is included.", type: "text" }],
-		} satisfies UIMessage;
+		} satisfies ChatMessage;
 
 		expect(assistantAsksQuestion(assistantQuestion)).toBe(true);
 		expect(assistantAsksQuestion(assistantStatement)).toBe(false);

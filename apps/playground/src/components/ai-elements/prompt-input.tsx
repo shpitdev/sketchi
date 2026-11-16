@@ -8,7 +8,7 @@ import {
 } from "@sketchi/ui/components/input-group";
 import { Spinner } from "@sketchi/ui/components/spinner";
 import { cn } from "@sketchi/ui/lib/utils";
-import type { ChatStatus, FileUIPart } from "ai";
+import type { ChatStatus } from "@/features/playground/chat-message";
 import { CornerDownLeftIcon, SquareIcon, XIcon } from "lucide-react";
 import { nanoid } from "nanoid";
 import type {
@@ -55,7 +55,7 @@ const convertBlobUrlToDataUrl = async (url: string): Promise<string | null> => {
 // ============================================================================
 
 interface AttachmentsContext {
-  files: (FileUIPart & { id: string })[];
+  files: (PromptAttachment & { id: string })[];
   add: (files: File[] | FileList) => void;
   remove: (id: string) => void;
 }
@@ -72,7 +72,7 @@ const usePromptInputAttachments = () => {
 
 export interface PromptInputMessage {
   text: string;
-  files: FileUIPart[];
+  files: PromptAttachment[];
 }
 
 export type PromptInputProps = Omit<
@@ -111,7 +111,7 @@ export const PromptInput = ({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
 
-  const [files, setFiles] = useState<(FileUIPart & { id: string })[]>([]);
+  const [files, setFiles] = useState<(PromptAttachment & { id: string })[]>([]);
 
   // Keep a ref to files for cleanup on unmount (avoids stale closure)
   const filesRef = useRef(files);
@@ -178,7 +178,7 @@ export const PromptInput = ({
             message: "Too many files. Some were not added.",
           });
         }
-        const next: (FileUIPart & { id: string })[] = [];
+        const next: (PromptAttachment & { id: string })[] = [];
         for (const file of capped) {
           next.push({
             filename: file.name,
@@ -288,7 +288,7 @@ export const PromptInput = ({
 
       try {
         // Convert blob URLs to data URLs asynchronously
-        const convertedFiles: FileUIPart[] = await Promise.all(
+        const convertedFiles: PromptAttachment[] = await Promise.all(
           files.map(async ({ id: _id, ...item }) => {
             if (item.url?.startsWith("blob:")) {
               const dataUrl = await convertBlobUrlToDataUrl(item.url);
@@ -529,3 +529,5 @@ export const PromptInputSubmit = ({
     </InputGroupButton>
   );
 };
+
+interface PromptAttachment { readonly type: "file"; readonly url: string; readonly mediaType: string; readonly filename?: string; }

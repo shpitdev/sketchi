@@ -1,17 +1,17 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { page } from "vitest/browser";
-import { type ChatStatus, type UIMessage } from "ai";
+import { type ChatStatus, type ChatMessage } from "@/features/playground/chat-message";
 import { type BuildFlowchartResult } from "@sketchi/diagrams/families/flowchart/build";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const chat = vi.hoisted(() => ({
-	messages: [] as UIMessage[],
+	messages: [] as ChatMessage[],
 	status: "ready" as ChatStatus,
 	error: undefined as Error | undefined,
 	sendMessage: vi.fn(),
 	stop: vi.fn(),
 }));
-vi.mock("@ai-sdk/react", () => ({ useChat: () => chat }));
+vi.mock("./chat-client", () => ({ useStudioChat: () => chat }));
 vi.mock("@excalidraw/excalidraw", () => ({
 	Excalidraw: () => <div className="excalidraw" />,
 	getCommonBounds: () => [0, 0, 0, 0],
@@ -23,12 +23,12 @@ import { Route } from "../../routes/index";
 import { DEPLOY_PIPELINE_SCENE, DEPLOY_PIPELINE_SPEC } from "./deploy-pipeline-sample";
 
 const Studio = Route.options.component!;
-const prompt: UIMessage = {
+const prompt: ChatMessage = {
 	id: "request",
 	role: "user",
 	parts: [{ type: "text", text: "Draw a release pipeline" }],
 };
-const drawing: UIMessage = {
+const drawing: ChatMessage = {
 	id: "reply",
 	role: "assistant",
 	parts: [
@@ -57,7 +57,7 @@ const accepted = {
 		],
 	},
 } satisfies BuildFlowchartResult;
-const completed: UIMessage = {
+const completed: ChatMessage = {
 	...drawing,
 	parts: [
 		{

@@ -6,9 +6,14 @@
 		"@ai-sdk/openai": "4.0.104",
 		"@ai-sdk/react": "4.0.163",
 		"@cloudflare/playwright": "1.3.6",
+		"@effect/ai-openai": "4.1.4",
+		"@effect/atom-react": "catalog:",
+		"@effect/platform-browser": "catalog:",
 		"@excalidraw/excalidraw": "0.18.1",
 		"@radix-ui/react-use-controllable-state": "1.3.0",
+		"@sketchi/cloudflare": "workspace:*",
 		"@sketchi/community-icons": "workspace:*",
+		"@sketchi/diagrams": "workspace:*",
 		"@sketchi/drawing": "workspace:*",
 		"@sketchi/editor": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
@@ -24,11 +29,7 @@
 		"motion": "14.9.0",
 		"nanoid": "6.0.2",
 		"streamdown": "2.7.1",
-		"use-stick-to-bottom": "1.1.6",
-		"@sketchi/diagrams": "workspace:*",
-		"@sketchi/cloudflare": "workspace:*",
-		"@effect/atom-react": "catalog:",
-		"@effect/platform-browser": "catalog:"
+		"use-stick-to-bottom": "1.1.6"
 	},
 	"devDependencies": {
 		"@sketchi/diagram-scenarios": "workspace:*",

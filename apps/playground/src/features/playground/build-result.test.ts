@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type BuildFlowchartResult } from "@sketchi/diagrams/families/flowchart/build";
-import type { UIMessage } from "ai";
+import type { ChatMessage } from "@/features/playground/chat-message";
 import {
 	buildResultOf,
 	deriveBuildState,
@@ -10,7 +10,7 @@ import {
 } from "./build-result";
 import { DEPLOY_PIPELINE_SCENE, DEPLOY_PIPELINE_SPEC } from "./deploy-pipeline-sample";
 
-function pendingMessage(id: string): UIMessage {
+function pendingMessage(id: string): ChatMessage {
 	return {
 		id,
 		role: "assistant",
@@ -67,7 +67,7 @@ describe("build result selectors", () => {
 		).toBeNull();
 	});
 	it.each([false, true])("ignores an earlier unfinished call when busy=%s", (busy) => {
-		const latest: UIMessage = {
+		const latest: ChatMessage = {
 			id: "latest",
 			role: "assistant",
 			parts: [{ type: "text", text: "Done" }],
@@ -133,7 +133,7 @@ describe("build result selectors", () => {
 				],
 			},
 		} satisfies BuildFlowchartResult;
-		const message: UIMessage = {
+		const message: ChatMessage = {
 			id: "builds",
 			role: "assistant",
 			parts: [
@@ -184,7 +184,7 @@ describe("build result selectors", () => {
 			],
 			messages: [{ source: "browser", target: "api", label: "Checkout" }],
 		};
-		const drawing: UIMessage = {
+		const drawing: ChatMessage = {
 			id: "drawing",
 			role: "assistant",
 			parts: [
@@ -198,7 +198,7 @@ describe("build result selectors", () => {
 		};
 		expect(deriveBuildState([drawing], true).ghostLabels).toEqual(["Browser", "API"]);
 
-		const accepted: UIMessage = {
+		const accepted: ChatMessage = {
 			id: "accepted",
 			role: "assistant",
 			parts: [
