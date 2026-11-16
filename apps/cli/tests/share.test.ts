@@ -1,15 +1,26 @@
 import { strict as assert } from "node:assert";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { afterEach, describe, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber } from "effect";
+import { Deferred, Effect, Fiber, Layer } from "effect";
 import { TestClock } from "effect/testing";
 
-import { ShareTransport, ShareTransportLive } from "../src/share/excalidraw.js";
+import * as NodeServices from "@effect/platform-node/NodeServices";
+
+import {
+	LinkOpener,
+	ShareTransport,
+	ShareTransportLive,
+	makeLinkOpenerLayer,
+} from "../src/share/excalidraw.js";
 import {
 	decodeSharePayload,
 	encodeSharePayload,
 	formatShareLink,
 	parseShareLink,
+	ShareCryptoLive,
 } from "../src/share/protocol.js";
 
 const originalFetch = globalThis.fetch;
@@ -125,6 +136,68 @@ const fixtureJson =
 const upstreamFixtureBase64 =
 	"AAAAAQAAADt7InZlcnNpb24iOjIsImNvbXByZXNzaW9uIjoicGFrb0AxIiwiZW5jcnlwdGlvbiI6IkFFUy1HQ00ifQAAAAwAAQIDBAUGBwgJCgsAAABwS0FmJqaMrQb1t7tGQcGwgA4SZcyKsmKKKAOPGVtpp3rmpxH09x+3tCmigYL0JVNUhroYaQnEUAQO3xrbxSLUOHzf1Dqd34h2udD2ajvavYTylPF0qu/YiNffWt3Et/n0vqmnXlUaNEWJ68C2UnYinw==";
 
+function processExists(pid: number): boolean {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/** Runs the real opener path against a fake xdg-open that starts a grandchild. */
+const openWithFakeOpener = (script: string) =>
+	Effect.acquireUseRelease(
+		Effect.promise(() => mkdtemp(join(tmpdir(), "sketchi-opener-"))),
+		(directory) =>
+			Effect.gen(function* () {
+				const pidFile = join(directory, "grandchild.pid");
+				const opener = join(directory, "xdg-open");
+				yield* Effect.promise(() =>
+					writeFile(opener, `#!/bin/sh\nsleep 30 & echo $! > ${pidFile}\n${script}\n`, {
+						mode: 0o755,
+					}),
+				);
+				const path = process.env["PATH"];
+				process.env["PATH"] = `${directory}:${path ?? ""}`;
+				const result = yield* Effect.gen(function* () {
+					return yield* (yield* LinkOpener).open("https://excalidraw.com/#json=a,b");
+				}).pipe(
+					Effect.provide(
+						makeLinkOpenerLayer("linux", 1_000).pipe(Layer.provide(NodeServices.layer)),
+					),
+					Effect.ensuring(
+						Effect.sync(() => {
+							process.env["PATH"] = path;
+						}),
+					),
+				);
+				const grandchild = Number(yield* Effect.promise(() => readFile(pidFile, "utf8")));
+				const alive = processExists(grandchild);
+				if (alive) process.kill(grandchild, "SIGKILL");
+				return { result, alive };
+			}),
+		(directory) => Effect.promise(() => rm(directory, { force: true, recursive: true })),
+	);
+
+describe.skipIf(process.platform === "win32")("link opener processes", () => {
+	it.live("terminates a hung opener's whole process tree at the timeout", () =>
+		Effect.gen(function* () {
+			const { result, alive } = yield* openWithFakeOpener("sleep 30");
+			assert.deepEqual(result, { status: "unconfirmed", reason: "timeout" });
+			assert.equal(alive, false);
+		}),
+	);
+
+	it.live("leaves what a successful opener started running", () =>
+		Effect.gen(function* () {
+			const { result, alive } = yield* openWithFakeOpener("exit 0");
+			assert.deepEqual(result, { status: "accepted" });
+			assert.equal(alive, true);
+		}),
+	);
+});
+
 describe("Excalidraw share-link protocol", () => {
 	it.effect("decrypts the recorded upstream format-v2 fixture", () =>
 		Effect.gen(function* () {
@@ -133,7 +206,7 @@ describe("Excalidraw share-link protocol", () => {
 				fixtureKey,
 			);
 			assert.deepEqual(decoded, JSON.parse(fixtureJson));
-		}),
+		}).pipe(Effect.provide(ShareCryptoLive)),
 	);
 
 	it.effect("encodes a format-v2 payload that round-trips", () =>
@@ -145,7 +218,7 @@ describe("Excalidraw share-link protocol", () => {
 			);
 			assert.deepEqual(yield* decodeSharePayload(encoded, fixtureKey), JSON.parse(fixtureJson));
 			assert.equal(Buffer.from(encoded).toString("base64"), upstreamFixtureBase64);
-		}),
+		}).pipe(Effect.provide(ShareCryptoLive)),
 	);
 
 	it.effect("rejects tampering without leaking key material", () =>
@@ -155,7 +228,7 @@ describe("Excalidraw share-link protocol", () => {
 			const failure = yield* Effect.flip(decodeSharePayload(body, fixtureKey).pipe(Effect.asVoid));
 			assert.equal(failure.code, "share_crypto_failed");
 			assert.equal(failure.message.includes(fixtureKey), false);
-		}),
+		}).pipe(Effect.provide(ShareCryptoLive)),
 	);
 
 	it.effect("parses only strict root Excalidraw share URLs", () =>
@@ -192,6 +265,6 @@ describe("Excalidraw share-link protocol", () => {
 			}
 			const failure = yield* Effect.flip(encodeSharePayload(oversized, "invalid-key", fixtureIv));
 			assert.equal(failure.code, "share_payload_too_large");
-		}),
+		}).pipe(Effect.provide(ShareCryptoLive)),
 	);
 });

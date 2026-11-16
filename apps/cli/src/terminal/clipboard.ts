@@ -176,6 +176,10 @@ interface RunInput {
  * discarded and its stderr is our own pipe, so a forked daemon never holds the CLI's
  * streams; the stderr read end is closed on exit so the CLI can exit while the daemon
  * keeps serving the paste. Stdin tools run detached so the daemon outlives the shell.
+ *
+ * This stays on node:child_process. Effect's ChildProcess handle cannot close its stderr pipe
+ * while a daemon still holds the write end, so the CLI would stay open until the daemon exits
+ * (measured: unref plus interrupting the stderr reader still waited for the daemon).
  */
 const runTool = ({ tool, args, env, stdin }: RunInput) =>
 	Effect.callback<ClipboardOutcome>((resume) => {

@@ -27,6 +27,7 @@ import { DiagramPatcherLive } from "./patch.js";
 import { DiagramExporterLive } from "./render/exporter.js";
 import { CliPngRendererLive } from "./render/png-renderer.js";
 import { ExcalidrawShareLive, LinkOpenerLive, ShareTransportLive } from "./share/excalidraw.js";
+import { ShareCryptoLive } from "./share/protocol.js";
 import { DiagramStoreLive } from "./store/live.js";
 import { type StorageRoot, StorageRootLive } from "./store/service.js";
 import { Clipboard, ClipboardLive } from "./terminal/clipboard.js";
@@ -94,7 +95,10 @@ const codeModeDependencies = Layer.mergeAll(
 );
 const diagramBuilderLayer = Layer.provide(DiagramBuilderLive, codeModeDependencies);
 const diagramPatcherLayer = Layer.provide(DiagramPatcherLive, codeModeDependencies);
-const excalidrawShareLayer = Layer.provide(ExcalidrawShareLive, ShareTransportLive);
+const excalidrawShareLayer = Layer.provide(
+	ExcalidrawShareLive,
+	Layer.mergeAll(ShareTransportLive, ShareCryptoLive),
+);
 
 /** The application with its storage root, clipboard, and output chosen by the caller, for tests. */
 export function makeCliApplicationLayer({
