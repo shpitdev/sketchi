@@ -7,12 +7,9 @@ import { TestClock } from "effect/testing";
 
 import { CliFilesystemError } from "../src/errors.js";
 import { LocalFileSystem } from "../src/filesystem.js";
-import {
-	DiagramStore,
-	DiagramStoreLive,
-	makeStorageRootLayer,
-	writeExportFile,
-} from "../src/storage.js";
+import { DiagramStore, makeStorageRootLayer } from "../src/store/service.js";
+import { DiagramStoreLive } from "../src/store/live.js";
+import { writeExportFile } from "../src/store/export-file.js";
 import { builtDiagram, localFileSystemLive } from "./fixtures.js";
 
 const testParent = resolve(process.cwd(), ".memory/cli-tests");

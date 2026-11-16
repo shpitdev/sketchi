@@ -16,7 +16,7 @@ import {
 	MAX_API_RESPONSE_BYTES,
 	readBoundedText,
 } from "./response-body.js";
-import { DiagramStore } from "./storage.js";
+import { DiagramStore } from "./store/service.js";
 
 export const DEFAULT_GENERATE_ENDPOINT = "https://playground.sketchi.app/api/v1/generate";
 export const SKETCHI_GENERATE_ENDPOINT_ENV = "SKETCHI_GENERATE_ENDPOINT";

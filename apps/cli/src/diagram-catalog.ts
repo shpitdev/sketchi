@@ -3,7 +3,7 @@ import { Effect } from "effect";
 import type { DiagramListEntry, DiagramSummary } from "./contracts.js";
 import { validateStorageId } from "./document.js";
 import { CliStorageError } from "./errors.js";
-import { DiagramStore } from "./storage.js";
+import { DiagramStore } from "./store/service.js";
 
 /** The id alias that names the newest diagram. */
 export const LATEST_DIAGRAM = "latest";

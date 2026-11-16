@@ -7,10 +7,11 @@ import { Effect, Layer } from "effect";
 import { exitCodeForFailure } from "../src/errors.js";
 import { localFileSystemLive, builtDiagram } from "./fixtures.js";
 import { LocalFileSystem } from "../src/filesystem.js";
-import { CliPngRenderer, HeadlessPngRenderError } from "../src/png-renderer.js";
-import { pullIntoStore } from "../src/pull.js";
-import { ExcalidrawShare } from "../src/share.js";
-import { DiagramStore, DiagramStoreLive, makeStorageRootLayer } from "../src/storage.js";
+import { CliPngRenderer, HeadlessPngRenderError } from "../src/render/png-renderer.js";
+import { pullIntoStore } from "../src/share/pull.js";
+import { ExcalidrawShare } from "../src/share/excalidraw.js";
+import { DiagramStore, makeStorageRootLayer } from "../src/store/service.js";
+import { DiagramStoreLive } from "../src/store/live.js";
 
 const testParent = resolve(process.cwd(), ".memory/cli-tests");
 const rendererProbeScene = builtDiagram().excalidraw;

@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { Effect } from "effect";
 
 import type { DiagramFormat, StoredDiagram } from "./contracts.js";
-import { DiagramExporter } from "./exporter.js";
+import { DiagramExporter } from "./render/exporter.js";
 import {
 	generateDiagram,
 	type GenerateDiagramInput,
@@ -13,7 +13,7 @@ import {
 } from "./generation.js";
 import { LocalFileSystem } from "./filesystem.js";
 import { CliExportError, type CliFilesystemError, type CliStorageError } from "./errors.js";
-import { writeExportFile } from "./storage.js";
+import { writeExportFile } from "./store/export-file.js";
 
 export type GenerationDestination =
 	| { readonly _tag: "Default" }

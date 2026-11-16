@@ -1,7 +1,7 @@
 /**
  * Excalidraw's own SVG export in Node, rasterized by resvg: what the draw
  * service's harness page does with a browser canvas. The DOM it needs is the
- * CLI's headless PNG export setup (apps/cli/src/png-renderer-runtime.ts).
+ * CLI's headless PNG export setup (apps/cli/src/render/png-renderer-runtime.ts).
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";

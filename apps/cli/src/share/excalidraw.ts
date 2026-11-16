@@ -2,8 +2,8 @@ import { spawn } from "node:child_process";
 
 import { Context, Effect, Layer, Schema } from "effect";
 
-import { CliShareError } from "./errors.js";
-import { readBoundedBody, readBoundedText } from "./response-body.js";
+import { CliShareError } from "../errors.js";
+import { readBoundedBody, readBoundedText } from "../response-body.js";
 import {
 	EXCALIDRAW_GET_ENDPOINT,
 	EXCALIDRAW_POST_ENDPOINT,
@@ -17,7 +17,7 @@ import {
 	generateShareKey,
 	parseShareLink,
 	serializeForShare,
-} from "./share-protocol.js";
+} from "./protocol.js";
 
 export interface OpenResult {
 	readonly status: "not_requested" | "accepted" | "unconfirmed";

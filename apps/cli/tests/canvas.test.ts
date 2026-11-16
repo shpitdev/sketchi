@@ -6,7 +6,7 @@ import { TestClock } from "effect/testing";
 import { createCanvasDiagram, DEFAULT_CANVAS_ENDPOINT } from "../src/canvas.js";
 import { type BuiltDiagram, DiagramRecordManifest, type StoredDiagram } from "../src/contracts.js";
 import { exitCodeForFailure } from "../src/errors.js";
-import { DiagramStore } from "../src/storage.js";
+import { DiagramStore } from "../src/store/service.js";
 
 const canvasSpec = Schema.decodeUnknownSync(CreateCanvasRequest.fields.spec)({
 	kind: "canvas",

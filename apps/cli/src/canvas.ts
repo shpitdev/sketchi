@@ -9,9 +9,9 @@ import { Effect, Schema, SchemaIssue, Result } from "effect";
 import { type BuiltDiagram, type StoredDiagram } from "./contracts.js";
 import { validateStorageId } from "./document.js";
 import { CliCanvasError, CliInputError, CliValidationError } from "./errors.js";
-import { type InputSource } from "./internal/effect-cli.js";
-import { InputReader } from "./input.js";
-import { DiagramStore } from "./storage.js";
+import { type InputSource } from "./terminal/effect-cli.js";
+import { InputReader } from "./terminal/input.js";
+import { DiagramStore } from "./store/service.js";
 import { API_REQUEST_TIMEOUT, MAX_API_RESPONSE_BYTES, readBoundedText } from "./response-body.js";
 
 export const DEFAULT_CANVAS_ENDPOINT = "https://playground.sketchi.app/api/v1/canvases/create";
