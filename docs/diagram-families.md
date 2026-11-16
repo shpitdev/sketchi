@@ -26,7 +26,7 @@ document builds without requiring particular source, story or test filenames.
 | generation output parsing | The `parsers` entry and validation-error mapping in `generate/candidates.ts`. Diagnostics should carry repair hints. | compile, generated-response pipeline |
 | Studio chat | The family's `tool-<toolName>` entry in `BUILD_TOOLS` (`apps/studio/src/features/chat/build-result.ts`) and its line in the chat policy (`packages/diagrams/src/build/policy.ts`). | review; the chat agent test covers only the tool list |
 | CLI | `sketchi create`, `generate --type` and the offline builder read the registry. Add a changeset for `@sketchi/cli`. | offline-build pipeline, CLI behavior tests |
-| generate API request | `POST /api/v1/generate` decodes `GenerateRequest` (`packages/diagrams/src/generate/contract.ts`), whose `type` is any of `DIAGRAM_TYPES`, in `apps/studio/src/server/generation/api.server.ts`. | request schema |
+| generate API request | `POST /api/v1/generate` decodes `GenerateRequest` (`packages/diagrams/src/generate/contract.ts`), whose `type` is any of `DIAGRAM_TYPES`, in `apps/studio/src/features/generate/api.server.ts`. | request schema |
 | maintained scenarios | `packages/diagram/scenarios`: scenarios with checks scored on the model's own diagram, registered in `diagramScenarios` or the reliability scenarios. | scenario regressions and Frontierclimb |
 | Storybook story | `tools/storybook/families/<name>.stories.tsx`. | Storybook build and review |
 
@@ -62,7 +62,7 @@ rest; see `docs/quadrant-charts.md`. Mindmaps radiate from their central topic; 
 `docs/mindmaps.md`.
 
 Surfaces that offer a family to people also need updating: the playground
-generate API (`apps/studio/src/server/generation/api.server.ts`), Studio
+generate API (`apps/studio/src/features/generate/api.server.ts`), Studio
 chat build tools (`apps/studio/src/features/chat/`), and `llms.txt`. Add
 optional `icon` support through the shared `DiagramIconRef` when a family's
 elements represent named technologies.

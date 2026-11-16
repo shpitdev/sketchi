@@ -29,7 +29,7 @@ import { NodeIconImaging } from "./imaging";
  */
 export type BatchAuthor = IconAuthorModel | "source";
 
-/** Studio's judge (`DEFAULT_JUDGE_MODEL` in apps/studio/src/server/icons/draw.server.ts). */
+/** Studio's judge (`DEFAULT_JUDGE_MODEL` in apps/studio/src/features/icons/draw.server.ts). */
 export const JUDGE_MODEL = "openai/gpt-6-sol";
 
 /** USD per million tokens, to estimate a draw's cost before the gateway's logs price it. */
