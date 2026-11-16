@@ -34,7 +34,7 @@ export default defineConfig(() => ({
 		},
 		// Stubs the browser APIs Excalidraw needs; it only acts in jsdom tests.
 		setupFiles: ["./tests/setup-excalidraw.ts"],
-		include: ["src/**/*.test.ts"],
+		include: ["tests/**/*.test.ts"],
 		reporters: ["default"],
 		coverage: {
 			reportsDirectory: "../../../coverage/packages/icons/draw",
