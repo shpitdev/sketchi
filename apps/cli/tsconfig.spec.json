@@ -4,9 +4,11 @@
     "outDir": "../../dist/out-tsc",
     "types": ["vitest/globals", "vitest/importMeta", "vite/client", "node"],
     "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
     "composite": false,
     "rootDir": "../..",
     "tsBuildInfoFile": "dist/tsconfig.spec.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "vitest.config.mts", "src/**/*.test.ts", "src/**/*.d.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.mts"]
 }

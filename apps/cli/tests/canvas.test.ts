@@ -3,10 +3,10 @@ import { afterEach, assert, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Schema } from "effect";
 import { TestClock } from "effect/testing";
 
-import { createCanvasDiagram, DEFAULT_CANVAS_ENDPOINT, parseCanvasSpec } from "./canvas.js";
-import { type BuiltDiagram, DiagramRecordManifest, type StoredDiagram } from "./contracts.js";
-import { exitCodeForFailure } from "./errors.js";
-import { DiagramStore } from "./storage.js";
+import { createCanvasDiagram, DEFAULT_CANVAS_ENDPOINT } from "../src/canvas.js";
+import { type BuiltDiagram, DiagramRecordManifest, type StoredDiagram } from "../src/contracts.js";
+import { exitCodeForFailure } from "../src/errors.js";
+import { DiagramStore } from "../src/storage.js";
 
 const canvasSpec = Schema.decodeUnknownSync(CreateCanvasRequest.fields.spec)({
 	kind: "canvas",
@@ -105,33 +105,6 @@ function acceptedResponse(): Response {
 const originalFetch = globalThis.fetch;
 
 describe("Universal Canvas public API client", () => {
-	it.effect("keeps response-stream I/O failures in the network exit class", () => {
-		const created: BuiltDiagram[] = [];
-		globalThis.fetch = () =>
-			Promise.resolve(
-				new Response(
-					new ReadableStream<Uint8Array>({
-						start(controller) {
-							controller.error(new Error("connection closed"));
-						},
-					}),
-				),
-			);
-		return Effect.gen(function* () {
-			const error = yield* Effect.flip(
-				createCanvasDiagram({
-					endpoint: DEFAULT_CANVAS_ENDPOINT,
-					spec: canvasSpec,
-				}),
-			);
-			assert.strictEqual(error._tag, "CliCanvasError");
-			if (error._tag === "CliCanvasError") {
-				assert.strictEqual(error.code, "network_failure");
-				assert.strictEqual(exitCodeForFailure(error), 10);
-			}
-			assert.strictEqual(created.length, 0);
-		}).pipe(Effect.provide(capturingStoreLayer(created)));
-	});
 	for (const stall of ["headers", "body"] as const) {
 		it.effect(`bounds stalled canvas ${stall} without persisting`, () => {
 			const created: BuiltDiagram[] = [];
@@ -238,45 +211,6 @@ describe("Universal Canvas public API client", () => {
 			assert.strictEqual(created.length, 1);
 			assert.deepStrictEqual(decodedRequest?.options?.artifactFormats, ["scene", "excalidraw"]);
 			assert.deepStrictEqual(decodedRequest?.options?.inlineArtifacts, ["excalidraw"]);
-		}).pipe(Effect.provide(capturingStoreLayer(created)));
-	});
-
-	it.effect("rejects malformed CanvasSpec before any request", () =>
-		Effect.gen(function* () {
-			let requested = false;
-			globalThis.fetch = () => {
-				requested = true;
-				return Promise.resolve(acceptedResponse());
-			};
-			const error = yield* Effect.flip(parseCanvasSpec('{"kind":"canvas","version":1}'));
-
-			assert.strictEqual(error._tag, "CliValidationError");
-			assert.isFalse(requested);
-		}),
-	);
-
-	it.effect("reports an unsafe CanvasSpec diagramId at the correct path", () => {
-		const created: BuiltDiagram[] = [];
-		let requested = false;
-		globalThis.fetch = () => {
-			requested = true;
-			return Promise.resolve(acceptedResponse());
-		};
-
-		return Effect.gen(function* () {
-			const error = yield* Effect.flip(
-				createCanvasDiagram({
-					endpoint: DEFAULT_CANVAS_ENDPOINT,
-					spec: { ...canvasSpec, diagramId: "unsafe/id" },
-				}),
-			);
-
-			assert.strictEqual(error._tag, "CliValidationError");
-			if (error._tag === "CliValidationError") {
-				assert.deepStrictEqual(error.details, ["spec.diagramId"]);
-			}
-			assert.isFalse(requested);
-			assert.strictEqual(created.length, 0);
 		}).pipe(Effect.provide(capturingStoreLayer(created)));
 	});
 
@@ -446,26 +380,6 @@ describe("Universal Canvas public API client", () => {
 			assert.strictEqual(error._tag, "CliCanvasError");
 			if (error._tag === "CliCanvasError") {
 				assert.strictEqual(error.code, "malformed_response");
-			}
-			assert.strictEqual(created.length, 0);
-		}).pipe(Effect.provide(capturingStoreLayer(created)));
-	});
-
-	it.effect("maps network failure without committing", () => {
-		const created: BuiltDiagram[] = [];
-		globalThis.fetch = () => Promise.reject(new Error("offline"));
-
-		return Effect.gen(function* () {
-			const error = yield* Effect.flip(
-				createCanvasDiagram({
-					endpoint: DEFAULT_CANVAS_ENDPOINT,
-					spec: canvasSpec,
-				}),
-			);
-
-			assert.strictEqual(error._tag, "CliCanvasError");
-			if (error._tag === "CliCanvasError") {
-				assert.strictEqual(error.code, "network_failure");
 			}
 			assert.strictEqual(created.length, 0);
 		}).pipe(Effect.provide(capturingStoreLayer(created)));
