@@ -1,4 +1,4 @@
-import { checkRequestCoverage, type CoverageIssue, keepsStatedStructure } from "./coverage.js";
+import { checkRequestCoverage, type CoverageIssue, keepsStatedStructure } from "./coverage";
 import {
 	recordMetric,
 	SpanContent,
@@ -13,18 +13,18 @@ import {
 	type DiagramGenerationRequest,
 	type DiagramGenerationUsage,
 	enforceCandidateRequestRequirements,
-} from "./candidates.js";
-import type { DiagramGenerationPolicyConfig } from "./client.js";
+} from "./candidates";
+import type { DiagramGenerationPolicyConfig } from "./client";
 import {
 	type DiagramGenerationError,
 	DiagramGenerationLimitError,
 	DiagramGenerationTimeoutError,
 	generationErrorToCandidate,
 	isRetryableGenerationError,
-} from "./errors.js";
-import { type DiagramFamilyNarrowing, familyNarrowingAttributes } from "./family-narrowing.js";
-import { revisesFlowchartWithEdits } from "./messages.js";
-import { withNarrowedFamilyRoute } from "./routing.js";
+} from "./errors";
+import { type DiagramFamilyNarrowing, familyNarrowingAttributes } from "./family-narrowing";
+import { revisesFlowchartWithEdits } from "./messages";
+import { withNarrowedFamilyRoute } from "./routing";
 
 const generationAttempts = Metric.counter("sketchi_generation_attempts", {
 	description: "Diagram generation upstream attempts",

@@ -6,8 +6,8 @@ import { families, familyForType } from "@sketchi/diagrams/family";
 
 import { Option, Result, Schema } from "effect";
 
-import { type DiagramScenario } from "./diagram-scenarios.js";
-import { type ScenarioCheck } from "./evaluate.js";
+import { type DiagramScenario } from "./diagram-scenarios";
+import { type ScenarioCheck } from "./evaluate";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === "object" && !Array.isArray(value);

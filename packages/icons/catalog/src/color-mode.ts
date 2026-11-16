@@ -1,4 +1,4 @@
-import type { MarkPixels } from "./mark-features.js";
+import type { MarkPixels } from "./mark-features";
 
 /**
  * How a mark meets light and dark surfaces, measured from its pixels drawn on

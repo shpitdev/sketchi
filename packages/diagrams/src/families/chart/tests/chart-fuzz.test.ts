@@ -9,11 +9,11 @@ import {
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import { parseChartDiagram, type ChartDiagram } from "../document.js";
+import { parseChartDiagram, type ChartDiagram } from "../document";
 
-import { readChartMarks } from "../readout.js";
-import { chartBarOrientation, renderChartDiagram } from "../render.js";
-import { formatValue, niceScale, PIE_MAX_DECIMALS, piePercentages, unitParts } from "../scale.js";
+import { readChartMarks } from "../readout";
+import { chartBarOrientation, renderChartDiagram } from "../render";
+import { formatValue, niceScale, PIE_MAX_DECIMALS, piePercentages, unitParts } from "../scale";
 
 interface Box {
 	readonly left: number;

@@ -1,4 +1,4 @@
-import type { SketchiIcon } from "./manifest.js";
+import type { SketchiIcon } from "./manifest";
 
 /** Largest catalog SVG accepted as an embedded diagram node logo. */
 export const NODE_LOGO_MAX_BYTES = 64 * 1024;

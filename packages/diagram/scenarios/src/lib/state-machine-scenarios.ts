@@ -10,8 +10,8 @@ import {
 	type StateMachineStateKind,
 } from "@sketchi/diagrams/families/state-machine/document";
 
-import type { ScenarioCheck } from "./evaluate.js";
-import type { DiagramScenarioDifficulty } from "./scenarios.js";
+import type { ScenarioCheck } from "./evaluate";
+import type { DiagramScenarioDifficulty } from "./scenarios";
 
 /**
  * A state the prompt names. A generated state matches when its kind matches

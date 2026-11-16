@@ -1,5 +1,5 @@
-import { inspectSvgCapabilities } from "./capabilities.js";
-import { constructNativeTrace, PROVISIONAL_POINT_BUDGET } from "./native.js";
+import { inspectSvgCapabilities } from "./capabilities";
+import { constructNativeTrace, PROVISIONAL_POINT_BUDGET } from "./native";
 import type {
 	CanonicalSvgDocument,
 	EffectiveSvgToExcalidrawOptions,
@@ -7,7 +7,7 @@ import type {
 	NativeTraceMetrics,
 	SvgToExcalidrawOptions,
 	SvgToExcalidrawResult,
-} from "./types.js";
+} from "./types";
 
 const EMPTY_METRICS: NativeTraceMetrics = {
 	elements: 0,

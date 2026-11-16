@@ -1,7 +1,7 @@
 import { Outlet, createFileRoute, useRouterState } from "@tanstack/react-router";
 
-import { AgentSetupView } from "../components/agent-setup-view/index.js";
-import { SiteShell } from "../components/site-shell/site-shell.js";
+import { AgentSetupView } from "../components/agent-setup-view/index";
+import { SiteShell } from "../components/site-shell/site-shell";
 import { pageMeta } from "../lib/site-meta";
 import { getWebSurfaceUrls } from "../lib/surface-urls-rpc";
 

@@ -3,14 +3,14 @@ import { Array, ByteSize, Context, Effect, Layer, Schema, String } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
 
-import { type ClientLimitNamespace, limitClient } from "./client-limit.js";
+import { type ClientLimitNamespace, limitClient } from "./client-limit";
 import {
 	bareCommunitySlug,
 	COMMUNITY_ICON_LIMITS,
 	communityDiagramSlug,
 	type CommunityIcon,
 	type CommunityIconStorageError,
-} from "./contracts.js";
+} from "./contracts";
 import {
 	CommunityDetail,
 	CommunityHttpApi,
@@ -19,15 +19,15 @@ import {
 	CommunityPage,
 	CommunityPublished,
 	CommunityVisibilityRequest,
-} from "./http-api.js";
+} from "./http-api";
 import {
 	CommunityIconModeration,
 	unavailableCommunityModerationLayer,
 	workersAiCommunityModerationLayer,
 	type CommunityModerationAi,
-} from "./moderation.js";
-import { publishCommunityIcon } from "./publish.js";
-import { communityIconStoreLayer, CommunityIconStore } from "./store.js";
+} from "./moderation";
+import { publishCommunityIcon } from "./publish";
+import { communityIconStoreLayer, CommunityIconStore } from "./store";
 
 export const COMMUNITY_PUBLISHES_PER_CLIENT_MINUTE = 10;
 export interface CommunityEnv {

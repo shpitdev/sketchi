@@ -1,12 +1,12 @@
 import { Effect } from "effect";
 
-import type { StoredDiagram } from "../contracts.js";
-import { encodeJson, validateStorageId } from "../document.js";
-import { CliShareError } from "../errors.js";
-import { CliPngRenderer } from "../render/png-renderer.js";
-import { ExcalidrawShare } from "./excalidraw.js";
-import { validateShareScene } from "./protocol.js";
-import { DiagramStore } from "../store/service.js";
+import type { StoredDiagram } from "../contracts";
+import { encodeJson, validateStorageId } from "../document";
+import { CliShareError } from "../errors";
+import { CliPngRenderer } from "../render/png-renderer";
+import { ExcalidrawShare } from "./excalidraw";
+import { validateShareScene } from "./protocol";
+import { DiagramStore } from "../store/service";
 
 function unsupportedPulledScene(error: { readonly message: string }): CliShareError {
 	return CliShareError.make({

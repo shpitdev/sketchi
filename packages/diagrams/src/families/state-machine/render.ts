@@ -5,8 +5,8 @@ import {
 	stateInitial,
 	stateLabel,
 	stateTransitionLabel,
-} from "./document.js";
-import { type GraphEdge, type GraphNode, type GraphInput } from "../../graph/input.js";
+} from "./document";
+import { type GraphEdge, type GraphNode, type GraphInput } from "../../graph/input";
 import {
 	routingQualityFindings,
 	routingQualityScale,
@@ -14,8 +14,8 @@ import {
 	type CanvasSpec,
 } from "@sketchi/drawing";
 
-import { arrowCrossings } from "../../graph/readability.js";
-import { renderGraphDiagram } from "../../graph/scene.js";
+import { arrowCrossings } from "../../graph/readability";
+import { renderGraphDiagram } from "../../graph/scene";
 
 /** The machine's own initial pseudostate; state ids never contain ":". */
 const INITIAL_ID = ":initial";

@@ -1,4 +1,4 @@
-import { CommandBlock } from "../command-block/index.js";
+import { CommandBlock } from "../command-block/index";
 import {
 	CLI_INSTALL_COMMAND,
 	CLI_NODE_REQUIREMENT,

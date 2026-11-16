@@ -3,12 +3,8 @@ import { estimateTextWidth, fnv1a32, wrapTextToWidth, type IconRecipe } from "@s
 
 import { type ExcalidrawElement, iconRecipeElements } from "@sketchi/drawing/excalidraw";
 
-import { RECIPE_PREVIEW_SIZE } from "../../lib/recipe-drawing.js";
-import {
-	DRAWN_NAME_FONT_SIZE,
-	DRAWN_NAME_GAP,
-	DRAWN_NAME_MAX_WIDTH,
-} from "../../lib/drawn-name.js";
+import { RECIPE_PREVIEW_SIZE } from "../../lib/recipe-drawing";
+import { DRAWN_NAME_FONT_SIZE, DRAWN_NAME_GAP, DRAWN_NAME_MAX_WIDTH } from "../../lib/drawn-name";
 
 // The pages load this when someone copies or downloads a drawing: the
 // Excalidraw conversion is most of its code and none of their first paint.

@@ -1,4 +1,4 @@
-import { buildResponse, type BuildRejection } from "../../../build/operation.js";
+import { buildResponse, type BuildRejection } from "../../../build/operation";
 import { describe, expect, it } from "vitest";
 import { Effect, Result } from "effect";
 import {
@@ -8,13 +8,13 @@ import {
 	type GanttValidationIssue,
 	parseGanttDay,
 	parseGanttDiagram,
-} from "../document.js";
+} from "../document";
 
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { buildGantt } from "../../../build/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
-import { applyDiagramPatch } from "../../../canvas/patch.js";
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
+import { buildGantt } from "../../../build/builds";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { applyDiagramPatch } from "../../../canvas/patch";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
 
 const storage = makeMemoryArtifactStorage();
 function run<A, E extends BuildRejection<unknown>>(

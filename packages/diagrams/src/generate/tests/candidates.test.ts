@@ -4,7 +4,7 @@ import {
 	candidateFromText,
 	type DiagramGenerationRequest,
 	enforceCandidateRequestRequirements,
-} from "../candidates.js";
+} from "../candidates";
 
 const flowchart = (nodes: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
 	candidateFromText({

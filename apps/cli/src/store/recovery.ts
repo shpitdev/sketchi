@@ -10,9 +10,9 @@ import {
 	filesystemErrorHasCode,
 	recordPath,
 	unsafeEntry,
-} from "./entries.js";
-import type { LocalEntry } from "../filesystem.js";
-import type { StoreContext } from "./service.js";
+} from "./entries";
+import type { LocalEntry } from "../filesystem";
+import type { StoreContext } from "./service";
 
 export function processIsAlive(pid: number): boolean {
 	if (!Number.isSafeInteger(pid) || pid <= 0) return false;

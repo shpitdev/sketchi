@@ -4,10 +4,10 @@ import { resolve } from "node:path";
 
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
 
-import { getIconSourceFile, nodeLogoIcons } from "../src/catalog.js";
-import { lookAlikeSourceHash, LOOK_ALIKE_RENDER_SIZE } from "../src/look-alikes.js";
-import { markFeatures } from "../src/mark-features.js";
-import { sanitizeSvg } from "../src/svg-input.js";
+import { getIconSourceFile, nodeLogoIcons } from "../src/catalog";
+import { lookAlikeSourceHash, LOOK_ALIKE_RENDER_SIZE } from "../src/look-alikes";
+import { markFeatures } from "../src/mark-features";
+import { sanitizeSvg } from "../src/svg-input";
 
 // Features of every node-logo mark, rendered on white the way the draw service
 // renders an uploaded logo, so a new mark can be judged against the marks it

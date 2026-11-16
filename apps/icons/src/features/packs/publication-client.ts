@@ -1,9 +1,9 @@
 import { Array, Effect, Schema, SchemaIssue } from "effect";
 import { HttpApiClient } from "effect/http-api";
 import { HttpClient, HttpClientRequest } from "effect/http";
-import { PackPublicationApi } from "./publication-api.js";
-import { PublishPayload } from "./publication.js";
-import { IconQueryError } from "../../lib/query-atoms.js";
+import { PackPublicationApi } from "./publication-api";
+import { PublishPayload } from "./publication";
+import { IconQueryError } from "../../lib/query-atoms";
 const formatValidationIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 const decode = HttpApiClient.decodeResponse(PackPublicationApi, {
 	group: "packs",

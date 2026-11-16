@@ -1,9 +1,9 @@
 import { Schema } from "effect";
 
-import { PublishedBuildIssue } from "../build/result.js";
-import { ApplyDiagramPatchRequest } from "../canvas/patch-contract.js";
-import { DIAGRAM_TYPES } from "../family.js";
-import { PublishedCoverageIssue } from "../families/flowchart/issues.js";
+import { PublishedBuildIssue } from "../build/result";
+import { ApplyDiagramPatchRequest } from "../canvas/patch-contract";
+import { DIAGRAM_TYPES } from "../family";
+import { PublishedCoverageIssue } from "../families/flowchart/issues";
 
 /**
  * Room for a pasted roster, DDL schema or task list of the largest diagrams the family limits

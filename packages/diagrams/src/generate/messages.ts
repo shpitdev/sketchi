@@ -1,24 +1,24 @@
 import { Schema } from "effect";
-import { CHART_RULES } from "../families/chart/rules.js";
-import { CLASS_RULES } from "../families/class/rules.js";
-import { ER_RULES } from "../families/er/rules.js";
-import { FLOWCHART_EDIT_RULES, FLOWCHART_RULES } from "../families/flowchart/rules.js";
-import { GANTT_RULES } from "../families/gantt/rules.js";
-import { JOURNEY_RULES } from "../families/journey/rules.js";
-import { MINDMAP_RULES } from "../families/mindmap/rules.js";
-import { ORG_CHART_RULES } from "../families/org-chart/rules.js";
-import { QUADRANT_RULES } from "../families/quadrant/rules.js";
-import { SANKEY_RULES } from "../families/sankey/rules.js";
-import { SEQUENCE_RULES } from "../families/sequence/rules.js";
-import { STATE_MACHINE_RULES } from "../families/state-machine/rules.js";
-import { TIMELINE_RULES } from "../families/timeline/rules.js";
-import { VENN_RULES } from "../families/venn/rules.js";
-import { WIREFRAME_RULES } from "../families/wireframe/rules.js";
-import { DIAGRAM_TYPES, type DiagramTypeValue } from "../family.js";
-import { FLOWCHART_NODE_COLOR_NAMES } from "../families/flowchart/document.js";
+import { CHART_RULES } from "../families/chart/rules";
+import { CLASS_RULES } from "../families/class/rules";
+import { ER_RULES } from "../families/er/rules";
+import { FLOWCHART_EDIT_RULES, FLOWCHART_RULES } from "../families/flowchart/rules";
+import { GANTT_RULES } from "../families/gantt/rules";
+import { JOURNEY_RULES } from "../families/journey/rules";
+import { MINDMAP_RULES } from "../families/mindmap/rules";
+import { ORG_CHART_RULES } from "../families/org-chart/rules";
+import { QUADRANT_RULES } from "../families/quadrant/rules";
+import { SANKEY_RULES } from "../families/sankey/rules";
+import { SEQUENCE_RULES } from "../families/sequence/rules";
+import { STATE_MACHINE_RULES } from "../families/state-machine/rules";
+import { TIMELINE_RULES } from "../families/timeline/rules";
+import { VENN_RULES } from "../families/venn/rules";
+import { WIREFRAME_RULES } from "../families/wireframe/rules";
+import { DIAGRAM_TYPES, type DiagramTypeValue } from "../family";
+import { FLOWCHART_NODE_COLOR_NAMES } from "../families/flowchart/document";
 
-import { CURATED_EXAMPLES } from "./examples.js";
-import { DiagramGenerationTypeSchema } from "./intent.js";
+import { CURATED_EXAMPLES } from "./examples";
+import { DiagramGenerationTypeSchema } from "./intent";
 
 /** `a or b`, or `a, b, or c`, for a list of alternatives. */
 export function listAlternatives(values: readonly string[]): string {

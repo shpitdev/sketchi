@@ -4,7 +4,7 @@ import { type Meta, type StoryObj } from "@storybook/react-vite";
 import { stateMachineScenarios } from "@sketchi/diagram-scenarios";
 import { mediaPlayerStateMachine } from "@sketchi/diagrams/families/state-machine/document";
 
-import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index.js";
+import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index";
 
 const stateMachineFixture = familyForType("state-machine").fixture;
 

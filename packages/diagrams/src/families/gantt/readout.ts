@@ -1,6 +1,6 @@
-import { parseGanttDay } from "./document.js";
+import { parseGanttDay } from "./document";
 
-import { GANTT_MARK_ROLE } from "./render.js";
+import { GANTT_MARK_ROLE } from "./render";
 import {
 	type CanvasElement as SceneElement,
 	type CanvasPoint as ScenePoint,

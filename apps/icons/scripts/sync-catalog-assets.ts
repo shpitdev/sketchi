@@ -4,8 +4,8 @@ import { dirname, resolve } from "node:path";
 
 import { ICON_SOURCE_URL_PREFIX, iconManifest } from "@sketchi/icon-catalog/catalog";
 
-import { catalogDrawings, DRAWINGS_PATH } from "../src/lib/drawings.js";
-import { excalidrawLibrary } from "../src/features/export/excalidraw-export.js";
+import { catalogDrawings, DRAWINGS_PATH } from "../src/lib/drawings";
+import { excalidrawLibrary } from "../src/features/export/excalidraw-export";
 import {
 	ALL_ICONS_PACK_ID,
 	ICON_PACKS,
@@ -20,9 +20,9 @@ import {
 	packPreviewImagePath,
 	packSummary,
 	packVersion,
-} from "../src/lib/packs.js";
-import { packPreviewImage } from "./pack-preview-image.js";
-import { packCard, siteCard } from "./social-cards.js";
+} from "../src/lib/packs";
+import { packPreviewImage } from "./pack-preview-image";
+import { packCard, siteCard } from "./social-cards";
 
 // The catalog package owns the manifest, SVG sources and hand-drawn recipes.
 // The app publishes copies at stable public URLs; every output is generated

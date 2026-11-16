@@ -2,10 +2,10 @@ import { String } from "effect";
 
 import handler from "@tanstack/react-start/server-entry";
 
-import { makeIconsHttpHandler } from "./lib/http.server.js";
+import { makeIconsHttpHandler } from "./lib/http.server";
 
-import { handleIconMcpRequest, type IconsMcpEnv } from "./lib/mcp.server.js";
-export { IconsMcpSession } from "./lib/mcp-session.server.js";
+import { handleIconMcpRequest, type IconsMcpEnv } from "./lib/mcp.server";
+export { IconsMcpSession } from "./lib/mcp-session.server";
 
 export { ClientRateLimit } from "./lib/client-rate-limit.server";
 

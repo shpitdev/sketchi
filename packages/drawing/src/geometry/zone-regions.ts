@@ -1,12 +1,12 @@
-import { type CanvasShapeElement, type CanvasSpec, type CanvasTextElement } from "../scene.js";
-import { GROUP_OUTLINE_CLEARANCE } from "./group-regions.js";
+import { type CanvasShapeElement, type CanvasSpec, type CanvasTextElement } from "../scene";
+import { GROUP_OUTLINE_CLEARANCE } from "./group-regions";
 import {
 	AXIS_ALIGNED_EPSILON,
 	segmentCrossesBoundsInterior,
 	segmentOverlapLength,
 	segmentsFromPoints,
-} from "./segments.js";
-import { boundLabelWidth, wrapTextToWidth, wrappedLabelWidth } from "./text-metrics.js";
+} from "./segments";
+import { boundLabelWidth, wrapTextToWidth, wrappedLabelWidth } from "./text-metrics";
 
 export interface ZoneRegionIssue {
 	readonly code:

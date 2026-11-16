@@ -9,7 +9,7 @@ import {
 	MutableHashSet as Set,
 } from "effect";
 
-import { cleanToolString, slug } from "../../clean-text.js";
+import { cleanToolString, slug } from "../../clean-text";
 
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 

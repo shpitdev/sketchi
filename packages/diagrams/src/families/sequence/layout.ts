@@ -1,4 +1,4 @@
-import { type SequenceDiagram } from "./document.js";
+import { type SequenceDiagram } from "./document";
 
 /**
  * A participant's active period: from a call it receives to its return to the

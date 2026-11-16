@@ -1,16 +1,12 @@
 import { DIAGRAM_TYPES } from "@sketchi/diagrams/family";
 import { Effect, Option } from "effect";
 
-import { resolveDiagramId } from "../diagram-catalog.js";
-import { runReviseWorkflow } from "../generate-workflow.js";
-import { resolveGenerateEndpoint, SKETCHI_GENERATE_ENDPOINT_ENV } from "../generation.js";
-import { Command, Flag } from "../terminal/effect-cli.js";
-import {
-	copyGeneratedArtifact,
-	reportGenerateOperation,
-	textNeedsDisplayHint,
-} from "./generated.js";
-import { diagramIdArgument, rootCommand } from "./root.js";
+import { resolveDiagramId } from "../diagram-catalog";
+import { runReviseWorkflow } from "../generate-workflow";
+import { resolveGenerateEndpoint, SKETCHI_GENERATE_ENDPOINT_ENV } from "../generation";
+import { Command, Flag } from "../terminal/effect-cli";
+import { copyGeneratedArtifact, reportGenerateOperation, textNeedsDisplayHint } from "./generated";
+import { diagramIdArgument, rootCommand } from "./root";
 
 const REVISE_HELP = `Change a stored diagram with a request, keep the change as the record's next revision, and export its PNG by default. Sketchi sends the diagram's canonical document and the request to the public Sketchi generate API in one unauthenticated HTTPS POST; for a flowchart the model writes only edits by id, which the server applies and returns with the document (--output json shows them); for other families it returns the complete revised document. Either keeps the diagram's id and family, and everything the request does not mention stays as it was.
 

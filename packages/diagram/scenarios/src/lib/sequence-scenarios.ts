@@ -6,7 +6,7 @@ import {
 	parseSequenceDiagram,
 } from "@sketchi/diagrams/families/sequence/document";
 
-import type { DiagramScenarioDifficulty, DiagramScenarioLogo } from "./scenarios.js";
+import type { DiagramScenarioDifficulty, DiagramScenarioLogo } from "./scenarios";
 
 /**
  * One message the model must draw. Participants and labels match when the

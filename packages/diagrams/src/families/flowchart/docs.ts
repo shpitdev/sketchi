@@ -1,5 +1,5 @@
-import { FLOWCHART_NODE_COLOR_NAMES } from "../../families/flowchart/document.js";
-import { FLOWCHART_RULES } from "./rules.js";
+import { FLOWCHART_NODE_COLOR_NAMES } from "../../families/flowchart/document";
+import { FLOWCHART_RULES } from "./rules";
 const PROMPT = "the prompt";
 const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] }`;
 const FLOWCHART_COLORS = FLOWCHART_NODE_COLOR_NAMES.map((name) => `"${name}"`).join(" | ");

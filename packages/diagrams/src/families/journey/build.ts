@@ -1,6 +1,6 @@
-import { PublishedBuildIssue } from "../../build/result.js";
+import { PublishedBuildIssue } from "../../build/result";
 import { Array, Result } from "effect";
-import { defineBuild } from "../../build/operation.js";
+import { defineBuild } from "../../build/operation";
 import {
 	JourneyDocument,
 	JourneyDiagram,
@@ -10,8 +10,8 @@ import {
 	resolveJourneyShorthand,
 	validateJourneyDiagram,
 	counts,
-} from "./document.js";
-import { renderJourneyDiagram } from "./render.js";
+} from "./document";
+import { renderJourneyDiagram } from "./render";
 
 export const journeyBuild = defineBuild({
 	publishedIssues: PublishedBuildIssue,

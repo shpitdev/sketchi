@@ -1,4 +1,4 @@
-import { type SankeyDiagram } from "./document.js";
+import { type SankeyDiagram } from "./document";
 import {
 	CANVAS_SPEC_VERSION,
 	SKETCHI_DIAGRAM_PALETTE,
@@ -11,7 +11,7 @@ import {
 	type CanvasSpec,
 } from "@sketchi/drawing";
 
-import { formatValue, unitParts } from "../chart/scale.js";
+import { formatValue, unitParts } from "../chart/scale";
 import {
 	layoutSankeyDiagram,
 	polygonBounds,
@@ -19,7 +19,7 @@ import {
 	type SankeyBox,
 	type SankeyLayout,
 	type SankeyText,
-} from "./layout.js";
+} from "./layout";
 
 export const SANKEY_MARK_ROLE = "sankey-mark";
 

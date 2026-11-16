@@ -1,6 +1,6 @@
-import { type FlowchartDiagram } from "./document.js";
+import { type FlowchartDiagram } from "./document";
 
-import { type QualityCheck, type QualityReport } from "../../build/result.js";
+import { type QualityCheck, type QualityReport } from "../../build/result";
 
 const GENERIC_LABEL = /^(node|step|item|box|thing|process|task)\s*\d*$/i;
 const GENERIC_TITLE = /^(diagram|untitled|flowchart|chart|sketch)$/i;

@@ -66,7 +66,6 @@ const compiler = rspack({
 	},
 	resolve: {
 		extensions: [".ts", ".js"],
-		extensionAlias: { ".js": [".ts", ".js"] },
 		alias: {
 			"@excalidraw/excalidraw": resolve(
 				projectRoot,

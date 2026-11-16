@@ -2,11 +2,11 @@ import { CloudflareAiGatewayBinding } from "@sketchi/cloudflare/ai-gateway";
 
 import { Array, Context, Effect, Layer, Option, Schedule, String } from "effect";
 
-import { makeAuthorCall } from "./author-model.js";
+import { makeAuthorCall } from "./author-model";
 import type { Prompt } from "effect/ai";
-import { IconModelError } from "./errors.js";
-import { type IconSource, svgCurveSegments } from "./input.js";
-import { makeJudgeCall, stripOpenAiModelPrefix } from "./judge-model.js";
+import { IconModelError } from "./errors";
+import { type IconSource, svgCurveSegments } from "./input";
+import { makeJudgeCall, stripOpenAiModelPrefix } from "./judge-model";
 
 /** Author models a draw request may name. */
 export const ICON_AUTHOR_MODELS = [

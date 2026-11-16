@@ -1,6 +1,6 @@
 // Server entrypoint for hosts that run builds: the operations they call and the
 // environment, storage and icon services they provide. Schemas alone come from
-// `./contract.js`; agent limits from `./policy.js`.
+// `./contract`; agent limits from `./policy`.
 export {
 	CodeModeArtifactStorage,
 	CodeModeArtifactStorageMemory,
@@ -10,26 +10,26 @@ export {
 	type CodeModeObjectBucket,
 	type CodeModeObjectBucketObject,
 	type StoredArtifactFormat,
-} from "./artifacts.js";
-export { observeCodeModeBoundary } from "./boundary.js";
-export { bindBuild, buildFlowchart } from "./builds.js";
+} from "./artifacts";
+export { observeCodeModeBoundary } from "./boundary";
+export { bindBuild, buildFlowchart } from "./builds";
 export {
 	buildCanonicalDocument,
 	canonicalDocumentFromDiagram,
 	isCanonicalDocumentType,
-} from "./documents.js";
-export { editFlowchart } from "./edit-flowchart.js";
+} from "./documents";
+export { editFlowchart } from "./edit-flowchart";
 export {
 	CodeModeIconLoadError,
 	makeCodeModeIconCatalog,
 	normalizeIconSlug,
 	type CodeModeCommunityIcons,
 	type CodeModeIconCatalog,
-} from "./icons.js";
-export { buildResponse, type BuildRejection } from "./operation.js";
+} from "./icons";
+export { buildResponse, type BuildRejection } from "./operation";
 export {
 	CodeModeRuntimeEnvironment,
 	makeCodeModeRuntimeEnvironmentLayer,
 	type CodeModeArtifactRenderer,
-} from "./runtime.js";
-export { searchIcons } from "./search-icons.js";
+} from "./runtime";
+export { searchIcons } from "./search-icons";

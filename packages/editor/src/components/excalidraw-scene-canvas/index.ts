@@ -1,2 +1,2 @@
-export * from "./excalidraw-scene-canvas.js";
-export { createFoldedRouteRelease, type MutateElement } from "./route-release.js";
+export * from "./excalidraw-scene-canvas";
+export { createFoldedRouteRelease, type MutateElement } from "./route-release";

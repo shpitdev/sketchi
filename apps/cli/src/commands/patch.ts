@@ -1,14 +1,14 @@
 import { Effect } from "effect";
 
-import { resolveDiagramId } from "../diagram-catalog.js";
-import { CliValidationError } from "../errors.js";
-import { DiagramPatcher } from "../patch.js";
-import { DiagramStore } from "../store/service.js";
-import { Command, exclusiveInputSourceFlags, resolveInputSource } from "../terminal/effect-cli.js";
-import { readPatchInput } from "../terminal/input.js";
-import { runReported } from "../terminal/output.js";
-import { storedData, summaryText } from "./present.js";
-import { diagramIdArgument, rootCommand } from "./root.js";
+import { resolveDiagramId } from "../diagram-catalog";
+import { CliValidationError } from "../errors";
+import { DiagramPatcher } from "../patch";
+import { DiagramStore } from "../store/service";
+import { Command, exclusiveInputSourceFlags, resolveInputSource } from "../terminal/effect-cli";
+import { readPatchInput } from "../terminal/input";
+import { runReported } from "../terminal/output";
+import { storedData, summaryText } from "./present";
+import { diagramIdArgument, rootCommand } from "./root";
 
 export const patchCommand = Command.make(
 	"patch",

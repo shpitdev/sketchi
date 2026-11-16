@@ -4,7 +4,7 @@ import {
 	FLOWCHART_NODE_SHAPES,
 	FLOWCHART_ZONE_KINDS,
 	FlowchartNodeColorSchema,
-} from "../../families/flowchart/document.js";
+} from "../../families/flowchart/document";
 import {
 	FLOWCHART_DIRECTIONS,
 	FlowchartDocumentEdgeSchema,
@@ -26,7 +26,7 @@ import {
 	type FlowchartDocumentNode,
 	type FlowchartDocumentNodeDetails,
 	FLOWCHART_MAX_EDGES,
-} from "./document.js";
+} from "./document";
 
 /**
  * Edits to a flowchart document, each addressing nodes, groups and lanes by id

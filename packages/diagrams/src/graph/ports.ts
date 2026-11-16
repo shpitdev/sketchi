@@ -10,7 +10,7 @@ import {
 	type PortPreference,
 	type PortOrder,
 	type GroupLayout,
-} from "./layout-types.js";
+} from "./layout-types";
 import {
 	FORWARD_SIDE,
 	EDGE_NORMAL,
@@ -37,8 +37,8 @@ import {
 	reservedArrivals,
 	reservedDepartures,
 	endRunOf,
-} from "./geometry.js";
-import { branches, branchLabelMetrics, markerSize, squareChoice } from "./measure.js";
+} from "./geometry";
+import { branches, branchLabelMetrics, markerSize, squareChoice } from "./measure";
 import {
 	AXIS_ALIGNED_EPSILON,
 	type CanvasShapeElement as NodeSceneElement,
@@ -46,10 +46,10 @@ import {
 	canvasFrameNameBox,
 	type CanvasConnectorElement as ArrowSceneElement,
 } from "@sketchi/drawing";
-import { type GraphInput } from "./input.js";
-import { type GraphLayout } from "./topology.js";
-import { labelBox } from "./label-geometry.js";
-import { groupChain, obstacleBox } from "./containers.js";
+import { type GraphInput } from "./input";
+import { type GraphLayout } from "./topology";
+import { labelBox } from "./label-geometry";
+import { groupChain, obstacleBox } from "./containers";
 
 /**
  * Each branch of a decision in lanes leaves by the vertex that faces its

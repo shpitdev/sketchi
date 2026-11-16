@@ -3,8 +3,8 @@ import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
 import { Check, Info } from "lucide-react";
 import { memo } from "react";
 
-import { DrawnIcon } from "../../../components/drawn-icon/drawn-icon.js";
-import { IconMark } from "../../../components/icon-mark/icon-mark.js";
+import { DrawnIcon } from "../../../components/drawn-icon/drawn-icon";
+import { IconMark } from "../../../components/icon-mark/icon-mark";
 
 export interface IconCardProps {
 	readonly active?: boolean;

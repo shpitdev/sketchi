@@ -1,4 +1,4 @@
-import { fnv1a32 } from "../hash.js";
+import { fnv1a32 } from "../hash";
 import { type ExcalidrawLinearElement } from "@excalidraw/excalidraw/element/types";
 import { generateKeyBetween } from "fractional-indexing";
 
@@ -9,7 +9,7 @@ import {
 	keyholeBridge,
 	regionsFromRings,
 	triangulateRegion,
-} from "./geometry.js";
+} from "./geometry";
 import {
 	type CanonicalShape,
 	type CanonicalSvgDocument,
@@ -20,7 +20,7 @@ import {
 	type ProvisionalPointBudget,
 	type NativeFillStyle,
 	type NativeRoughness,
-} from "./types.js";
+} from "./types";
 
 export const PROVISIONAL_POINT_BUDGET: ProvisionalPointBudget = {
 	perElement: 256,

@@ -24,8 +24,8 @@ import {
 	classNodeName,
 	hasClassEnds,
 	isClassGeneralization,
-} from "./document.js";
-import { type GraphInput } from "../../graph/input.js";
+} from "./document";
+import { type GraphInput } from "../../graph/input";
 
 import {
 	CLASS_END_RUN,
@@ -33,9 +33,9 @@ import {
 	type ClassPlacement,
 	type ClassPlacementOptions,
 	placeClasses,
-} from "./layout.js";
-import { arrowCrossings } from "../../graph/readability.js";
-import { renderGraphDiagram } from "../../graph/scene.js";
+} from "./layout";
+import { arrowCrossings } from "../../graph/readability";
+import { renderGraphDiagram } from "../../graph/scene";
 
 /** The name compartment: one 16 px line for the name, another over it for a keyword. */
 const NAME_FONT_SIZE = 16;

@@ -1,9 +1,10 @@
+import type { RuleSource } from "../../rule-source";
 import {
+	FLOWCHART_MAX_EDGES,
+	FLOWCHART_MAX_NODES,
 	FLOWCHART_NODE_COLOR_NAMES,
 	FLOWCHART_ZONE_KINDS,
-} from "../../families/flowchart/document.js";
-import type { RuleSource } from "../../rule-source.js";
-import { FLOWCHART_MAX_EDGES, FLOWCHART_MAX_NODES } from "./document.js";
+} from "./document";
 
 const zoneKinds = `${FLOWCHART_ZONE_KINDS.slice(0, -1).join(", ")} or ${FLOWCHART_ZONE_KINDS.at(-1)}`;
 

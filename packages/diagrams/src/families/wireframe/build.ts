@@ -1,6 +1,6 @@
-import { PublishedBuildIssue } from "../../build/result.js";
+import { PublishedBuildIssue } from "../../build/result";
 import { Array } from "effect";
-import { defineBuild } from "../../build/operation.js";
+import { defineBuild } from "../../build/operation";
 import {
 	WireframeDocument,
 	WireframeDiagram,
@@ -10,8 +10,8 @@ import {
 	normalizeWireframe,
 	validateWireframeDiagram,
 	counts,
-} from "./document.js";
-import { renderWireframeDiagram } from "./render.js";
+} from "./document";
+import { renderWireframeDiagram } from "./render";
 
 export const wireframeBuild = defineBuild({
 	publishedIssues: PublishedBuildIssue,

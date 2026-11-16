@@ -1,22 +1,16 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result, Schema } from "effect";
 import * as drawing from "@sketchi/drawing";
-import { FlowchartDiagram } from "../../families/flowchart/document.js";
-import { classFixture } from "../../families/class/document.js";
-import { classStressFixtures } from "../../families/class/fixtures.js";
-import { crossingFixtures } from "../../families/flowchart/fixtures/crossing-fixtures.js";
-import { crossingStateMachines } from "../../families/state-machine/crossing-fixtures.js";
-import { erFixture, orgChartEr } from "../../families/er/document.js";
-import { erStressFixtures } from "../../families/er/fixtures.js";
-import { flowchartFixture } from "../../families/flowchart/fixtures/index.js";
-import {
-	laneFixtures,
-	laneStressFixtures,
-} from "../../families/flowchart/fixtures/lane-fixtures.js";
-import {
-	zoneFixtures,
-	zoneStressFixtures,
-} from "../../families/flowchart/fixtures/zone-fixtures.js";
+import { FlowchartDiagram } from "../../families/flowchart/document";
+import { classFixture } from "../../families/class/document";
+import { classStressFixtures } from "../../families/class/fixtures";
+import { crossingFixtures } from "../../families/flowchart/fixtures/crossing-fixtures";
+import { crossingStateMachines } from "../../families/state-machine/crossing-fixtures";
+import { erFixture, orgChartEr } from "../../families/er/document";
+import { erStressFixtures } from "../../families/er/fixtures";
+import { flowchartFixture } from "../../families/flowchart/fixtures/index";
+import { laneFixtures, laneStressFixtures } from "../../families/flowchart/fixtures/lane-fixtures";
+import { zoneFixtures, zoneStressFixtures } from "../../families/flowchart/fixtures/zone-fixtures";
 
 import { describe, expect, it, vi } from "vitest";
 import { arrowCrossings } from "../readability";

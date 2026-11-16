@@ -6,7 +6,7 @@ import { Result } from "effect";
 import { chartScenarios } from "@sketchi/diagram-scenarios";
 import { parseChartDiagram } from "@sketchi/diagrams/families/chart/document";
 
-import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index.js";
+import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index";
 
 const chartFixture = familyForType("chart").fixture;
 

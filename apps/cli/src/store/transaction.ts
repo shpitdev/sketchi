@@ -14,10 +14,10 @@ import {
 	type StoredDiagram,
 	recordProvenance,
 	revisionDirectoryName,
-} from "../contracts.js";
-import { type DiagramDocument, encodeJson } from "../document.js";
-import type { CliFilesystemError, CliStorageError } from "../errors.js";
-import { isValidPng } from "../render/png-validate.js";
+} from "../contracts";
+import { type DiagramDocument, encodeJson } from "../document";
+import type { CliFilesystemError, CliStorageError } from "../errors";
+import { isValidPng } from "../render/png-validate";
 import {
 	BACKUP_PREFIX,
 	STAGE_PREFIX,
@@ -26,10 +26,10 @@ import {
 	recordPath,
 	storageError,
 	unsafeEntry,
-} from "./entries.js";
-import type { makeLocks } from "./locks.js";
-import type { makeRecordReader } from "./record.js";
-import type { StoreContext } from "./service.js";
+} from "./entries";
+import type { makeLocks } from "./locks";
+import type { makeRecordReader } from "./record";
+import type { StoreContext } from "./service";
 
 /** Staged, atomic record replacement that archives the current state as a revision. */
 export function makeTransactions(

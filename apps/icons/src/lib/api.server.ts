@@ -4,7 +4,7 @@ import { getIconBySlug, iconManifest } from "@sketchi/icon-catalog/catalog";
 import { Array, Context, Effect, Schema, String } from "effect";
 import type { IconDetail, IconSearchResult } from "@sketchi/icon-catalog/http-api";
 
-import type { IconSourceLoader } from "./catalog.server.js";
+import type { IconSourceLoader } from "./catalog.server";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;

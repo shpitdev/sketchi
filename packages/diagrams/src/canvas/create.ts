@@ -1,17 +1,17 @@
-import { canvasValidationIssues } from "../build/scene.js";
+import { canvasValidationIssues } from "../build/scene";
 
 import { compileCanvasSpec, getCanvasValidationIssues } from "@sketchi/drawing";
 import { Effect, Result, Schema } from "effect";
 
-import { boundary, type CodeModeWorkflowEffect } from "../build/boundary.js";
+import { boundary, type CodeModeWorkflowEffect } from "../build/boundary";
 import {
 	exportAndStoreScene,
 	requestedFormats,
 	requestedInlineFormats,
 	scenePartial,
 	withoutIconAssets,
-} from "../build/export.js";
-import { catalogForRequest, embedSceneIcons } from "../build/icons.js";
+} from "../build/export";
+import { catalogForRequest, embedSceneIcons } from "../build/icons";
 import {
 	codeModeInputIssues,
 	failureResult,
@@ -19,19 +19,19 @@ import {
 	issue,
 	responseRequestId,
 	workflowFailure,
-} from "../build/issues.js";
-import { CodeModeRuntimeEnvironment } from "../build/runtime.js";
+} from "../build/issues";
+import { CodeModeRuntimeEnvironment } from "../build/runtime";
 import {
 	CreateCanvasRejected,
 	CreateCanvasRequest,
 	type CreateCanvasResult,
-} from "./create-contract.js";
+} from "./create-contract";
 import {
 	canvasExportIssues,
 	normalizeCanvasInput,
 	serializedCanvasLimitIssue,
 	undrawableCanvasIconIssues,
-} from "./normalize.js";
+} from "./normalize";
 
 const CreateCanvasFailure = workflowFailure(
 	"CreateCanvasFailure",

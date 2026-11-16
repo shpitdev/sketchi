@@ -3,7 +3,7 @@ import {
 	type ScenarioEvaluation,
 	evaluateScenarioDiagram,
 	type ScenarioCheck,
-} from "./lib/evaluate.js";
+} from "./lib/evaluate";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -15,15 +15,15 @@ import {
 	extractJsonObject,
 } from "@sketchi/diagrams/generate/candidates";
 
-import { parseCliOptions, resolveGeneratorCommand, usage } from "./lib/cli-options.js";
-import { candidateFromMcpResult } from "./lib/mcp-results.js";
-import { buildScenarioPrompt, toDiagramGenerationPrompt } from "./lib/prompt.js";
-import { editabilityMetrics } from "./lib/scene-editability.js";
+import { parseCliOptions, resolveGeneratorCommand, usage } from "./lib/cli-options";
+import { candidateFromMcpResult } from "./lib/mcp-results";
+import { buildScenarioPrompt, toDiagramGenerationPrompt } from "./lib/prompt";
+import { editabilityMetrics } from "./lib/scene-editability";
 import {
 	type DiagramScenario,
 	diagramScenarios,
 	getDiagramScenario,
-} from "./lib/diagram-scenarios.js";
+} from "./lib/diagram-scenarios";
 import {
 	requireSuccessfulToolProcess,
 	runToolProcess,
@@ -33,7 +33,7 @@ import {
 	ToolProcessSpawner,
 	ToolProcessSpawnerLive,
 	ToolProcessSpawnError,
-} from "./internal/tool-process.js";
+} from "./internal/tool-process";
 
 class ScenarioToolError extends Schema.TaggedError<
 	ScenarioToolError,

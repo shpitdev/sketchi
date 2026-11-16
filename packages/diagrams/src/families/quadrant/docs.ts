@@ -1,4 +1,4 @@
-import { QUADRANT_RULES } from "./rules.js";
+import { QUADRANT_RULES } from "./rules";
 const PROMPT = "the prompt";
 const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] }`;
 

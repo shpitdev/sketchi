@@ -1,8 +1,8 @@
-import { BenefitStrip } from "../benefit-strip/index.js";
-import { CliBand } from "../cli-band/index.js";
-import { HomeHero } from "../home-hero/index.js";
-import { IconWall } from "../icon-wall/index.js";
-import { SiteShell } from "../site-shell/site-shell.js";
+import { BenefitStrip } from "../benefit-strip/index";
+import { CliBand } from "../cli-band/index";
+import { HomeHero } from "../home-hero/index";
+import { IconWall } from "../icon-wall/index";
+import { SiteShell } from "../site-shell/site-shell";
 import { DEFAULT_WEB_SURFACE_URLS, type WebSurfaceUrls } from "../../lib/surface-urls";
 
 export interface MarketingHomeProps {

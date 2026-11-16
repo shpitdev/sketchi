@@ -4,8 +4,8 @@ import {
 	type DiagramGenerationPrompt,
 } from "@sketchi/diagrams/generate/messages";
 
-import type { DiagramScenario } from "./diagram-scenarios.js";
-import type { GenerationReliabilityScenario } from "./generation-reliability.js";
+import type { DiagramScenario } from "./diagram-scenarios";
+import type { GenerationReliabilityScenario } from "./generation-reliability";
 
 type GenerationPromptScenario = DiagramScenario | GenerationReliabilityScenario;
 

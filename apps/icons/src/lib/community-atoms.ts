@@ -3,13 +3,8 @@ import { Array, Effect, Option, Stream, String } from "effect";
 import { HttpApiClient } from "effect/http-api";
 import { AsyncResult, Atom, AtomHttpApi } from "effect/reactivity";
 
-import { bareSlug } from "./community-client.js";
-import {
-	browserOrigin,
-	IconQueryError,
-	queryHttpLayer,
-	refreshOnReconnect,
-} from "./query-atoms.js";
+import { bareSlug } from "./community-client";
+import { browserOrigin, IconQueryError, queryHttpLayer, refreshOnReconnect } from "./query-atoms";
 
 export class CommunityApi extends AtomHttpApi.Service<CommunityApi>()("IconsCommunityApi", {
 	api: CommunityHttpApi,

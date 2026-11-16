@@ -6,9 +6,9 @@ import { HttpClient } from "effect/http";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { useCallback, useContext, useState } from "react";
 
-import { queryRuntime, IconQueryError } from "../../lib/query-atoms.js";
-import { permanentSvgUrl } from "../../lib/permanent-svg-url.js";
-import { useExportFeedback } from "../browser/feedback.js";
+import { queryRuntime, IconQueryError } from "../../lib/query-atoms";
+import { permanentSvgUrl } from "../../lib/permanent-svg-url";
+import { useExportFeedback } from "../browser/feedback";
 import {
 	copyText,
 	createIconZip,
@@ -16,11 +16,11 @@ import {
 	downloadSvg,
 	svgDataUri,
 	svgToJsxComponent,
-} from "../export/actions.js";
-import { type IconDetailAction } from "./icon-detail/icon-detail.js";
+} from "../export/actions";
+import { type IconDetailAction } from "./icon-detail/icon-detail";
 
 export type SelectionAction = "copy" | "zip";
-const loadExcalidrawExport = () => import("../export/excalidraw-export.js");
+const loadExcalidrawExport = () => import("../export/excalidraw-export");
 // ClipboardItem requires a native Promise supplied during the user's click.
 const drawingClipboard = (icon: SketchiIcon, drawing: IconRecipe, named: boolean) =>
 	loadExcalidrawExport().then(({ excalidrawClipboard }) =>

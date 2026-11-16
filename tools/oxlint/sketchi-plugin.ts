@@ -290,9 +290,46 @@ const noRestrictedImportTypes = defineRule({
 	},
 });
 
+const relativeCodeModule = /^\.{1,2}\/.*\.(?:js|jsx|ts|tsx|mts|cts)$/u;
+
+/**
+ * `import/extensions` checks import and export declarations only, so an
+ * `import("./x.js")` expression or type would bring the ending back. Relative
+ * code modules are imported without one; other endings (`.mjs`, `.json`) stay.
+ */
+const extensionlessImportExpressions = defineRule({
+	meta: {
+		type: "problem",
+		docs: {
+			description:
+				"Import relative code modules without their extension in import() and import types.",
+		},
+		messages: {
+			extension: "Import '{{specifier}}' without its file extension.",
+		},
+		schema: [],
+	},
+	create(context: Context) {
+		const check = (source: Node) => {
+			if (source.type !== "Literal" || typeof source.value !== "string") return;
+			if (!relativeCodeModule.test(source.value)) return;
+			context.report({ node: source, messageId: "extension", data: { specifier: source.value } });
+		};
+		return {
+			ImportExpression(node) {
+				check(node.source);
+			},
+			TSImportType(node) {
+				check(node.source);
+			},
+		};
+	},
+});
+
 export default definePlugin({
 	meta: { name: "sketchi" },
 	rules: {
+		"extensionless-import-expressions": extensionlessImportExpressions,
 		"no-react-effects": noReactEffects,
 		"no-restricted-import-types": noRestrictedImportTypes,
 	},

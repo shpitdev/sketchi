@@ -32,8 +32,8 @@ import {
 } from "@sketchi/icon-catalog";
 import { Context, Effect, Schema } from "effect";
 
-import { cleanToolString } from "../clean-text.js";
-import { type PublishedBuildIssue } from "./result.js";
+import { cleanToolString } from "../clean-text";
+import { type PublishedBuildIssue } from "./result";
 
 /** One catalog mark that diagrams may draw inside a node. */
 export interface CodeModeCatalogIcon {

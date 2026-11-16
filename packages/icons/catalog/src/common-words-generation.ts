@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
-import type { SearchableIcon } from "./search.js";
-import { termTokens } from "./terms.js";
+import type { SearchableIcon } from "./search";
+import { termTokens } from "./terms";
 
 /**
  * SCOWL size 50 is the common-English cut: it holds "stream", "segment",

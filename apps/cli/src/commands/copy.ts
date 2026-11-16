@@ -1,14 +1,14 @@
 import { Effect } from "effect";
 
-import { LATEST_DIAGRAM, resolveDiagramId } from "../diagram-catalog.js";
-import { CliExportError } from "../errors.js";
-import { DiagramExporter } from "../render/exporter.js";
-import { DiagramStore } from "../store/service.js";
-import { Clipboard } from "../terminal/clipboard.js";
-import { Argument, Command } from "../terminal/effect-cli.js";
-import { runReported } from "../terminal/output.js";
-import { COPIED_ROW, headline, row } from "./present.js";
-import { rootCommand } from "./root.js";
+import { LATEST_DIAGRAM, resolveDiagramId } from "../diagram-catalog";
+import { CliExportError } from "../errors";
+import { DiagramExporter } from "../render/exporter";
+import { DiagramStore } from "../store/service";
+import { Clipboard } from "../terminal/clipboard";
+import { Argument, Command } from "../terminal/effect-cli";
+import { runReported } from "../terminal/output";
+import { COPIED_ROW, headline, row } from "./present";
+import { rootCommand } from "./root";
 
 export const copyCommand = Command.make(
 	"copy",

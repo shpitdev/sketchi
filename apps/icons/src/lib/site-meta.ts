@@ -1,5 +1,5 @@
-import { ICONS_SITE_URL } from "./home-url.js";
-import { ALL_ICONS_PACK_ID, findPack, packCardPath, SITE_CARD_PATH } from "./packs.js";
+import { ICONS_SITE_URL } from "./home-url";
+import { ALL_ICONS_PACK_ID, findPack, packCardPath, SITE_CARD_PATH } from "./packs";
 
 export const SITE_TITLE = "Sketchi Icons: hand-drawn icons for Excalidraw";
 

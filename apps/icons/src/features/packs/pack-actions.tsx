@@ -1,9 +1,9 @@
 import { String as Str } from "effect";
 import { Download, Upload } from "lucide-react";
 
-import type { PackExcalidrawState, PackPullRequest } from "./publication.js";
-import { packLibraryFileName, packLibraryPath, type PackSummary } from "../../lib/packs.js";
-import { ExcalidrawGlyph, GitHubGlyph } from "./brand-glyphs.js";
+import type { PackExcalidrawState, PackPullRequest } from "./publication";
+import { packLibraryFileName, packLibraryPath, type PackSummary } from "../../lib/packs";
+import { ExcalidrawGlyph, GitHubGlyph } from "./brand-glyphs";
 
 const STATE_LABELS = { open: "Open", merged: "Merged", closed: "Closed" } as const;
 

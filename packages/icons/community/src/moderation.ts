@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Schema } from "effect";
 
-import { CommunityIconModerationUnavailableError } from "./contracts.js";
+import { CommunityIconModerationUnavailableError } from "./contracts";
 
 /** Jev on Workers AI: billed and logged through the account, no key needed. */
 export const COMMUNITY_MODERATION_MODEL = "typesafe/jev";

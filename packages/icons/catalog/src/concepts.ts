@@ -1,4 +1,4 @@
-import type { ConceptIcon } from "./concept.js";
+import type { ConceptIcon } from "./concept";
 
 /**
  * The concept icons diagrams may draw, each transcribed from a Lucide (ISC)

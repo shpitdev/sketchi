@@ -1,6 +1,6 @@
 import { Array, Result } from "effect";
-import { defineBuild } from "../../build/operation.js";
-import { PublishedBuildIssue } from "../../build/result.js";
+import { defineBuild } from "../../build/operation";
+import { PublishedBuildIssue } from "../../build/result";
 import {
 	ErDocument,
 	ErDiagram,
@@ -10,8 +10,8 @@ import {
 	validateErDiagram,
 	resolveErShorthand,
 	counts,
-} from "./document.js";
-import { renderErDiagram } from "./render.js";
+} from "./document";
+import { renderErDiagram } from "./render";
 
 /** ER authoring policy; shared build owns decoding, delivery and the response envelope. */
 export const erBuild = defineBuild({

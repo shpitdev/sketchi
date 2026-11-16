@@ -1,8 +1,4 @@
-import {
-	type CodeModeIssue,
-	type ArtifactBuildCapabilities,
-	type BuildDelivery,
-} from "./result.js";
+import { type CodeModeIssue, type ArtifactBuildCapabilities, type BuildDelivery } from "./result";
 
 import { CANVAS_LIMITS, type CanvasSpec } from "@sketchi/drawing";
 import {
@@ -25,14 +21,14 @@ import {
 	CodeModeArtifactStorage,
 	jsonSizeBytes,
 	type StoredArtifactFormat,
-} from "./artifacts.js";
-import { FailureContextSchema, issue, storageFailureIssue } from "./issues.js";
+} from "./artifacts";
+import { FailureContextSchema, issue, storageFailureIssue } from "./issues";
 import {
 	CodeModeArtifactRenderFailed,
 	CodeModeRuntimeEnvironment,
 	type CodeModeArtifactRenderer,
 	type CodeModeRuntimeOptions,
-} from "./runtime.js";
+} from "./runtime";
 
 const DEFAULT_BUILD_FORMATS: ArtifactFormat[] = ["excalidraw", "scene"];
 const DEFAULT_INLINE_FORMATS: InlineArtifactFormat[] = ["scene"];

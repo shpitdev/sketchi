@@ -13,7 +13,7 @@ import {
 	Tracer,
 } from "effect";
 
-import { type JsonValue, toJsonValue } from "./json.js";
+import { type JsonValue, toJsonValue } from "./json";
 import {
 	rowBatches,
 	spanRows,
@@ -22,7 +22,7 @@ import {
 	type TelemetryMetricEvent,
 	type TelemetryOutcome,
 	type TelemetrySpan,
-} from "./rows.js";
+} from "./rows";
 
 /** Attribute names for the content a span carries. */
 export const SpanContent = {

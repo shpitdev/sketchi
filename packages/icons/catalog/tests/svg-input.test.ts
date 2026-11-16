@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { sanitizeSvg } from "../src/svg-input.js";
+import { sanitizeSvg } from "../src/svg-input";
 
 describe("sanitizeSvg", () => {
 	it("keeps the drawing and drops scripts, handlers, metadata and outside references", () => {

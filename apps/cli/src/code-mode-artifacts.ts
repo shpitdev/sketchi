@@ -5,8 +5,8 @@ import { CodeModeArtifactStorage, CodeModeRuntimeEnvironment } from "@sketchi/di
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Schema, Result } from "effect";
 
-import { type PatchedDiagramArtifacts } from "./contracts.js";
-import { CliBuildError, CliStorageError, CliValidationError } from "./errors.js";
+import { type PatchedDiagramArtifacts } from "./contracts";
+import { CliBuildError, CliStorageError, CliValidationError } from "./errors";
 
 const INLINE_FORMATS: Array<"scene" | "excalidraw"> = ["scene", "excalidraw"];
 

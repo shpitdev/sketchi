@@ -10,7 +10,7 @@ import {
 } from "@sketchi/diagrams/family";
 import { Effect, Schema, SchemaIssue } from "effect";
 
-import { CliInputError, CliValidationError } from "./errors.js";
+import { CliInputError, CliValidationError } from "./errors";
 
 function pathForIssue(path: ReadonlyArray<PropertyKey>): string {
 	if (path.length === 0) return "document";

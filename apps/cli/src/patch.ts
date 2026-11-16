@@ -5,9 +5,9 @@ import { applyDiagramPatch } from "@sketchi/diagrams/canvas/patch";
 import { ApplyDiagramPatchRequest } from "@sketchi/diagrams/canvas/patch-contract";
 import { Context, Effect, Layer, Schema, Result } from "effect";
 
-import { codeModeFailure, decodeInlineArtifacts, withCodeMode } from "./code-mode-artifacts.js";
-import type { PatchedDiagramArtifacts } from "./contracts.js";
-import { CliBuildError, CliInputError, CliStorageError, CliValidationError } from "./errors.js";
+import { codeModeFailure, decodeInlineArtifacts, withCodeMode } from "./code-mode-artifacts";
+import type { PatchedDiagramArtifacts } from "./contracts";
+import { CliBuildError, CliInputError, CliStorageError, CliValidationError } from "./errors";
 
 export interface CliPatchInput {
 	readonly operations: ApplyDiagramPatchRequest["operations"];

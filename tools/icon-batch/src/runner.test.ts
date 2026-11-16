@@ -7,14 +7,14 @@ import { type SketchiIcon } from "@sketchi/icon-catalog";
 import { type IconAuthorModel } from "@sketchi/icon-draw";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { attemptCeilingUsd, type BatchAuthor, type MarkAttempt, priceLogs } from "./draw-mark.js";
-import { initializeResvg, svgPng } from "./excalidraw-export.js";
-import { verdictLine, writeSheets } from "./sheets.js";
-import { promote } from "./promote.js";
-import { runBatch } from "./runner.js";
-import { marksToDraw } from "./selection.js";
-import { RunStore } from "./store.js";
-import { ledgerCsv, summarize, summaryMarkdown } from "./summary.js";
+import { attemptCeilingUsd, type BatchAuthor, type MarkAttempt, priceLogs } from "./draw-mark";
+import { initializeResvg, svgPng } from "./excalidraw-export";
+import { verdictLine, writeSheets } from "./sheets";
+import { promote } from "./promote";
+import { runBatch } from "./runner";
+import { marksToDraw } from "./selection";
+import { RunStore } from "./store";
+import { ledgerCsv, summarize, summaryMarkdown } from "./summary";
 
 const SONNET: IconAuthorModel = "anthropic/claude-sonnet-5-5";
 const OPUS: IconAuthorModel = "anthropic/claude-opus-5-5";

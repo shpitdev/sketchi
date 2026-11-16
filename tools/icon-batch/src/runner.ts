@@ -1,14 +1,14 @@
 import type { IconAuthorModel } from "@sketchi/icon-draw";
 
-import { attemptCeilingUsd, type BatchAuthor, type MarkAttempt } from "./draw-mark.js";
-import type { CatalogMark } from "./selection.js";
+import { attemptCeilingUsd, type BatchAuthor, type MarkAttempt } from "./draw-mark";
+import type { CatalogMark } from "./selection";
 import {
 	attemptCost,
 	type MarkRecord,
 	recordCost,
 	type RunStore,
 	type StoredAttempt,
-} from "./store.js";
+} from "./store";
 
 export interface RunOptions {
 	readonly marks: readonly CatalogMark[];

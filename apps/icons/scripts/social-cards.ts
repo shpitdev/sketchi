@@ -18,10 +18,10 @@ import {
 	wordmarkWidth,
 } from "@sketchi/social-card";
 
-import { recipeSvg } from "../src/lib/pack-preview.js";
-import type { PackIcon } from "../src/lib/packs.js";
-import { RECIPE_PREVIEW_SIZE } from "../src/lib/recipe-drawing.js";
-import { packCardAlt, SITE_CARD_ALT } from "../src/lib/site-meta.js";
+import { recipeSvg } from "../src/lib/pack-preview";
+import type { PackIcon } from "../src/lib/packs";
+import { RECIPE_PREVIEW_SIZE } from "../src/lib/recipe-drawing";
+import { packCardAlt, SITE_CARD_ALT } from "../src/lib/site-meta";
 
 const fontDirectory = resolve(import.meta.dirname, "../public/fonts/Excalifont");
 let excalifont: Promise<Uint8Array[]> | undefined;

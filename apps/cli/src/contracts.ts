@@ -5,7 +5,7 @@ import { type CodeModeIssue } from "@sketchi/diagrams/build/contract";
 import { type ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Schema } from "effect";
 
-import { type DiagramDocument } from "./document.js";
+import { type DiagramDocument } from "./document";
 
 export const RECORD_SCHEMA_VERSION = 1;
 export const MANIFEST_FILE = "manifest.json";

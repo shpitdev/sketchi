@@ -7,7 +7,7 @@
 import { recordMetric, SpanContent } from "@sketchi/observability";
 import { Context, Effect, Layer, Metric, Schema } from "effect";
 import { type AiError, Decision, DecisionModel } from "effect/ai";
-import { DIAGRAM_TYPES, type DiagramTypeValue } from "../family.js";
+import { DIAGRAM_TYPES, type DiagramTypeValue } from "../family";
 
 import {
 	anyKindFitsQuestion,
@@ -20,8 +20,8 @@ import {
 	separatingQuestion,
 	whichKindQuestion,
 	whichOfShortlistQuestion,
-} from "./family-questions.js";
-import { workersAiJevLayer, type WorkersAiRunner } from "./jev-workers-ai.js";
+} from "./family-questions";
+import { workersAiJevLayer, type WorkersAiRunner } from "./jev-workers-ai";
 
 const { no, sure, yes } = FAMILY_THRESHOLDS;
 

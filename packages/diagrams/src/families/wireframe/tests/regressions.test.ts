@@ -3,10 +3,10 @@ import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect } from "effect";
 import { expect, it } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
-import { buildWireframe } from "../../../build/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
-import { buildResponse } from "../../../build/operation.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { buildWireframe } from "../../../build/builds";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { buildResponse } from "../../../build/operation";
 
 const build = (spec: unknown) =>
 	Effect.runPromise(

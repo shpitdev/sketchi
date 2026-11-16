@@ -5,7 +5,7 @@ import {
 	type ErDiagram,
 	parseErDiagram,
 	parseErFieldShorthand,
-} from "./document.js";
+} from "./document";
 
 type Table = readonly [id: string, fields: readonly string[]];
 type Link = readonly [

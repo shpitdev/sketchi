@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import { DIAGRAM_TYPES, type DiagramTypeValue } from "../family.js";
+import { DIAGRAM_TYPES, type DiagramTypeValue } from "../family";
 
-import type { DiagramGenerationRequest } from "./candidates.js";
-import type { DiagramFamilyNarrowing, FamilyNarrowing } from "./family-narrowing.js";
+import type { DiagramGenerationRequest } from "./candidates";
+import type { DiagramFamilyNarrowing, FamilyNarrowing } from "./family-narrowing";
 
 /**
  * Words that name a family outright. Bare "chart" and "diagram" name none: an

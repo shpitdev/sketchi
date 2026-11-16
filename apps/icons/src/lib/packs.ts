@@ -1,11 +1,7 @@
 import { type IconRecipe } from "@sketchi/drawing";
 import { type SketchiIcon } from "@sketchi/icon-catalog";
 
-import {
-	DRAWINGS_LIBRARY_PATH,
-	DRAWINGS_NAMED_LIBRARY_PATH,
-	type IconDrawings,
-} from "./drawings.js";
+import { DRAWINGS_LIBRARY_PATH, DRAWINGS_NAMED_LIBRARY_PATH, type IconDrawings } from "./drawings";
 
 /**
  * A pack is a ready-made Excalidraw library: the drawn marks of some catalog
@@ -309,6 +305,10 @@ export function packSummary(
 		count: members.length,
 		preview: packPreview(pack, members),
 	};
+}
+
+export function iconCount(count: number): string {
+	return `${count.toLocaleString("en-US")} ${count === 1 ? "icon" : "icons"}`;
 }
 
 export function packPagePath(id: string): string {

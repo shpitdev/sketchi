@@ -1,11 +1,5 @@
-import { searchIcons, type SearchableIcon } from "./search.js";
-import {
-	isDistinctiveWord,
-	isEnglishWord,
-	isGenericTechWord,
-	termTokens,
-	wordsOf,
-} from "./terms.js";
+import { searchIcons, type SearchableIcon } from "./search";
+import { isDistinctiveWord, isEnglishWord, isGenericTechWord, termTokens, wordsOf } from "./terms";
 
 /** Most catalog terms a prompt can offer one diagram. */
 export const MAX_TEXT_ICON_MATCHES = 24;

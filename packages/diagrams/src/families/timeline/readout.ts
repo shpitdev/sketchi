@@ -1,7 +1,7 @@
 import { type CanvasSpec } from "@sketchi/drawing";
 
-import { TIMELINE_MARKER_ROLE } from "./render.js";
-import { TIMELINE_DURATION_UNITS } from "./captions.js";
+import { TIMELINE_MARKER_ROLE } from "./render";
+import { TIMELINE_DURATION_UNITS } from "./captions";
 
 export interface TimelineMarkerReadout {
 	/** Where the event starts: a point marker's center or a bar's left edge. */

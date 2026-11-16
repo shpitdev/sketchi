@@ -9,8 +9,8 @@ import {
 import { formatValue, unitParts } from "@sketchi/diagrams/families/chart/scale";
 import { readChartMarks } from "@sketchi/diagrams/families/chart/readout";
 
-import { type DiagramScenarioDifficulty } from "./scenarios.js";
-import { type ScenarioCheck } from "./evaluate.js";
+import { type DiagramScenarioDifficulty } from "./scenarios";
+import { type ScenarioCheck } from "./evaluate";
 
 export interface ChartScenarioSeries {
 	/** Accepted series names; empty for a lone series the prompt does not name. */

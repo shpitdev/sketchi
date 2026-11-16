@@ -15,7 +15,7 @@ import {
 	WORDMARK_WIDTH,
 } from "@sketchi/ui/components/sketchi-wordmark-ink";
 
-import { TILE_PATHS } from "./tile.js";
+import { TILE_PATHS } from "./tile";
 
 export const CARD_WIDTH = 1200;
 export const CARD_HEIGHT = 630;

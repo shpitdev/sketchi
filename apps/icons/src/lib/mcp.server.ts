@@ -10,11 +10,11 @@ import { Context, Effect, Layer, Predicate, Scheduler } from "effect";
 import { SecureRandom } from "effect/crypto";
 import { McpProtocol, McpSchema, McpServer } from "effect/ai";
 import { HttpMiddleware, HttpRouter, HttpServer, HttpServerRequest } from "effect/http";
-import { IconSource } from "./api.server.js";
-import { createIconSourceLoader } from "./catalog.server.js";
-import { corsPreflight, withCors } from "./cors-policy.js";
-import type { IconsHttpEnv } from "./http.server.js";
-import { IconToolkit, IconToolHandlers } from "./toolkit.server.js";
+import { IconSource } from "./api.server";
+import { createIconSourceLoader } from "./catalog.server";
+import { corsPreflight, withCors } from "./cors-policy";
+import type { IconsHttpEnv } from "./http.server";
+import { IconToolkit, IconToolHandlers } from "./toolkit.server";
 
 /** Request-owned export target, never captured in registrations or session state. */
 class IconMcpExport extends Context.Service<IconMcpExport, TelemetryExportTarget>()(

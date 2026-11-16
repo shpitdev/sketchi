@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { type IconRecipe } from "@sketchi/drawing";
 import { LARGE_ICON_SIZE, NODE_ICON_SIZE, previewScene } from "@sketchi/icon-draw";
 
-import { exportScenePng, initializeResvg, svgPng } from "./excalidraw-export.js";
-import { prepareSvg } from "./imaging.js";
-import { SHEET_COLUMNS, SHEET_ROWS } from "./sheets.js";
+import { exportScenePng, initializeResvg, svgPng } from "./excalidraw-export";
+import { prepareSvg } from "./imaging";
+import { SHEET_COLUMNS, SHEET_ROWS } from "./sheets";
 
 const CELL_WIDTH = 330;
 const CELL_HEIGHT = 178;

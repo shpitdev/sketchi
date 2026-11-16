@@ -6,7 +6,7 @@ import { Result } from "effect";
 import { quadrantScenarios } from "@sketchi/diagram-scenarios";
 import { parseQuadrantDiagram } from "@sketchi/diagrams/families/quadrant/document";
 
-import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index.js";
+import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index";
 
 const quadrantFixture = familyForType("quadrant").fixture;
 

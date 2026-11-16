@@ -14,8 +14,8 @@ import {
 	wrapTextToWidth,
 	wrappedLabelWidth,
 } from "@sketchi/drawing";
-import { type GraphNode, type GraphEdge } from "./input.js";
-import { type LayoutEdge, type LabelMetrics, type DescriptionMetrics } from "./layout-types.js";
+import { type GraphNode, type GraphEdge } from "./input";
+import { type LayoutEdge, type LabelMetrics, type DescriptionMetrics } from "./layout-types";
 
 export const MIN_NODE_WIDTH = 184;
 

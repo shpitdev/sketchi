@@ -20,8 +20,8 @@ import {
 import { TelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Layer, Result } from "effect";
 
-import { type GatewayAccess, httpGateway, readLogCosts, SKETCHI_GATEWAY_ID } from "./gateway.js";
-import { NodeIconImaging } from "./imaging.js";
+import { type GatewayAccess, httpGateway, readLogCosts, SKETCHI_GATEWAY_ID } from "./gateway";
+import { NodeIconImaging } from "./imaging";
 
 /**
  * An author model, or `"source"`: the engine's own choice from the mark once it

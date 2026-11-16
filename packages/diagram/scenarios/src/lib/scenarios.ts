@@ -9,7 +9,7 @@ import {
 } from "@sketchi/diagrams/families/flowchart/document";
 import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
-import { flowchartLabelWords } from "./flowchart-labels.js";
+import { flowchartLabelWords } from "./flowchart-labels";
 
 export interface FlowchartScenarioAssertions {
 	minEdgeCount: number;

@@ -1,8 +1,8 @@
 /** Owns internal candidate readouts: export defects, crossings, reader findings and touches. */
-import { EXPORT_PADDING, MIN_NODE_HEIGHT, PADDING } from "./measure.js";
-import { type GroupLayout, type LaneLayout, type DiagramLayout } from "./layout-types.js";
-import { ownEndRunCount, straightRuns, drawnSize, routeLength } from "./route-geometry.js";
-import { groupRouteDefects, laneRouteDefects, groupBlocks, laneBlocks } from "./containers.js";
+import { EXPORT_PADDING, MIN_NODE_HEIGHT, PADDING } from "./measure";
+import { type GroupLayout, type LaneLayout, type DiagramLayout } from "./layout-types";
+import { ownEndRunCount, straightRuns, drawnSize, routeLength } from "./route-geometry";
+import { groupRouteDefects, laneRouteDefects, groupBlocks, laneBlocks } from "./containers";
 import {
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
@@ -18,7 +18,7 @@ import {
 	candidateRouteQuality,
 	touchingLines,
 } from "@sketchi/drawing";
-import { center } from "./geometry.js";
+import { center } from "./geometry";
 
 /**
  * ...or about 2.5 times: a column always, since a tall export shrinks to fit

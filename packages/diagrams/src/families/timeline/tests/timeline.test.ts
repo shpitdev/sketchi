@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { Effect, Result } from "effect";
 import { CANVAS_LIMITS } from "@sketchi/drawing";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { buildResponse, type BuildRejection } from "../../../build/operation.js";
-import { buildTimeline } from "../../../build/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
-import { applyDiagramPatch } from "../../../canvas/patch.js";
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
+import { buildResponse, type BuildRejection } from "../../../build/operation";
+import { buildTimeline } from "../../../build/builds";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { applyDiagramPatch } from "../../../canvas/patch";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
 import {
 	orderedTimelineEvents,
 	parseTimelineDiagram,
@@ -14,7 +14,7 @@ import {
 	TIMELINE_MAX_LANES,
 	TimelineValidationIssueCodeSchema,
 	type TimelineValidationIssue,
-} from "../document.js";
+} from "../document";
 
 const storage = makeMemoryArtifactStorage();
 function run<A, E extends BuildRejection<unknown>>(

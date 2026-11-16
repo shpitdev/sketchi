@@ -62,6 +62,25 @@
 			}
 		],
 		"import/no-cycle": "error",
+		// Relative code modules are imported without an extension; bundlers and
+		// Bundler resolution find them. Assets and Node scripts keep their literal
+		// ending (`.mjs`, `.json`, `.css`, `?raw`), and package paths are the
+		// package's exports to name.
+		"import/extensions": [
+			"error",
+			"always",
+			{
+				"ignorePackages": true,
+				"checkTypeImports": true,
+				"js": "never",
+				"jsx": "never",
+				"ts": "never",
+				"tsx": "never",
+				"mts": "never",
+				"cts": "never"
+			}
+		],
+		"sketchi/extensionless-import-expressions": "error",
 		"import/no-duplicates": "error",
 		"react-hooks/rules-of-hooks": "error",
 		// `import("…")` types bypass no-restricted-imports; mirror its policy.
@@ -147,6 +166,15 @@
 		"jsx-a11y/prefer-tag-over-role": "off"
 	},
 	"overrides": [
+		{
+			// Plain JavaScript here is run by Node itself, which needs every
+			// relative import's full file name.
+			"files": ["**/*.js", "**/*.mjs", "**/*.cjs"],
+			"rules": {
+				"import/extensions": ["error", "always", { "ignorePackages": true }],
+				"sketchi/extensionless-import-expressions": "off"
+			}
+		},
 		{
 			// Vendored AI Elements registry components stay close to upstream so
 			// registry updates apply cleanly. Their React idioms are upstream's.

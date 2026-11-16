@@ -1,1 +1,1 @@
-export { CopyButton, type CopyButtonProps } from "./copy-button.js";
+export { CopyButton, type CopyButtonProps } from "./copy-button";

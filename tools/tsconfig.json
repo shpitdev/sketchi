@@ -1,7 +1,6 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "allowImportingTsExtensions": true,
     "paths": {
       "@sketchi/drawing/excalidraw": ["../packages/drawing/src/excalidraw/index.ts"],
       "@sketchi/diagram-scenarios": ["../packages/diagram/scenarios/src/index.ts"],

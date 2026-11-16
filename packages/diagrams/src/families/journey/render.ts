@@ -4,7 +4,7 @@ import {
 	JOURNEY_NEUTRAL_SCORE,
 	type JourneyDiagram,
 	journeySentiment,
-} from "./document.js";
+} from "./document";
 import {
 	CANVAS_SPEC_VERSION,
 	estimateTextWidth,
@@ -21,7 +21,7 @@ import {
 	type CanvasSpec,
 } from "@sketchi/drawing";
 
-import { breakRulesUnderText, type RuleBox } from "../../graph/scene-rules.js";
+import { breakRulesUnderText, type RuleBox } from "../../graph/scene-rules";
 
 export const JOURNEY_MARK_ROLE = "journey-mark";
 

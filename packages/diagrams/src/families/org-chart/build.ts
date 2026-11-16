@@ -1,6 +1,6 @@
-import { PublishedBuildIssue } from "../../build/result.js";
+import { PublishedBuildIssue } from "../../build/result";
 import { Array } from "effect";
-import { defineBuild } from "../../build/operation.js";
+import { defineBuild } from "../../build/operation";
 import {
 	OrgChartDocument,
 	OrgChartDiagram,
@@ -10,8 +10,8 @@ import {
 	prepareOrgChart,
 	validateOrgChartDiagram,
 	counts,
-} from "./document.js";
-import { renderOrgChartDiagram } from "./render.js";
+} from "./document";
+import { renderOrgChartDiagram } from "./render";
 
 export const orgChartBuild = defineBuild({
 	publishedIssues: PublishedBuildIssue,

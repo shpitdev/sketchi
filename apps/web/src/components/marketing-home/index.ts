@@ -1,1 +1,1 @@
-export * from "./marketing-home.js";
+export * from "./marketing-home";

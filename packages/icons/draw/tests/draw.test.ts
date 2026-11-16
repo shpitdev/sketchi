@@ -21,7 +21,7 @@ import {
 	IconImaging,
 	type ModelCall,
 	prepareIconInput,
-} from "../src/index.js";
+} from "../src/index";
 
 const SLACK_SVG = `<svg viewBox="0 0 24 24"><rect x="1" y="7" width="10" height="4" fill="#36c5f0"/><rect x="13" y="1" width="4" height="10" fill="#2eb67d"/><rect x="13" y="13" width="10" height="4" fill="#ecb22e"/><rect x="7" y="13" width="4" height="10" fill="#e01e5a"/></svg>`;
 

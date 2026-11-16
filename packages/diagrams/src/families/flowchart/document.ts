@@ -1,5 +1,5 @@
 /** Owns authored Flowchart documents, their canonical wire shape and domain validation. */
-import { slug, cleanToolString } from "../../clean-text.js";
+import { slug, cleanToolString } from "../../clean-text";
 import { Schema, Effect, Array as Arr, Option, Result } from "effect";
 import {
 	DiagramIconRef,

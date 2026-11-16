@@ -1,11 +1,11 @@
 import { Context, Effect, Layer, Schema, Stream } from "effect";
 import { Stdio } from "effect/Stdio";
 
-import type { GeneratedArtifact } from "../generate-workflow.js";
-import type { OutputFormat } from "../contracts.js";
-import { encodeJson } from "../document.js";
-import { type CliFailure, CliFilesystemError, exitCodeForFailure } from "../errors.js";
-import { redactShareLinks } from "./redaction.js";
+import type { GeneratedArtifact } from "../generate-workflow";
+import type { OutputFormat } from "../contracts";
+import { encodeJson } from "../document";
+import { type CliFailure, CliFilesystemError, exitCodeForFailure } from "../errors";
+import { redactShareLinks } from "./redaction";
 
 export class OutputWriter extends Context.Service<
 	OutputWriter,

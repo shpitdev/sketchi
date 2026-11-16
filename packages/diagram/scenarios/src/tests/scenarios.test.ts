@@ -13,52 +13,48 @@ import {
 	chartGeometryCheck,
 	chartPieLabelCheck,
 	chartScenarios,
-} from "../lib/chart-scenarios.js";
-import { classClearanceCheck, classDrawnCheck, classScenarios } from "../lib/class-scenarios.js";
-import { type DiagramScenario, diagramScenarios } from "../lib/diagram-scenarios.js";
-import { erDrawnCheck, erScenarios } from "../lib/er-scenarios.js";
+} from "../lib/chart-scenarios";
+import { classClearanceCheck, classDrawnCheck, classScenarios } from "../lib/class-scenarios";
+import { type DiagramScenario, diagramScenarios } from "../lib/diagram-scenarios";
+import { erDrawnCheck, erScenarios } from "../lib/er-scenarios";
 import {
 	evaluateScenarioDiagram,
 	evaluateScenarioFixture,
 	type ScenarioCheck,
-} from "../lib/evaluate.js";
+} from "../lib/evaluate";
 import {
 	ganttClearanceCheck,
 	ganttDrawnDataCheck,
 	ganttGeometryCheck,
 	ganttScenarios,
-} from "../lib/gantt-scenarios.js";
-import {
-	journeyDrawnCheck,
-	journeyLayoutCheck,
-	journeyScenarios,
-} from "../lib/journey-scenarios.js";
-import { mindmapLayoutCheck, mindmapScenarios } from "../lib/mindmap-scenarios.js";
+} from "../lib/gantt-scenarios";
+import { journeyDrawnCheck, journeyLayoutCheck, journeyScenarios } from "../lib/journey-scenarios";
+import { mindmapLayoutCheck, mindmapScenarios } from "../lib/mindmap-scenarios";
 import {
 	orgChartDrawnCheck,
 	orgChartLayoutCheck,
 	orgChartScenarios,
-} from "../lib/org-chart-scenarios.js";
+} from "../lib/org-chart-scenarios";
 import {
 	quadrantDrawnCheck,
 	quadrantLayoutCheck,
 	quadrantScenarios,
-} from "../lib/quadrant-scenarios.js";
-import { sankeyDrawnCheck, sankeyLayoutCheck, sankeyScenarios } from "../lib/sankey-scenarios.js";
-import { getFlowchartScenario } from "../lib/scenarios.js";
-import { getSequenceScenario } from "../lib/sequence-scenarios.js";
-import { stateMachineScenarios } from "../lib/state-machine-scenarios.js";
+} from "../lib/quadrant-scenarios";
+import { sankeyDrawnCheck, sankeyLayoutCheck, sankeyScenarios } from "../lib/sankey-scenarios";
+import { getFlowchartScenario } from "../lib/scenarios";
+import { getSequenceScenario } from "../lib/sequence-scenarios";
+import { stateMachineScenarios } from "../lib/state-machine-scenarios";
 import {
 	timelineGapOrderCheck,
 	timelineScenarios,
 	timelineSpacingCheck,
-} from "../lib/timeline-scenarios.js";
-import { vennDrawnCheck, vennLayoutCheck, vennScenarios } from "../lib/venn-scenarios.js";
+} from "../lib/timeline-scenarios";
+import { vennDrawnCheck, vennLayoutCheck, vennScenarios } from "../lib/venn-scenarios";
 import {
 	wireframeDrawnCheck,
 	wireframeLayoutCheck,
 	wireframeScenarios,
-} from "../lib/wireframe-scenarios.js";
+} from "../lib/wireframe-scenarios";
 
 function pick<S extends { readonly id: string }>(list: readonly S[], id: string): S {
 	const found = list.find((entry) => entry.id === id);

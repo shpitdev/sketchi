@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { ExcalidrawWorkspace } from "../components/excalidraw-workspace/index.js";
-import { SvgIconWorkspace } from "../components/svg-icon-workspace/index.js";
+import { ExcalidrawWorkspace } from "../components/excalidraw-workspace/index";
+import { SvgIconWorkspace } from "../components/svg-icon-workspace/index";
 import { parseSvgHandoff, validateSvgHandoffSearch } from "../lib/svg-handoff";
 
 export const Route = createFileRoute("/")({

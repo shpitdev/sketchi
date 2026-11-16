@@ -1,8 +1,8 @@
 import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { MarkAttempt } from "./draw-mark.js";
-import type { CatalogMark } from "./selection.js";
+import type { MarkAttempt } from "./draw-mark";
+import type { CatalogMark } from "./selection";
 
 /** Recognized: the judge picked the drawing's source out of its look-alikes. */
 export type MarkStatus = "recognized" | "unrecognized" | "failed";

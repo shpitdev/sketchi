@@ -5,9 +5,9 @@
 import { Console, Effect, Option } from "effect";
 import { Argument, CliConfig, CliError, CliOutput, Command, Flag, GlobalFlag } from "effect/cli";
 
-import type { OutputFormat } from "../contracts.js";
-import { redactShareLinks } from "./redaction.js";
-import { renderRootHelp, terminalRootHelp } from "./help-brand.js";
+import type { OutputFormat } from "../contracts";
+import { redactShareLinks } from "./redaction";
+import { renderRootHelp, terminalRootHelp } from "./help-brand";
 
 export { Argument, Command, Flag };
 

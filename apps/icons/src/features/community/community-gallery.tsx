@@ -3,19 +3,19 @@ import { TooltipProvider } from "@sketchi/ui/components/tooltip";
 import { Download, Search, X } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
-import { copyText, downloadBlob } from "../export/actions.js";
-import { bareSlug, type CommunityIconEntry } from "../../lib/community-client.js";
-import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
+import { copyText, downloadBlob } from "../export/actions";
+import { bareSlug, type CommunityIconEntry } from "../../lib/community-client";
+import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url";
 import { useAtom, useAtomSet } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
-import { useExportFeedback } from "../browser/feedback.js";
-import { drawnNames } from "../browser/drawn-names.js";
-import { useLoadOnScroll } from "../browser/use-load-on-scroll.js";
-import { IconsChrome } from "../../components/icons-chrome.js";
-import { NamesToggle } from "../../components/names-toggle/names-toggle.js";
-import { PreviewToggle, type PreviewMode } from "../../components/preview-toggle/preview-toggle.js";
-import { CommunityCard } from "./community-card.js";
-import { CommunityDetail, type CommunityDetailAction } from "./community-detail.js";
+import { useExportFeedback } from "../browser/feedback";
+import { drawnNames } from "../browser/drawn-names";
+import { useLoadOnScroll } from "../browser/use-load-on-scroll";
+import { IconsChrome } from "../../components/icons-chrome";
+import { NamesToggle } from "../../components/names-toggle/names-toggle";
+import { PreviewToggle, type PreviewMode } from "../../components/preview-toggle/preview-toggle";
+import { CommunityCard } from "./community-card";
+import { CommunityDetail, type CommunityDetailAction } from "./community-detail";
 
 type LoadStatus = "error" | "loading" | "ready";
 
@@ -42,7 +42,7 @@ function plural(count: number, one: string, many: string): string {
 	return `${count.toLocaleString()} ${count === 1 ? one : many}`;
 }
 
-const loadExcalidrawExport = () => import("../export/excalidraw-export.js");
+const loadExcalidrawExport = () => import("../export/excalidraw-export");
 // A failed prefetch is retried by the action that needs the code, which reports it.
 const preloadExcalidrawExport = () => {
 	loadExcalidrawExport().catch(() => undefined);

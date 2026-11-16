@@ -8,7 +8,7 @@
  */
 import { routingCorridorGap, routingQualityScale } from "@sketchi/drawing";
 
-import { type GraphAnchor } from "../../graph/options.js";
+import { type GraphAnchor } from "../../graph/options";
 
 /** A class box to place: its size. */
 export interface ClassLayoutBox {

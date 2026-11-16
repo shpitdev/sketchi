@@ -4,14 +4,14 @@ import {
 	type CanvasNodeIcon,
 	type CanvasShapeElement,
 	type CanvasSpec,
-} from "../scene.js";
+} from "../scene";
 import {
 	AXIS_ALIGNED_EPSILON,
 	segmentCrossesBoundsInterior,
 	segmentOverlapLength,
 	segmentsFromPoints,
-} from "./segments.js";
-import { estimateTextWidth, wrapTextToWidth, wrappedLabelWidth } from "./text-metrics.js";
+} from "./segments";
+import { estimateTextWidth, wrapTextToWidth, wrappedLabelWidth } from "./text-metrics";
 
 /**
  * Excalidraw paints a frame's name 3 px above its top-left corner in 14 px

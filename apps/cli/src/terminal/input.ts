@@ -9,11 +9,11 @@ import {
 	type CanonicalDiagramDocument,
 	decodeCanonicalDiagramDocument,
 	parseJsonDocument,
-} from "../document.js";
-import { CliInputError, CliValidationError } from "../errors.js";
-import { LocalFileSystem } from "../filesystem.js";
-import type { InputSource } from "./effect-cli.js";
-import { parseJsonPatchInput } from "../patch.js";
+} from "../document";
+import { CliInputError, CliValidationError } from "../errors";
+import { LocalFileSystem } from "../filesystem";
+import type { InputSource } from "./effect-cli";
+import { parseJsonPatchInput } from "../patch";
 
 export interface InputReadOptions {
 	readonly maxBytes?: number;

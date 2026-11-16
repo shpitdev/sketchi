@@ -1,5 +1,5 @@
-import { type BuildFlowchartResult } from "../../families/flowchart/build.js";
-import { buildResponse, type BuildRejection } from "../../build/operation.js";
+import { type BuildFlowchartResult } from "../../families/flowchart/build";
+import { buildResponse, type BuildRejection } from "../../build/operation";
 import { CANVAS_LIMITS, type CanvasShapeElement, CanvasSpec } from "@sketchi/drawing";
 import { type ArtifactFormat } from "@sketchi/drawing/artifacts";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
@@ -13,19 +13,19 @@ import {
 	type CodeModeArtifactStorageShape,
 	type CodeModeObjectBucket,
 	type CodeModeObjectBucketObject,
-} from "../../build/artifacts.js";
-import { buildFlowchart } from "../../build/builds.js";
-import { CodeModeRuntimeEnvironment, type CodeModeRuntimeOptions } from "../../build/runtime.js";
-import { getArtifact } from "../artifact.js";
-import { type GetArtifactResult } from "../artifact-contract.js";
-import { createCanvas } from "../create.js";
-import { type CreateCanvasResult } from "../create-contract.js";
-import { applyDiagramPatch } from "../patch.js";
+} from "../../build/artifacts";
+import { buildFlowchart } from "../../build/builds";
+import { CodeModeRuntimeEnvironment, type CodeModeRuntimeOptions } from "../../build/runtime";
+import { getArtifact } from "../artifact";
+import { type GetArtifactResult } from "../artifact-contract";
+import { createCanvas } from "../create";
+import { type CreateCanvasResult } from "../create-contract";
+import { applyDiagramPatch } from "../patch";
 import {
 	DIAGRAM_PATCH_OPERATION_NAMES,
 	type ApplyDiagramPatchResult,
 	type DiagramPatchOperation,
-} from "../patch-contract.js";
+} from "../patch-contract";
 
 function makeTestRuntime(
 	options: CodeModeRuntimeOptions & {

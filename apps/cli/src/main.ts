@@ -4,7 +4,7 @@ import { NodeRuntime } from "@effect/platform-node";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { Effect, Layer } from "effect";
 
-import { CliApplicationLayer, cliProgram } from "./cli.js";
+import { CliApplicationLayer, cliProgram } from "./cli";
 
 const MainLayer = Layer.provideMerge(CliApplicationLayer, NodeServices.layer);
 

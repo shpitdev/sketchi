@@ -4,7 +4,7 @@ import {
 	orgChartReports,
 	orgChartRoots,
 	orgPersonInitials,
-} from "./document.js";
+} from "./document";
 import {
 	CANVAS_SPEC_VERSION,
 	canvasFrameNameBox,
@@ -31,7 +31,7 @@ import {
 	type RoutePort,
 	type RouteSegment,
 	routeSegments,
-} from "../gantt/routing.js";
+} from "../gantt/routing";
 import {
 	layoutOrgChart,
 	type OrgLayout,
@@ -39,7 +39,7 @@ import {
 	type OrgRect,
 	type OrgTreeNode,
 	simplifyPolyline,
-} from "./layout.js";
+} from "./layout";
 
 const NAME_FONT_SIZE = 16;
 const DETAIL_FONT_SIZE = 13;

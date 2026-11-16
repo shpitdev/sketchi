@@ -1,5 +1,5 @@
 import { Result } from "effect";
-import { parseFlowchartDiagram, flowchartDiagramType } from "../document.js";
+import { parseFlowchartDiagram, flowchartDiagramType } from "../document";
 
 export const flowchartFixture = parseFlowchartDiagram({
 	id: "onboarding-flow",

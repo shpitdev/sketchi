@@ -1,4 +1,4 @@
-import { FLOWCHART_COVERAGE_CODES } from "../families/flowchart/coverage-codes.js";
+import { FLOWCHART_COVERAGE_CODES } from "../families/flowchart/coverage-codes";
 /**
  * Deterministic checks of a generated diagram against what its request states
  * outright: the classes, fields and tables pasted as code, quoted text, the

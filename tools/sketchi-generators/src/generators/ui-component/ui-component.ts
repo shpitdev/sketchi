@@ -26,7 +26,7 @@ export async function uiComponentGenerator(tree: Tree, options: UiComponentGener
 	const componentRoot = joinPathFragments(sourceRoot, directory, normalizedName.fileName);
 	const componentPath = joinPathFragments(componentRoot, `${normalizedName.fileName}.tsx`);
 	const indexPath = joinPathFragments(sourceRoot, "index.ts");
-	const exportPath = `./${directory}/${normalizedName.fileName}/index.js`;
+	const exportPath = `./${directory}/${normalizedName.fileName}/index`;
 	const storyTitle = `Diagram UI/Components/${normalizedName.className}`;
 
 	if (tree.exists(componentPath)) {

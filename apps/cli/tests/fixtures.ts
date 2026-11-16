@@ -2,10 +2,10 @@ import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import { Effect, FileSystem, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 
-import { makeLocalFileSystem } from "../src/filesystem.js";
+import { makeLocalFileSystem } from "../src/filesystem";
 
-import type { BuiltDiagram } from "../src/contracts.js";
-import { decodeCanonicalDiagramDocument, type CanonicalDiagramDocument } from "../src/document.js";
+import type { BuiltDiagram } from "../src/contracts";
+import { decodeCanonicalDiagramDocument, type CanonicalDiagramDocument } from "../src/document";
 
 export const localFileSystemLive = Effect.runSync(
 	Effect.map(FileSystem.FileSystem, makeLocalFileSystem).pipe(Effect.provide(NodeFileSystem.layer)),

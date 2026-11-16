@@ -7,18 +7,18 @@ import {
 	readCanvasSpecInput,
 	resolveCanvasEndpoint,
 	SKETCHI_CANVAS_ENDPOINT_ENV,
-} from "../canvas.js";
-import { exportCreatedDiagram, type GenerateWorkflowResult } from "../generate-workflow.js";
-import { API_REQUEST_TIMEOUT } from "../response-body.js";
+} from "../canvas";
+import { exportCreatedDiagram, type GenerateWorkflowResult } from "../generate-workflow";
+import { API_REQUEST_TIMEOUT } from "../response-body";
 import {
 	Command,
 	exclusiveInputSourceFlags,
 	Flag,
 	resolveInputSource,
-} from "../terminal/effect-cli.js";
-import { runReportedArtifact } from "../terminal/output.js";
-import { displayHint, exportData, storedData, summaryText } from "./present.js";
-import { rootCommand } from "./root.js";
+} from "../terminal/effect-cli";
+import { runReportedArtifact } from "../terminal/output";
+import { displayHint, exportData, storedData, summaryText } from "./present";
+import { rootCommand } from "./root";
 
 interface CanvasCommandResult extends CreateCanvasDiagramResult {
 	readonly artifact: GenerateWorkflowResult["artifact"];

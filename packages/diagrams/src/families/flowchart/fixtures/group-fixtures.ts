@@ -1,16 +1,16 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Result } from "effect";
-import { parseFlowchartDiagram } from "../document.js";
-import expenseApprovalByTeam from "./groups/expense-approval-by-team.js";
-import expenseApprovalResubmit from "./groups/expense-approval-resubmit.js";
-import fiveTeamRow from "./groups/five-team-row.js";
-import groupedApproval from "./groups/grouped-approval.js";
-import manyGroups from "./groups/many-groups.js";
-import mixedMembership from "./groups/mixed-membership.js";
-import mixedMembershipRow from "./groups/mixed-membership-row.js";
-import scatteredMembers from "./groups/scattered-members.js";
-import singleGroup from "./groups/single-group.js";
-import threeZoneService from "./groups/three-zone-service.js";
+import { parseFlowchartDiagram } from "../document";
+import expenseApprovalByTeam from "./groups/expense-approval-by-team";
+import expenseApprovalResubmit from "./groups/expense-approval-resubmit";
+import fiveTeamRow from "./groups/five-team-row";
+import groupedApproval from "./groups/grouped-approval";
+import manyGroups from "./groups/many-groups";
+import mixedMembership from "./groups/mixed-membership";
+import mixedMembershipRow from "./groups/mixed-membership-row";
+import scatteredMembers from "./groups/scattered-members";
+import singleGroup from "./groups/single-group";
+import threeZoneService from "./groups/three-zone-service";
 
 function flowchart(fixture: object, direction: "LR" | "TB" = "TB") {
 	return parseFlowchartDiagram({

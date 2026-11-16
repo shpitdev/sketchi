@@ -1,7 +1,7 @@
 import { Effect, Result, Schema } from "effect";
 
-import { CodeModeArtifactStorage, isInlineArtifactFormat } from "../build/artifacts.js";
-import { boundary, type CodeModeWorkflowEffect } from "../build/boundary.js";
+import { CodeModeArtifactStorage, isInlineArtifactFormat } from "../build/artifacts";
+import { boundary, type CodeModeWorkflowEffect } from "../build/boundary";
 import {
 	codeModeInputIssues,
 	failureResult,
@@ -9,13 +9,13 @@ import {
 	issue,
 	storageFailureIssue,
 	workflowFailure,
-} from "../build/issues.js";
-import { CodeModeRuntimeEnvironment } from "../build/runtime.js";
+} from "../build/issues";
+import { CodeModeRuntimeEnvironment } from "../build/runtime";
 import {
 	GetArtifactRejected,
 	GetArtifactRequest,
 	type GetArtifactResult,
-} from "./artifact-contract.js";
+} from "./artifact-contract";
 
 const GetArtifactFailure = workflowFailure(
 	"GetArtifactFailure",

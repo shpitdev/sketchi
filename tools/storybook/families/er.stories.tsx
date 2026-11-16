@@ -4,7 +4,7 @@ import { type Meta, type StoryObj } from "@storybook/react-vite";
 import { erScenarios } from "@sketchi/diagram-scenarios";
 import { orgChartEr } from "@sketchi/diagrams/families/er/document";
 
-import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index.js";
+import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index";
 
 const erFixture = familyForType("er").fixture;
 

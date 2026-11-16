@@ -1,25 +1,21 @@
 import { DIAGRAM_TYPES } from "@sketchi/diagrams/family";
 import { Effect, Option } from "effect";
 
-import { alternativeList } from "../document.js";
-import { type GenerationDestination, runGenerateWorkflow } from "../generate-workflow.js";
+import { alternativeList } from "../document";
+import { type GenerationDestination, runGenerateWorkflow } from "../generate-workflow";
 import {
 	DEFAULT_GENERATE_ENDPOINT,
 	resolveGenerateEndpoint,
 	SKETCHI_GENERATE_ENDPOINT_ENV,
-} from "../generation.js";
-import { Command, Flag, invalidFlagValue, missingRequiredFlag } from "../terminal/effect-cli.js";
+} from "../generation";
+import { Command, Flag, invalidFlagValue, missingRequiredFlag } from "../terminal/effect-cli";
 import {
 	GenerateWizard,
 	liveGenerateWizardAvailable,
 	type WizardDestination,
-} from "../terminal/generate-wizard.js";
-import {
-	copyGeneratedArtifact,
-	reportGenerateOperation,
-	textNeedsDisplayHint,
-} from "./generated.js";
-import { rootCommand } from "./root.js";
+} from "../terminal/generate-wizard";
+import { copyGeneratedArtifact, reportGenerateOperation, textNeedsDisplayHint } from "./generated";
+import { rootCommand } from "./root";
 
 function wizardDestination(destination: WizardDestination): GenerationDestination {
 	switch (destination._tag) {

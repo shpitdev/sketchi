@@ -6,8 +6,8 @@ import {
 	type GanttDiagram,
 	type GanttSchedule,
 	type GanttTask,
-} from "./document.js";
-import { type TimelineDiagram } from "../timeline/document.js";
+} from "./document";
+import { type TimelineDiagram } from "../timeline/document";
 import {
 	CANVAS_SPEC_VERSION,
 	estimateTextWidth,
@@ -29,7 +29,7 @@ import {
 	ganttAxis,
 	ganttBandLabels,
 	type GanttAxis,
-} from "./scale.js";
+} from "./scale";
 import {
 	KINK_LENGTH,
 	ROUTE_APPROACH,
@@ -54,10 +54,10 @@ import {
 	type RoutePort,
 	type RouteRequest,
 	type RouteSegment,
-} from "./routing.js";
+} from "./routing";
 
-import { breakRulesUnderText } from "../../graph/scene-rules.js";
-import { timelineCaptions } from "../timeline/captions.js";
+import { breakRulesUnderText } from "../../graph/scene-rules";
+import { timelineCaptions } from "../timeline/captions";
 
 export const GANTT_MARK_ROLE = "gantt-mark";
 

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { candidateFromText, type DiagramGenerationRequest } from "../candidates.js";
-import { checkRequestCoverage } from "../coverage.js";
-import { runDiagramGenerationWithPolicy } from "../policy.js";
+import { candidateFromText, type DiagramGenerationRequest } from "../candidates";
+import { checkRequestCoverage } from "../coverage";
+import { runDiagramGenerationWithPolicy } from "../policy";
 
 describe("the coverage repair", () => {
 	const request = "flowchart: push code → build image → test → ship to production";

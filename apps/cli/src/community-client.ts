@@ -3,8 +3,8 @@ import { Duration, Effect, Schedule, String } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
 
-import { CliIconError } from "./errors.js";
-import { boundedResponse } from "./response-body.js";
+import { CliIconError } from "./errors";
+import { boundedResponse } from "./response-body";
 
 export type PublishedIcon = Pick<typeof CommunityPublished.Type, "slug" | "url" | "created">;
 const decodePublished = HttpApiClient.decodeResponse(CommunityHttpApi, {

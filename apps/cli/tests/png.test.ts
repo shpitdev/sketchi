@@ -7,10 +7,10 @@ import { assert, layer } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { PNG } from "pngjs";
 
-import { DiagramBuilder, DiagramBuilderLive } from "../src/builder.js";
-import { cliIconCatalog } from "../src/icon-catalog.js";
-import { CliPngRenderer, CliPngRendererLive } from "../src/render/png-renderer.js";
-import { canonicalDocument, flowchartInput, mindmapInput, sequenceInput } from "./fixtures.js";
+import { DiagramBuilder, DiagramBuilderLive } from "../src/builder";
+import { cliIconCatalog } from "../src/icon-catalog";
+import { CliPngRenderer, CliPngRendererLive } from "../src/render/png-renderer";
+import { canonicalDocument, flowchartInput, mindmapInput, sequenceInput } from "./fixtures";
 
 const builderLayer = DiagramBuilderLive.pipe(
 	Layer.provide(

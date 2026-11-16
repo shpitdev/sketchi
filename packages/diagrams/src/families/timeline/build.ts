@@ -1,6 +1,6 @@
-import { PublishedBuildIssue } from "../../build/result.js";
+import { PublishedBuildIssue } from "../../build/result";
 import { Array } from "effect";
-import { defineBuild } from "../../build/operation.js";
+import { defineBuild } from "../../build/operation";
 import {
 	TimelineDocument,
 	TimelineDiagram,
@@ -9,8 +9,8 @@ import {
 	normalizeTimeline,
 	validateTimelineDiagram,
 	counts,
-} from "./document.js";
-import { renderTimelineDiagram } from "./render.js";
+} from "./document";
+import { renderTimelineDiagram } from "./render";
 
 export const timelineBuild = defineBuild({
 	publishedIssues: PublishedBuildIssue,

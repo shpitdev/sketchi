@@ -14,8 +14,8 @@ import {
 	withSpanContent,
 	withTelemetryCorrelation,
 	withTelemetryExport,
-} from "./effect-telemetry.js";
-import { toJsonValue } from "./json.js";
+} from "./effect-telemetry";
+import { toJsonValue } from "./json";
 import {
 	MAX_ROW_BYTES,
 	rowBatches,
@@ -23,7 +23,7 @@ import {
 	spanRows,
 	type TelemetrySpan,
 	type TelemetrySpanRow,
-} from "./rows.js";
+} from "./rows";
 
 const requestCounter = Metric.counter("sketchi_test_requests", {
 	description: "Test request count",

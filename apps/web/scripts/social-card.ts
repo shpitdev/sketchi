@@ -22,7 +22,7 @@ import {
 	wordmark,
 } from "@sketchi/social-card";
 
-import { OG_IMAGE } from "../src/lib/site-meta.js";
+import { OG_IMAGE } from "../src/lib/site-meta";
 
 const media = resolve(import.meta.dirname, "../public/media");
 const diagram = readFileSync(resolve(media, "sketchi-card-diagram.png"));

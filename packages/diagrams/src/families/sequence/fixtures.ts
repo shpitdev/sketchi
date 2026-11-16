@@ -1,6 +1,6 @@
 // Maintained fixtures are trusted; an invalid fixture is a startup defect.
 import { Result } from "effect";
-import { parseSequenceDiagram, sequenceDiagramType } from "./document.js";
+import { parseSequenceDiagram, sequenceDiagramType } from "./document";
 export const sequenceFixture = parseSequenceDiagram({
 	id: "checkout-sequence",
 	title: "Checkout sequence",

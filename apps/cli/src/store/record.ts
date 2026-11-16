@@ -12,18 +12,18 @@ import {
 	REVISIONS_DIRECTORY,
 	SCENE_FILE,
 	type StoredDiagram,
-} from "../contracts.js";
-import { decodeStoredDiagramDocument } from "../document.js";
-import type { CliFilesystemError, CliStorageError } from "../errors.js";
-import { hasPngStructure } from "../render/png-validate.js";
+} from "../contracts";
+import { decodeStoredDiagramDocument } from "../document";
+import type { CliFilesystemError, CliStorageError } from "../errors";
+import { hasPngStructure } from "../render/png-validate";
 import {
 	compareRevisionEntries,
 	formatsFor,
 	recordPath,
 	storageError,
 	unsafeEntry,
-} from "./entries.js";
-import type { StoreContext } from "./service.js";
+} from "./entries";
+import type { StoreContext } from "./service";
 
 /** Reads and validates one record directory; callers hold its lock. */
 export function makeRecordReader({ fs, root }: StoreContext) {

@@ -1,9 +1,9 @@
 import type { MarkFeatures } from "@sketchi/icon-catalog";
 import { Context, type Effect } from "effect";
 
-import type { IconImagingError } from "./errors.js";
-import type { IconSource } from "./input.js";
-import type { IconScene } from "./scenes.js";
+import type { IconImagingError } from "./errors";
+import type { IconSource } from "./input";
+import type { IconScene } from "./scenes";
 
 /** Draw a logo square on white paper, trimmed to its ink, and measure it. */
 export interface IconImagePrepare {

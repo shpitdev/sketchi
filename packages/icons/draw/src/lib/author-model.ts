@@ -10,9 +10,9 @@ import { Array, Clock, Effect, Option, String, type Schedule } from "effect";
 import { type AiError, Prompt } from "effect/ai";
 import { HttpClient } from "effect/http";
 
-import { AUTHOR_REPLY_SCHEMA, AUTHOR_SYSTEM_PROMPT } from "./author.js";
-import { IconModelError } from "./errors.js";
-import type { AuthorCallReply, IconAuthorModel, IconDrawGatewayConfigValue } from "./models.js";
+import { AUTHOR_REPLY_SCHEMA, AUTHOR_SYSTEM_PROMPT } from "./author";
+import { IconModelError } from "./errors";
+import type { AuthorCallReply, IconAuthorModel, IconDrawGatewayConfigValue } from "./models";
 
 /** The domain keeps tolerant reply repair; generateObject would decode before that repair. */
 export const makeAuthorCall = (options: {

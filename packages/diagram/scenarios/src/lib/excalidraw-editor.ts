@@ -2,7 +2,7 @@ import { createRequire, registerHooks } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import type { ExcalidrawEditor } from "./edit-session.js";
+import type { ExcalidrawEditor } from "./edit-session";
 
 /**
  * The module of Excalidraw 0.18.1's build that holds its editor: the scene,

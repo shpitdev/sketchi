@@ -1,15 +1,15 @@
 import { Badge } from "@sketchi/ui/components/badge";
 import type { CSSProperties } from "react";
 
-import { BrandIcon } from "../brand-icon/index.js";
-import { CommandBlock } from "../command-block/index.js";
+import { BrandIcon } from "../brand-icon/index";
+import { CommandBlock } from "../command-block/index";
 import {
 	agentSetupEntries,
 	codeModeMcpEndpoint,
 	getAgentSetupEntry,
 	type AgentSetupEntry,
 	type AgentSetupId,
-} from "./agent-setup-data.js";
+} from "./agent-setup-data";
 
 export interface AgentSetupViewProps {
 	agentId?: AgentSetupId;

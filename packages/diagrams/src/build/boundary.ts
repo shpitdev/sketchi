@@ -1,4 +1,4 @@
-import { families } from "../family.js";
+import { families } from "../family";
 
 import {
 	recordMetric,
@@ -7,8 +7,8 @@ import {
 } from "@sketchi/observability";
 import { Clock, Effect, Metric, Result } from "effect";
 
-import { type CodeModeArtifactStorage } from "./artifacts.js";
-import { type CodeModeRuntimeEnvironment } from "./runtime.js";
+import { type CodeModeArtifactStorage } from "./artifacts";
+import { type CodeModeRuntimeEnvironment } from "./runtime";
 
 const codeModeRequests = Metric.counter("sketchi_codemode_requests", {
 	description: "Code Mode boundary requests by terminal outcome",

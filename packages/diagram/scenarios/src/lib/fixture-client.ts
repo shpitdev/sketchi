@@ -6,8 +6,8 @@ import { DiagramGenerationClient } from "@sketchi/diagrams/generate/client";
 import { DiagramGenerationInputError, errorMessage } from "@sketchi/diagrams/generate/errors";
 import { Clock, Effect, Layer } from "effect";
 
-import { getDiagramScenario } from "./diagram-scenarios.js";
-import { scenarioFlowchartDocument } from "./flowchart-document.js";
+import { getDiagramScenario } from "./diagram-scenarios";
+import { scenarioFlowchartDocument } from "./flowchart-document";
 
 export const FixtureGenerationClientLayer = Layer.succeed(DiagramGenerationClient, {
 	provider: "fixture",

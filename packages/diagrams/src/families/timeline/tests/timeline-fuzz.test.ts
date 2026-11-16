@@ -12,9 +12,9 @@ import type * as drawing from "@sketchi/drawing";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Result } from "effect";
 import { describe, expect, it, vi } from "vitest";
-import { renderDiagram } from "../../../family.js";
-import { parseTimelineDate, parseTimelineDiagram, type TimelineDiagram } from "../document.js";
-import { readTimelineAxis, readTimelineGaps, readTimelineMomentGaps } from "../readout.js";
+import { renderDiagram } from "../../../family";
+import { parseTimelineDate, parseTimelineDiagram, type TimelineDiagram } from "../document";
+import { readTimelineAxis, readTimelineGaps, readTimelineMomentGaps } from "../readout";
 
 // Count label measurements: each layout of the row measures every label once,
 // so the count bounds how many layouts a render tries, without a wall-clock timer.

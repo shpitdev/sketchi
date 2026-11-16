@@ -1,6 +1,6 @@
-import { PublishedBuildIssue } from "../../build/result.js";
+import { PublishedBuildIssue } from "../../build/result";
 import { Array } from "effect";
-import { defineBuild } from "../../build/operation.js";
+import { defineBuild } from "../../build/operation";
 import {
 	QuadrantDocument,
 	QuadrantDiagram,
@@ -9,8 +9,8 @@ import {
 	normalizeQuadrant,
 	validateQuadrantDiagram,
 	counts,
-} from "./document.js";
-import { renderQuadrantDiagram } from "./render.js";
+} from "./document";
+import { renderQuadrantDiagram } from "./render";
 
 export const quadrantBuild = defineBuild({
 	publishedIssues: PublishedBuildIssue,

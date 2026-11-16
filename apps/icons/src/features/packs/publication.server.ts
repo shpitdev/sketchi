@@ -29,14 +29,14 @@ import {
 	PublicationAdmission,
 	PublicationSchemaErrors,
 	publicationFailure,
-} from "./publication-api.js";
+} from "./publication-api";
 import {
 	PublishPayload,
 	type PackExcalidrawState,
 	PUBLISH_MAX_BODY_BYTES,
 	type PublishResult,
 	type PullRequestState,
-} from "./publication.js";
+} from "./publication";
 import {
 	findPack,
 	isExcalidrawInstallUrl,
@@ -44,7 +44,7 @@ import {
 	packPreviewImagePath,
 	packVersion,
 	type PackSummary,
-} from "../../lib/packs.js";
+} from "../../lib/packs";
 
 class PublicationReadError extends Schema.TaggedError<
 	PublicationReadError,

@@ -34,15 +34,15 @@ import {
 	type StudioProjectDetails,
 	type StudioProjectSummary,
 	type IsoDateString,
-} from "./contracts.js";
+} from "./contracts";
 import {
 	makeStudioJsonPersistence,
 	StudioObjectStore,
 	type StudioObjectMetadata,
-} from "./bucket.server.js";
-import { StudioNotFoundError, type StudioProjectsError } from "./errors.server.js";
-import { ensureOwner } from "./session.server.js";
-import { StudioSourceArtifactStore } from "./source-artifacts.server.js";
+} from "./bucket.server";
+import { StudioNotFoundError, type StudioProjectsError } from "./errors.server";
+import { ensureOwner } from "./session.server";
+import { StudioSourceArtifactStore } from "./source-artifacts.server";
 
 const STUDIO_PREFIX = "studio";
 const STUDIO_LISTING_CONCURRENCY = 8;

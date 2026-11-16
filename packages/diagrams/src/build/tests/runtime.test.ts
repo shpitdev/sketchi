@@ -1,8 +1,8 @@
-import { type BuildFlowchartResult } from "../../families/flowchart/build.js";
-import { FLOWCHART_MAX_NODES } from "../../families/flowchart/document.js";
-import { getArtifact } from "../../canvas/artifact.js";
-import { type GetArtifactResult } from "../../canvas/artifact-contract.js";
-import { buildResponse, type BuildRejection } from "../operation.js";
+import { type BuildFlowchartResult } from "../../families/flowchart/build";
+import { FLOWCHART_MAX_NODES } from "../../families/flowchart/document";
+import { getArtifact } from "../../canvas/artifact";
+import { type GetArtifactResult } from "../../canvas/artifact-contract";
+import { buildResponse, type BuildRejection } from "../operation";
 import { CanvasSpec } from "@sketchi/drawing";
 import { Context, Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";

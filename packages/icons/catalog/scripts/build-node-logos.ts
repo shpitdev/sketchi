@@ -1,8 +1,8 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { getIconSourceFile, nodeLogoIcons, standaloneWordmarkIcons } from "../src/catalog.js";
-import { nodeLogoSvgForPaper } from "../src/node-logos.js";
+import { getIconSourceFile, nodeLogoIcons, standaloneWordmarkIcons } from "../src/catalog";
+import { nodeLogoSvgForPaper } from "../src/node-logos";
 
 // Node-logo SVGs ready for diagram paper, in two shapes: one file per slug for hosts that
 // serve them as static assets, and one JSON map for hosts that bundle them.

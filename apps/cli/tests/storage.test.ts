@@ -5,12 +5,12 @@ import { assert, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Ref } from "effect";
 import { TestClock } from "effect/testing";
 
-import { CliFilesystemError } from "../src/errors.js";
-import { LocalFileSystem } from "../src/filesystem.js";
-import { DiagramStore, makeStorageRootLayer } from "../src/store/service.js";
-import { DiagramStoreLive } from "../src/store/live.js";
-import { writeExportFile } from "../src/store/export-file.js";
-import { builtDiagram, localFileSystemLive } from "./fixtures.js";
+import { CliFilesystemError } from "../src/errors";
+import { LocalFileSystem } from "../src/filesystem";
+import { DiagramStore, makeStorageRootLayer } from "../src/store/service";
+import { DiagramStoreLive } from "../src/store/live";
+import { writeExportFile } from "../src/store/export-file";
+import { builtDiagram, localFileSystemLive } from "./fixtures";
 
 const testParent = resolve(process.cwd(), ".memory/cli-tests");
 function detachedBytes(revision = 1): Uint8Array {

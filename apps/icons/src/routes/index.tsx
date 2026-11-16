@@ -2,9 +2,9 @@ import { useAtomValue, useAtomRefresh } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
 import { createFileRoute } from "@tanstack/react-router";
 
-import { IconLibrary } from "../features/catalog/icon-library.js";
-import { drawingsQuery, manifestQuery, queryError, queryStatus } from "../lib/query-atoms.js";
-import { getPackShelf } from "../lib/packs-rpc.js";
+import { IconLibrary } from "../features/catalog/icon-library";
+import { drawingsQuery, manifestQuery, queryError, queryStatus } from "../lib/query-atoms";
+import { getPackShelf } from "../lib/packs-rpc";
 
 export const Route = createFileRoute("/")({
 	// The packs render with the page; without their index the icons still work.

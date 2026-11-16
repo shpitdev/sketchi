@@ -1,11 +1,11 @@
 import * as React from "react"
 
-import { cn } from "../lib/utils.js"
+import { cn } from "../lib/utils"
 import {
   WORDMARK_HEIGHT,
   WORDMARK_PATH,
   WORDMARK_WIDTH,
-} from "./sketchi-wordmark-ink.js"
+} from "./sketchi-wordmark-ink"
 
 /**
  * The Sketchi wordmark, written by hand with a marker and inked as one path in

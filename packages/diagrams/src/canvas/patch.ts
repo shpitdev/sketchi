@@ -1,5 +1,5 @@
-import { type CodeModeIssue } from "../build/result.js";
-import { canvasFailureStatus, canvasValidationIssues } from "../build/scene.js";
+import { type CodeModeIssue } from "../build/result";
+import { canvasFailureStatus, canvasValidationIssues } from "../build/scene";
 
 import {
 	CANVAS_LIMITS,
@@ -9,15 +9,15 @@ import {
 } from "@sketchi/drawing";
 import { Effect, Result, Schema } from "effect";
 
-import { CodeModeArtifactStorage, storageIssue } from "../build/artifacts.js";
-import { boundary, type CodeModeWorkflowEffect } from "../build/boundary.js";
+import { CodeModeArtifactStorage, storageIssue } from "../build/artifacts";
+import { boundary, type CodeModeWorkflowEffect } from "../build/boundary";
 import {
 	exportAndStoreScene,
 	requestedFormats,
 	requestedInlineFormats,
 	scenePartial,
-} from "../build/export.js";
-import { catalogForRequest, embedSceneIcons } from "../build/icons.js";
+} from "../build/export";
+import { catalogForRequest, embedSceneIcons } from "../build/icons";
 import {
 	codeModeInputIssues,
 	failureResult,
@@ -25,21 +25,17 @@ import {
 	issue,
 	responseRequestId,
 	workflowFailure,
-} from "../build/issues.js";
-import { CodeModeRuntimeEnvironment } from "../build/runtime.js";
-import { type CanvasInput } from "./input.js";
-import {
-	canvasExportIssues,
-	normalizeCanvasInput,
-	serializedCanvasLimitIssue,
-} from "./normalize.js";
+} from "../build/issues";
+import { CodeModeRuntimeEnvironment } from "../build/runtime";
+import { type CanvasInput } from "./input";
+import { canvasExportIssues, normalizeCanvasInput, serializedCanvasLimitIssue } from "./normalize";
 import {
 	ApplyDiagramPatchRejected,
 	ApplyDiagramPatchRequest,
 	DIAGRAM_PATCH_OPERATION_NAMES,
 	type ApplyDiagramPatchResult,
-} from "./patch-contract.js";
-import { applyPatchOperation, sameConnectivity, sourceConnectivity } from "./patch-operations.js";
+} from "./patch-contract";
+import { applyPatchOperation, sameConnectivity, sourceConnectivity } from "./patch-operations";
 
 const ApplyDiagramPatchFailure = workflowFailure(
 	"ApplyDiagramPatchFailure",

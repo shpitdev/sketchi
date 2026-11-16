@@ -26,9 +26,9 @@ import {
 	type RoutedEdge,
 	type LaneFrame,
 	type LaneLayout,
-} from "./layout-types.js";
-import { type GroupStructure } from "./topology.js";
-import { NODE_LABEL_LINE_HEIGHT } from "./measure.js";
+} from "./layout-types";
+import { type GroupStructure } from "./topology";
+import { NODE_LABEL_LINE_HEIGHT } from "./measure";
 
 /** The band above each frame that keeps Excalidraw's frame name clear. */
 export const GROUP_LABEL_BAND = 28;

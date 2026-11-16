@@ -8,8 +8,8 @@ import {
 } from "@sketchi/diagrams/families/journey/document";
 import { journeyLayoutIssues, readJourneyScene } from "@sketchi/diagrams/families/journey/readout";
 
-import { type ScenarioCheck } from "./evaluate.js";
-import { type DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate";
+import { type DiagramScenarioDifficulty } from "./scenarios";
 
 /** A step the prompt states: its label, score, and the actor or touchpoint it names. */
 export interface JourneyScenarioStep {

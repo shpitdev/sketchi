@@ -8,9 +8,9 @@ import {
 	VENN_MAX_ITEMS,
 	VENN_MAX_REGION_ITEMS,
 	type VennDiagram,
-} from "../document.js";
-import { readVennScene, vennLayoutIssues } from "../readout.js";
-import { renderVennDiagram } from "../render.js";
+} from "../document";
+import { readVennScene, vennLayoutIssues } from "../readout";
+import { renderVennDiagram } from "../render";
 
 import {
 	convertSceneToExcalidraw,

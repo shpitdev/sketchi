@@ -1,8 +1,8 @@
 import { Effect } from "effect";
 
-import { DiagramRecordManifest, RECORD_SCHEMA_VERSION, type BuiltDiagram } from "../contracts.js";
-import { formatsFor, storageError } from "./entries.js";
-import type { makeTransactions } from "./transaction.js";
+import { DiagramRecordManifest, RECORD_SCHEMA_VERSION, type BuiltDiagram } from "../contracts";
+import { formatsFor, storageError } from "./entries";
+import type { makeTransactions } from "./transaction";
 
 export function makeEdit({ transition, writeBuilt }: ReturnType<typeof makeTransactions>) {
 	const edit = Effect.fn("sketchi.cli.storage.edit")(

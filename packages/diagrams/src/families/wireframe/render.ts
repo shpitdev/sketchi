@@ -8,8 +8,8 @@ import {
 	type WireframeDevice,
 	type WireframeDiagram,
 	type WireframeScreen,
-} from "./document.js";
-import { orgPersonInitials } from "../org-chart/document.js";
+} from "./document";
+import { orgPersonInitials } from "../org-chart/document";
 import {
 	CANVAS_SPEC_VERSION,
 	canvasBoundTextBox,
@@ -27,7 +27,7 @@ import {
 	type CanvasSpec,
 } from "@sketchi/drawing";
 
-import { routeNavigations, type NavigationBox } from "./navigation.js";
+import { routeNavigations, type NavigationBox } from "./navigation";
 
 /** Every gap between siblings, and every container's padding, comes from this scale. */
 export const WIREFRAME_SPACING = [4, 8, 12, 16, 24, 32] as const;

@@ -1,5 +1,5 @@
-import { fnv1a32 } from "./hash.js";
-import { type IconRecipe } from "./icon-recipe.js";
+import { fnv1a32 } from "./hash";
+import { type IconRecipe } from "./icon-recipe";
 import { Schema } from "effect";
 
 /**

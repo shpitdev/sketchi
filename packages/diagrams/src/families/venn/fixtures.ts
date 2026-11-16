@@ -1,6 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Result } from "effect";
-import { parseVennDiagram, type VennDiagram } from "./document.js";
+import { parseVennDiagram, type VennDiagram } from "./document";
 
 /** Venn diagrams that stress the layout: heavy regions, counts, long and non-Latin text. */
 export const vennStressFixtures = {

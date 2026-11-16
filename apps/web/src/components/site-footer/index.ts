@@ -1,1 +1,1 @@
-export * from "./site-footer.js";
+export * from "./site-footer";

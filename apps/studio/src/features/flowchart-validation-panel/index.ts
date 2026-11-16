@@ -1,1 +1,1 @@
-export * from "./flowchart-validation-panel.js";
+export * from "./flowchart-validation-panel";

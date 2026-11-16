@@ -1,5 +1,5 @@
-import { contractDiscriminatorAnnotation } from "../build/input.js";
-import { CodeModeIssue } from "../build/result.js";
+import { contractDiscriminatorAnnotation } from "../build/input";
+import { CodeModeIssue } from "../build/result";
 
 import {
 	ArtifactBundleSchema,
@@ -22,8 +22,8 @@ import {
 	requiredObject,
 	RequiredNonEmptyString,
 	stringLiteral,
-} from "../build/schema.js";
-import { CanvasElementInput, CanvasInput } from "./input.js";
+} from "../build/schema";
+import { CanvasElementInput, CanvasInput } from "./input";
 
 const FLOWCHART_NODE_KINDS = ["start", "process", "decision", "end"] as const;
 const FlowchartNodeKindSchema = Object.assign(literals(FLOWCHART_NODE_KINDS), {

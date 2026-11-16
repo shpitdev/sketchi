@@ -9,7 +9,7 @@ import {
 	isBoundArrow,
 	isCurved,
 	type Point,
-} from "./edit-session.js";
+} from "./edit-session";
 
 /**
  * How a delivered Excalidraw scene holds up when a person drags its shapes in

@@ -1,7 +1,7 @@
 import { Button } from "@sketchi/ui/components/button";
 
-import { BrandIcon } from "../brand-icon/index.js";
-import { CommandBlock } from "../command-block/index.js";
+import { BrandIcon } from "../brand-icon/index";
+import { CommandBlock } from "../command-block/index";
 import {
 	CLI_EXAMPLE_COMMAND,
 	CLI_NODE_REQUIREMENT,

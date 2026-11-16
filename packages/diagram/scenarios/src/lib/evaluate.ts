@@ -40,60 +40,56 @@ import {
 	chartGeometryCheck,
 	chartPieLabelCheck,
 	chartScenarioChecks,
-} from "./chart-scenarios.js";
-import { classClearanceCheck, classDrawnCheck, classScenarioChecks } from "./class-scenarios.js";
-import { erDrawnCheck, erScenarioChecks } from "./er-scenarios.js";
+} from "./chart-scenarios";
+import { classClearanceCheck, classDrawnCheck, classScenarioChecks } from "./class-scenarios";
+import { erDrawnCheck, erScenarioChecks } from "./er-scenarios";
 import {
 	ganttClearanceCheck,
 	ganttDrawnDataCheck,
 	ganttGeometryCheck,
 	ganttScenarioChecks,
-} from "./gantt-scenarios.js";
-import {
-	journeyDrawnCheck,
-	journeyLayoutCheck,
-	journeyScenarioChecks,
-} from "./journey-scenarios.js";
-import { mindmapLayoutCheck, mindmapScenarioChecks } from "./mindmap-scenarios.js";
+} from "./gantt-scenarios";
+import { journeyDrawnCheck, journeyLayoutCheck, journeyScenarioChecks } from "./journey-scenarios";
+import { mindmapLayoutCheck, mindmapScenarioChecks } from "./mindmap-scenarios";
 import {
 	orgChartDrawnCheck,
 	orgChartLayoutCheck,
 	orgChartScenarioChecks,
-} from "./org-chart-scenarios.js";
+} from "./org-chart-scenarios";
 import {
 	quadrantDrawnCheck,
 	quadrantLayoutCheck,
 	quadrantScenarioChecks,
-} from "./quadrant-scenarios.js";
-import { sankeyDrawnCheck, sankeyLayoutCheck, sankeyScenarioChecks } from "./sankey-scenarios.js";
-import { stateMachineScenarioChecks } from "./state-machine-scenarios.js";
+} from "./quadrant-scenarios";
+import { sankeyDrawnCheck, sankeyLayoutCheck, sankeyScenarioChecks } from "./sankey-scenarios";
+import { stateMachineScenarioChecks } from "./state-machine-scenarios";
 import {
 	timelineGapOrderCheck,
 	timelineScenarioChecks,
 	timelineSpacingCheck,
-} from "./timeline-scenarios.js";
-import { vennDrawnCheck, vennLayoutCheck, vennScenarioChecks } from "./venn-scenarios.js";
+} from "./timeline-scenarios";
+import { vennDrawnCheck, vennLayoutCheck, vennScenarioChecks } from "./venn-scenarios";
 import {
 	wireframeDrawnCheck,
 	wireframeLayoutCheck,
 	wireframeScenarioChecks,
-} from "./wireframe-scenarios.js";
+} from "./wireframe-scenarios";
 
-import { type DiagramScenario } from "./diagram-scenarios.js";
-import { flowchartLabelMatches } from "./flowchart-labels.js";
+import { type DiagramScenario } from "./diagram-scenarios";
+import { flowchartLabelMatches } from "./flowchart-labels";
 import {
 	type BranchMatcher,
 	type ExpectedEdge,
 	type FlowchartConnection,
 	flowchartGroupsAround,
 	matchFlowchartSteps,
-} from "./flowchart-matching.js";
+} from "./flowchart-matching";
 import {
 	type DiagramScenarioLogo,
 	type FlowchartScenario,
 	type FlowchartScenarioRequiredNode,
-} from "./scenarios.js";
-import { type SequenceScenario, type SequenceScenarioMessage } from "./sequence-scenarios.js";
+} from "./scenarios";
+import { type SequenceScenario, type SequenceScenarioMessage } from "./sequence-scenarios";
 
 export interface ScenarioCheck {
 	id: string;

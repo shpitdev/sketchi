@@ -10,7 +10,7 @@ import {
 } from "@excalidraw/excalidraw/types";
 import { type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { SKETCHI_DIAGRAM_PALETTE } from "@sketchi/drawing";
-import { loadExcalidraw } from "../../lib/load-excalidraw.js";
+import { loadExcalidraw } from "../../lib/load-excalidraw";
 import {
 	type ComponentType,
 	lazy,

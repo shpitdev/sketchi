@@ -8,7 +8,7 @@ import {
 	type RoutedSoFar,
 	type TouchGrid,
 	type ConnectionEdge,
-} from "./layout-types.js";
+} from "./layout-types";
 import {
 	routeEndpoints,
 	isSelfLoop,
@@ -21,7 +21,7 @@ import {
 	portKey,
 	HORIZONTAL_GAP,
 	VERTICAL_GAP,
-} from "./geometry.js";
+} from "./geometry";
 import {
 	compactPoints,
 	straightRuns,
@@ -40,8 +40,8 @@ import {
 	routeBacktrackDistance,
 	routeTargetOvershootDistance,
 	routeTouchCount,
-} from "./route-geometry.js";
-import { type GraphInput } from "./input.js";
+} from "./route-geometry";
+import { type GraphInput } from "./input";
 import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasConnectorElement as ArrowSceneElement,
@@ -62,7 +62,7 @@ import {
 	straightHandoff,
 	branchLabelObstacles,
 	endpointStubsForRoutes,
-} from "./ports.js";
+} from "./ports";
 import {
 	boundsOf,
 	obstacleBox,
@@ -72,10 +72,10 @@ import {
 	laneOutlineLines,
 	laneObstacles,
 	groupObstacles,
-} from "./containers.js";
-import { padBox } from "./label-geometry.js";
-import { exportRouteDefects, pathCrossings } from "./readability.js";
-import { type GraphLayout } from "./topology.js";
+} from "./containers";
+import { padBox } from "./label-geometry";
+import { exportRouteDefects, pathCrossings } from "./readability";
+import { type GraphLayout } from "./topology";
 
 function arrowForRoute(
 	route: RoutedEdge,

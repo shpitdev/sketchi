@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { MarketingHome } from "../components/marketing-home/index.js";
+import { MarketingHome } from "../components/marketing-home/index";
 import { pageMeta, SITE_DESCRIPTION } from "../lib/site-meta";
 import { getWebSurfaceUrls } from "../lib/surface-urls-rpc";
 

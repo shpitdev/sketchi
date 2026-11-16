@@ -1,12 +1,12 @@
 import { Effect } from "effect";
 
-import { DiagramBuilder } from "../builder.js";
-import { resolveDiagramId } from "../diagram-catalog.js";
-import { DiagramStore } from "../store/service.js";
-import { Command, Flag } from "../terminal/effect-cli.js";
-import { runReported } from "../terminal/output.js";
-import { revisionLocations } from "./present.js";
-import { diagramIdArgument, rootCommand } from "./root.js";
+import { DiagramBuilder } from "../builder";
+import { resolveDiagramId } from "../diagram-catalog";
+import { DiagramStore } from "../store/service";
+import { Command, Flag } from "../terminal/effect-cli";
+import { runReported } from "../terminal/output";
+import { revisionLocations } from "./present";
+import { diagramIdArgument, rootCommand } from "./root";
 
 export const restoreCommand = Command.make(
 	"restore",

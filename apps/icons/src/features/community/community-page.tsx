@@ -2,10 +2,10 @@ import { useAtom, useAtomValue, useAtomRefresh } from "@effect/atom-react";
 import { Array, Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 
-import { communityPages, communitySearch, linkedCommunityIcon } from "../../lib/community-atoms.js";
-import type { CommunityIconEntry } from "../../lib/community-client.js";
-import { queryError, queryStatus } from "../../lib/query-atoms.js";
-import { CommunityGallery } from "./community-gallery.js";
+import { communityPages, communitySearch, linkedCommunityIcon } from "../../lib/community-atoms";
+import type { CommunityIconEntry } from "../../lib/community-client";
+import { queryError, queryStatus } from "../../lib/query-atoms";
+import { CommunityGallery } from "./community-gallery";
 
 /** The Community view: newest first, searched on the server as the user types. */
 export function CommunityPage({ slug }: { readonly slug?: string }) {

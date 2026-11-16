@@ -11,8 +11,8 @@ import {
 	CliStorageError,
 	CliValidationError,
 	exitCodeForFailure,
-} from "../src/errors.js";
-import { OutputWriter, reportFailure, reportSuccess } from "../src/terminal/output.js";
+} from "../src/errors";
+import { OutputWriter, reportFailure, reportSuccess } from "../src/terminal/output";
 
 function captureLayer(stdout: Array<string>, stderr: Array<string>) {
 	return Layer.succeed(OutputWriter, {

@@ -1,5 +1,5 @@
-import type { RuleSource } from "../../rule-source.js";
-import { VENN_COLOR_NAMES } from "./document.js";
+import type { RuleSource } from "../../rule-source";
+import { VENN_COLOR_NAMES } from "./document";
 
 const palette = `a palette name (${VENN_COLOR_NAMES.join(", ")}) or #rrggbb`;
 

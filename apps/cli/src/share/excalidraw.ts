@@ -2,8 +2,8 @@ import { Context, Effect, Layer, Schema } from "effect";
 import { Aead, SecureRandom } from "effect/crypto";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import { CliShareError } from "../errors.js";
-import { readBoundedBody, readBoundedText } from "../response-body.js";
+import { CliShareError } from "../errors";
+import { readBoundedBody, readBoundedText } from "../response-body";
 import {
 	EXCALIDRAW_GET_ENDPOINT,
 	EXCALIDRAW_POST_ENDPOINT,
@@ -17,7 +17,7 @@ import {
 	generateShareKey,
 	parseShareLink,
 	serializeForShare,
-} from "./protocol.js";
+} from "./protocol";
 
 export interface OpenResult {
 	readonly status: "not_requested" | "accepted" | "unconfirmed";

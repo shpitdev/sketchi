@@ -1,10 +1,10 @@
-import { type CodeModeIssue } from "../build/result.js";
+import { type CodeModeIssue } from "../build/result";
 
 import { curvedConnectorBetween, wrappedLabelWidth, wrapTextToWidth } from "@sketchi/drawing";
 
-import { issue } from "../build/issues.js";
-import { type CanvasInput } from "./input.js";
-import { type DiagramPatchOperation, type DiagramSelector } from "./patch-contract.js";
+import { issue } from "../build/issues";
+import { type CanvasInput } from "./input";
+import { type DiagramPatchOperation, type DiagramSelector } from "./patch-contract";
 
 const SCENE_PADDING = 48;
 

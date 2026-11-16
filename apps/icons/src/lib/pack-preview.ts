@@ -1,6 +1,6 @@
 import { type IconRecipe } from "@sketchi/drawing";
 
-import { RECIPE_PREVIEW_SIZE, type RecipePalette, recipePreview } from "./recipe-drawing.js";
+import { RECIPE_PREVIEW_SIZE, type RecipePalette, recipePreview } from "./recipe-drawing";
 
 /**
  * The preview excalidraw.com's "Publish library" dialog draws for a library

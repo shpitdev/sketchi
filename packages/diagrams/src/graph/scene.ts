@@ -7,8 +7,8 @@ import {
 	type CanvasFrameElement as FrameSceneElement,
 	CANVAS_SPEC_VERSION,
 } from "@sketchi/drawing";
-import { type GraphInput } from "./input.js";
-import { type GraphRenderOptions } from "./options.js";
+import { type GraphInput } from "./input";
+import { type GraphRenderOptions } from "./options";
 import {
 	type DiagramLayout,
 	type Arrangement,
@@ -16,7 +16,7 @@ import {
 	type SettledLayout,
 	type CompletedLayout,
 	type SideOverrides,
-} from "./layout-types.js";
+} from "./layout-types";
 import {
 	exportRouteDefects,
 	inwardEndpoints,
@@ -29,7 +29,7 @@ import {
 	touchingEdges,
 	touchingLineCount,
 	exportAspect,
-} from "./readability.js";
+} from "./readability";
 import {
 	polishLevels,
 	layoutDiagram,
@@ -43,7 +43,7 @@ import {
 	laneBreadthFor,
 	narrowStepGaps,
 	portOffsetsAt,
-} from "./layout.js";
+} from "./layout";
 import {
 	PLAIN_ARRANGEMENT,
 	CROSSING_REPAIR_MAX_EDGES,
@@ -64,11 +64,11 @@ import {
 	COMPACT_ASPECT,
 	laneColumns,
 	skipsRanks,
-} from "./placement.js";
-import { groupBlocks, laneBlocks } from "./containers.js";
-import { drawnSize, routeLength } from "./route-geometry.js";
-import { placedBranchLabels, branchLabels, clearLabels, clearOutlines } from "./labels.js";
-import { EXPORT_PADDING, NODE_LABEL_FONT_SIZE } from "./measure.js";
+} from "./placement";
+import { groupBlocks, laneBlocks } from "./containers";
+import { drawnSize, routeLength } from "./route-geometry";
+import { placedBranchLabels, branchLabels, clearLabels, clearOutlines } from "./labels";
+import { EXPORT_PADDING, NODE_LABEL_FONT_SIZE } from "./measure";
 import {
 	stepsClearOfEnds,
 	straightEndsOffVertices,
@@ -94,9 +94,9 @@ import {
 	LONGER_FOR_CROSSINGS,
 	chooseBranchSides,
 	RIVAL_CROSSING_SLACK,
-} from "./polish.js";
-import { ROUTE_STUB_LENGTH, OPPOSITE_EDGE, FORWARD_SIDE } from "./geometry.js";
-import { routeAllEdges, TOUCH_MOVES, TOUCH_DRAWINGS, TOUCH_ROUNDS } from "./routing.js";
+} from "./polish";
+import { ROUTE_STUB_LENGTH, OPPOSITE_EDGE, FORWARD_SIDE } from "./geometry";
+import { routeAllEdges, TOUCH_MOVES, TOUCH_DRAWINGS, TOUCH_ROUNDS } from "./routing";
 import {
 	nodeTexts,
 	withGroupFrames,
@@ -105,16 +105,16 @@ import {
 	zoneElements,
 	normalizeSceneOrigin,
 	sceneBounds,
-} from "./compose.js";
-import { curvedScene } from "./curved-routes.js";
+} from "./compose";
+import { curvedScene } from "./curved-routes";
 import {
 	type GraphLayout,
 	prepareGraph,
 	withReducedRanks,
 	withThroughRanks,
 	withSiftedRanks,
-} from "./topology.js";
-import { unavoidableCrossings } from "./planarity.js";
+} from "./topology";
+import { unavoidableCrossings } from "./planarity";
 
 /** Lay out and route the trusted geometry supplied by a validated family. */
 export function renderGraphDiagram(

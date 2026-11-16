@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import { Context, Effect, FileSystem, Layer, Option, type PlatformError } from "effect";
 
-import { CliFilesystemError } from "./errors.js";
+import { CliFilesystemError } from "./errors";
 
 export type LocalEntryKind = "file" | "directory" | "symbolic-link" | "other";
 

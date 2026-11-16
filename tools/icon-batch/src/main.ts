@@ -12,15 +12,15 @@ import { parseArgs } from "node:util";
 import { getIconSourceFile, iconManifest, nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
 import { iconAuthorModel, type IconAuthorModel } from "@sketchi/icon-draw";
 
-import { drawMark } from "./draw-mark.js";
-import { SKETCHI_ACCOUNT_ID } from "./gateway.js";
-import { promote } from "./promote.js";
-import { readRecipe, type SheetTheme, writeRecipeSheets } from "./recipe-sheets.js";
-import { runBatch } from "./runner.js";
-import { marksToDraw } from "./selection.js";
-import { writeSheets } from "./sheets.js";
-import { RunStore } from "./store.js";
-import { ledgerCsv, summaryMarkdown } from "./summary.js";
+import { drawMark } from "./draw-mark";
+import { SKETCHI_ACCOUNT_ID } from "./gateway";
+import { promote } from "./promote";
+import { readRecipe, type SheetTheme, writeRecipeSheets } from "./recipe-sheets";
+import { runBatch } from "./runner";
+import { marksToDraw } from "./selection";
+import { writeSheets } from "./sheets";
+import { RunStore } from "./store";
+import { ledgerCsv, summaryMarkdown } from "./summary";
 
 const workspaceRoot = resolve(import.meta.dirname, "../../..");
 const catalogRoot = join(workspaceRoot, "packages/icons/catalog");

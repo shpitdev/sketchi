@@ -4,8 +4,8 @@ import {
 	excalidrawKeepsElbowEnd,
 	excalidrawOutlineHit,
 	type Point,
-} from "./excalidraw-binding.js";
-import { elbowFixedPointAt, routeEntersShape } from "./route-folds.js";
+} from "./excalidraw-binding";
+import { elbowFixedPointAt, routeEntersShape } from "./route-folds";
 
 /** The fields of an Excalidraw element the release step reads. */
 export interface ReleasableElement {

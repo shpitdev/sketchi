@@ -1,25 +1,22 @@
-import { CHART_RULES } from "../../families/chart/rules.js";
-import { CLASS_RULES } from "../../families/class/rules.js";
-import { ER_RULES } from "../../families/er/rules.js";
-import { FLOWCHART_RULES } from "../../families/flowchart/rules.js";
-import { GANTT_RULES } from "../../families/gantt/rules.js";
-import { JOURNEY_RULES } from "../../families/journey/rules.js";
-import { MINDMAP_RULES } from "../../families/mindmap/rules.js";
-import { ORG_CHART_RULES } from "../../families/org-chart/rules.js";
-import { QUADRANT_RULES } from "../../families/quadrant/rules.js";
-import { SANKEY_RULES } from "../../families/sankey/rules.js";
-import {
-	SEQUENCE_MAX_MESSAGES,
-	SEQUENCE_MAX_PARTICIPANTS,
-} from "../../families/sequence/document.js";
-import { SEQUENCE_RULES } from "../../families/sequence/rules.js";
-import { STATE_MACHINE_RULES } from "../../families/state-machine/rules.js";
-import { TIMELINE_RULES } from "../../families/timeline/rules.js";
-import { VENN_RULES } from "../../families/venn/rules.js";
-import { WIREFRAME_RULES } from "../../families/wireframe/rules.js";
+import { CHART_RULES } from "../../families/chart/rules";
+import { CLASS_RULES } from "../../families/class/rules";
+import { ER_RULES } from "../../families/er/rules";
+import { FLOWCHART_RULES } from "../../families/flowchart/rules";
+import { GANTT_RULES } from "../../families/gantt/rules";
+import { JOURNEY_RULES } from "../../families/journey/rules";
+import { MINDMAP_RULES } from "../../families/mindmap/rules";
+import { ORG_CHART_RULES } from "../../families/org-chart/rules";
+import { QUADRANT_RULES } from "../../families/quadrant/rules";
+import { SANKEY_RULES } from "../../families/sankey/rules";
+import { SEQUENCE_MAX_MESSAGES, SEQUENCE_MAX_PARTICIPANTS } from "../../families/sequence/document";
+import { SEQUENCE_RULES } from "../../families/sequence/rules";
+import { STATE_MACHINE_RULES } from "../../families/state-machine/rules";
+import { TIMELINE_RULES } from "../../families/timeline/rules";
+import { VENN_RULES } from "../../families/venn/rules";
+import { WIREFRAME_RULES } from "../../families/wireframe/rules";
 import { describe, expect, it } from "vitest";
 
-import { DIAGRAM_AGENT_SYSTEM_PROMPT, MAX_DIAGRAM_BUILD_ATTEMPTS } from "../policy.js";
+import { DIAGRAM_AGENT_SYSTEM_PROMPT, MAX_DIAGRAM_BUILD_ATTEMPTS } from "../policy";
 
 describe("diagram agent policy", () => {
 	it("states the configured build budget and final-attempt stop rule", () => {

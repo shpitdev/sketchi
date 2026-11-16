@@ -1,4 +1,4 @@
-import { MINDMAP_RULES } from "./rules.js";
+import { MINDMAP_RULES } from "./rules";
 const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] }`;
 
 export const docs = {

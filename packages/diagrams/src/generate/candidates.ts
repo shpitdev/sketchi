@@ -1,13 +1,13 @@
-import { slug } from "../clean-text.js";
+import { slug } from "../clean-text";
 import { isDiagramIconSlug, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 import { Array as Arr, Match, Result, Schema, SchemaIssue } from "effect";
-import { ChartDiagram, validateChartDiagram } from "../families/chart/document.js";
+import { ChartDiagram, validateChartDiagram } from "../families/chart/document";
 import {
 	ClassDiagram,
 	resolveClassShorthand,
 	validateClassDiagram,
-} from "../families/class/document.js";
-import { ErDiagram, resolveErShorthand, validateErDiagram } from "../families/er/document.js";
+} from "../families/class/document";
+import { ErDiagram, resolveErShorthand, validateErDiagram } from "../families/er/document";
 import {
 	decodeFlowchartDocument,
 	flowchartDiagramFromDocument,
@@ -17,33 +17,33 @@ import {
 	type FlowchartDocument,
 	FlowchartNodeShapeSchema,
 	FlowchartZoneKindSchema,
-} from "../families/flowchart/document.js";
+} from "../families/flowchart/document";
 import {
 	applyFlowchartEdits,
 	decodeFlowchartEdits,
 	FlowchartEditsSchema,
 	type FlowchartEdit,
-} from "../families/flowchart/edits.js";
-import { FLOWCHART_RULES } from "../families/flowchart/rules.js";
-import { GanttDiagram, validateGanttDiagram } from "../families/gantt/document.js";
+} from "../families/flowchart/edits";
+import { FLOWCHART_RULES } from "../families/flowchart/rules";
+import { GanttDiagram, validateGanttDiagram } from "../families/gantt/document";
 import {
 	JourneyDiagram,
 	resolveJourneyShorthand,
 	validateJourneyDiagram,
-} from "../families/journey/document.js";
-import { MindmapInputError, parseMindmap } from "../families/mindmap/index.js";
+} from "../families/journey/document";
+import { MindmapInputError, parseMindmap } from "../families/mindmap/index";
 import {
 	OrgChartDiagram,
 	resolveOrgChartShorthand,
 	validateOrgChartDiagram,
-} from "../families/org-chart/document.js";
-import { QuadrantDiagram, validateQuadrantDiagram } from "../families/quadrant/document.js";
+} from "../families/org-chart/document";
+import { QuadrantDiagram, validateQuadrantDiagram } from "../families/quadrant/document";
 import {
 	resolveSankeyShorthand,
 	SankeyDiagram,
 	validateSankeyDiagram,
-} from "../families/sankey/document.js";
-import { SequenceDiagram, validateSequenceDiagram } from "../families/sequence/document.js";
+} from "../families/sankey/document";
+import { SequenceDiagram, validateSequenceDiagram } from "../families/sequence/document";
 import {
 	getStateMachineDefaultWarnings,
 	splitContinuingFinalStates,
@@ -51,35 +51,31 @@ import {
 	StateMachineDiagram,
 	validateStateMachineDiagram,
 	type StateMachineDefaultWarning,
-} from "../families/state-machine/document.js";
-import { TimelineDiagram, validateTimelineDiagram } from "../families/timeline/document.js";
-import {
-	resolveVennShorthand,
-	validateVennDiagram,
-	VennDiagram,
-} from "../families/venn/document.js";
+} from "../families/state-machine/document";
+import { TimelineDiagram, validateTimelineDiagram } from "../families/timeline/document";
+import { resolveVennShorthand, validateVennDiagram, VennDiagram } from "../families/venn/document";
 import {
 	prepareWireframe,
 	validateWireframeDiagram,
 	WireframeDiagram,
-} from "../families/wireframe/document.js";
+} from "../families/wireframe/document";
 import {
 	CanonicalDiagramSchema,
 	type CanonicalDiagram,
 	type CanonicalValidationError,
-} from "../family.js";
+} from "../family";
 
 import {
 	DiagramGenerationTypeSchema,
 	GeneratedDiagramResponse,
 	modelTitleOrFallback,
-} from "./intent.js";
-import { placeNodeLogos, type OfferedLogo } from "./logo-placement.js";
-import { DiagramGenerationPrompt } from "./messages.js";
-import { isUnknownRecord, objectValue } from "./unknown-record.js";
+} from "./intent";
+import { placeNodeLogos, type OfferedLogo } from "./logo-placement";
+import { DiagramGenerationPrompt } from "./messages";
+import { isUnknownRecord, objectValue } from "./unknown-record";
 
-import { repeatedJsonKeys } from "./repeated-keys.js";
-import { DiagramStyle, flowchartStylesAsNodeColors, generatedStyles } from "./styling.js";
+import { repeatedJsonKeys } from "./repeated-keys";
+import { DiagramStyle, flowchartStylesAsNodeColors, generatedStyles } from "./styling";
 
 export const diagramGenerationProviderIds: readonly [
 	"fixture",

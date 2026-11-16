@@ -1,6 +1,6 @@
 import { String as Str, Array as Arr, Option } from "effect";
 import { estimateTextWidth, wrapTextToWidth } from "@sketchi/drawing";
-import { vennRegionKey, type VennDiagram } from "./document.js";
+import { vennRegionKey, type VennDiagram } from "./document";
 export const VENN_ITEM_FONT = 15;
 export const VENN_REGION_LABEL_FONT = 17;
 export const VENN_COUNT_FONT = 26;

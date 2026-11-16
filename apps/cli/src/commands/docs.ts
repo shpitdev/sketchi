@@ -1,17 +1,17 @@
 import { DIAGRAM_TYPES } from "@sketchi/diagrams/family";
 import { Effect } from "effect";
 
-import { DEFAULT_CANVAS_ENDPOINT, SKETCHI_CANVAS_ENDPOINT_ENV } from "../canvas.js";
-import { DEFAULT_GENERATE_ENDPOINT, SKETCHI_GENERATE_ENDPOINT_ENV } from "../generation.js";
+import { DEFAULT_CANVAS_ENDPOINT, SKETCHI_CANVAS_ENDPOINT_ENV } from "../canvas";
+import { DEFAULT_GENERATE_ENDPOINT, SKETCHI_GENERATE_ENDPOINT_ENV } from "../generation";
 import {
 	MAX_RENDER_CANVAS_AREA,
 	MAX_RENDER_CANVAS_DIMENSION,
 	MAX_RENDER_ELEMENT_DIMENSION,
 	MAX_RENDER_OUTPUT_PIXELS,
-} from "../render/limits.js";
-import { Command } from "../terminal/effect-cli.js";
-import { reportSuccess } from "../terminal/output.js";
-import { rootCommand } from "./root.js";
+} from "../render/limits";
+import { Command } from "../terminal/effect-cli";
+import { reportSuccess } from "../terminal/output";
+import { rootCommand } from "./root";
 
 const AGENT_DOCS = `Sketchi CLI contracts for agents and automation.
 

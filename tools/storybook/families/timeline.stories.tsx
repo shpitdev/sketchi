@@ -6,7 +6,7 @@ import { Result } from "effect";
 import { timelineScenarios } from "@sketchi/diagram-scenarios";
 import { parseTimelineDiagram } from "@sketchi/diagrams/families/timeline/document";
 
-import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index.js";
+import { GenerationWorkspace } from "../../../apps/studio/src/features/generation-workspace/index";
 
 const timelineFixture = familyForType("timeline").fixture;
 

@@ -9,7 +9,7 @@ import {
 	type RoutingPolish,
 	type LayoutDirection,
 	type CompletedLayout,
-} from "./layout-types.js";
+} from "./layout-types";
 import {
 	straightRuns,
 	routeLength,
@@ -17,7 +17,7 @@ import {
 	drawnSize,
 	compactPoints,
 	routeClearanceCount,
-} from "./route-geometry.js";
+} from "./route-geometry";
 import {
 	ROUTE_STUB_LENGTH,
 	slotAxis,
@@ -35,7 +35,7 @@ import {
 	PORT_PADDING,
 	clamp,
 	portJogSteps,
-} from "./geometry.js";
+} from "./geometry";
 import {
 	segmentsFromPoints,
 	type CanvasConnectorElement as ArrowSceneElement,
@@ -49,12 +49,12 @@ import {
 	routingWideBend,
 	sharedSegments,
 } from "@sketchi/drawing";
-import { laned, ACROSS_DIRECTION, CROSSING_REPAIR_MAX_EDGES } from "./placement.js";
-import { branches } from "./measure.js";
-import { type GraphLayout } from "./topology.js";
-import { type GraphInput } from "./input.js";
-import { portOffsetsAt, portOrderOf, layoutDiagram, portJogCount } from "./layout.js";
-import { routeAllEdges, sideEnds, turnsCorner, resideArrivals, keepsStubs } from "./routing.js";
+import { laned, ACROSS_DIRECTION, CROSSING_REPAIR_MAX_EDGES } from "./placement";
+import { branches } from "./measure";
+import { type GraphLayout } from "./topology";
+import { type GraphInput } from "./input";
+import { portOffsetsAt, portOrderOf, layoutDiagram, portJogCount } from "./layout";
+import { routeAllEdges, sideEnds, turnsCorner, resideArrivals, keepsStubs } from "./routing";
 import {
 	arrowCrossings,
 	routesNoWorse,
@@ -62,11 +62,11 @@ import {
 	headCrossers,
 	exportAspect,
 	readerFindingCount,
-} from "./readability.js";
-import { type GraphRenderOptions } from "./options.js";
-import { groupBlocks, groupObstacles, laneBlocks } from "./containers.js";
-import { portLimit, directSegmentCrossesNode, branchLabelObstacles } from "./ports.js";
-import { placedBranchLabels } from "./labels.js";
+} from "./readability";
+import { type GraphRenderOptions } from "./options";
+import { groupBlocks, groupObstacles, laneBlocks } from "./containers";
+import { portLimit, directSegmentCrossesNode, branchLabelObstacles } from "./ports";
+import { placedBranchLabels } from "./labels";
 
 /**
  * How much longer a drawing may grow, its text shrinking as much once fitted,

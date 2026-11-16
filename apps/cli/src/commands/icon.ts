@@ -7,10 +7,10 @@ import {
 	resolveIconDrawEndpoint,
 	SKETCHI_COMMUNITY_ENDPOINT_ENV,
 	SKETCHI_ICON_DRAW_ENDPOINT_ENV,
-} from "../icon-draw.js";
-import { Argument, Command, Flag } from "../terminal/effect-cli.js";
-import { runReported } from "../terminal/output.js";
-import { rootCommand } from "./root.js";
+} from "../icon-draw";
+import { Argument, Command, Flag } from "../terminal/effect-cli";
+import { runReported } from "../terminal/output";
+import { rootCommand } from "./root";
 
 const ICON_DRAW_HELP = `Draw a logo as a hand-drawn Sketchi icon. Sketchi sends the logo (an SVG, or a PNG, JPEG or WebP) and its name to the public Sketchi icon service in one unauthenticated HTTPS POST per logo; a model draws it as a few Excalidraw parts, checks it at 28 px against the source, and a judge from another model family tries to pick it out of four look-alike logos.
 

@@ -7,10 +7,10 @@ import {
 	CommunityIconRejectedError,
 	PublishCommunityIconRequest,
 	type CommunityIcon,
-} from "./contracts.js";
-import { CommunityIconModeration } from "./moderation.js";
-import { cleanCommunityIconName, communityIconHash, communityIconWords } from "./recipe.js";
-import { CommunityIconStore } from "./store.js";
+} from "./contracts";
+import { CommunityIconModeration } from "./moderation";
+import { cleanCommunityIconName, communityIconHash, communityIconWords } from "./recipe";
+import { CommunityIconStore } from "./store";
 
 const decodeRequest = Schema.decodeUnknownEffect(PublishCommunityIconRequest);
 

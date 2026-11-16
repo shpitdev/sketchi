@@ -1,1 +1,1 @@
-export * from "./diagram-switcher.js";
+export * from "./diagram-switcher";

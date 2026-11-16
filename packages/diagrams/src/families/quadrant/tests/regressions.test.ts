@@ -2,11 +2,11 @@ import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect } from "effect";
 import { expect, it } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
-import { buildQuadrantChart } from "../../../build/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
-import { buildResponse } from "../../../build/operation.js";
-import { quadrantFixture } from "../document.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { buildQuadrantChart } from "../../../build/builds";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { buildResponse } from "../../../build/operation";
+import { quadrantFixture } from "../document";
 
 it("keeps prototype-like labels and groups apart through build and export", async () => {
 	const points = [

@@ -4,7 +4,7 @@ import {
 	type CanvasPoint as ScenePoint,
 	type CanvasSpec,
 } from "@sketchi/drawing";
-import { QUADRANT_KEYS, type QuadrantDiagram, type QuadrantKey } from "./document.js";
+import { QUADRANT_KEYS, type QuadrantDiagram, type QuadrantKey } from "./document";
 
 import {
 	QUADRANT_NEAREST_MARGIN,
@@ -15,7 +15,7 @@ import {
 	quadrantSegmentHitsBox,
 	quadrantSegmentsCross,
 	type QuadrantBox,
-} from "./render.js";
+} from "./render";
 
 type NodeElement = Extract<SceneElement, { type: "node" }>;
 type TextElement = Extract<SceneElement, { type: "text" }>;

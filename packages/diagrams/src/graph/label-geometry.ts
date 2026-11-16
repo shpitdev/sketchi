@@ -1,5 +1,5 @@
 /** Owns branch-label boxes and candidate positions along routed segments. */
-import { type LabelBox, type Box, type RoutedEdge } from "./layout-types.js";
+import { type LabelBox, type Box, type RoutedEdge } from "./layout-types";
 import {
 	type CanvasPoint as ScenePoint,
 	type CanvasShapeElement as NodeSceneElement,
@@ -10,10 +10,10 @@ import {
 	type CanvasTextElement as TextSceneElement,
 	segmentsFromPoints,
 } from "@sketchi/drawing";
-import { ARROWHEAD_LENGTH, ARROWHEAD_WING } from "./measure.js";
-import { obstacleBox } from "./containers.js";
-import { routeLength } from "./route-geometry.js";
-import { endRunOf } from "./geometry.js";
+import { ARROWHEAD_LENGTH, ARROWHEAD_WING } from "./measure";
+import { obstacleBox } from "./containers";
+import { routeLength } from "./route-geometry";
+import { endRunOf } from "./geometry";
 
 /** Clearance a label box keeps from its own line, and the wider one from other lines. */
 const LABEL_LINE_CLEARANCE = 3;

@@ -14,7 +14,7 @@ import {
 	SANKEY_LABEL_GAP,
 	segmentMeetsBox,
 	type SankeyBox,
-} from "./layout.js";
+} from "./layout";
 
 type Point = { readonly x: number; readonly y: number };
 

@@ -2,7 +2,7 @@ import { IconRecipeSchema } from "@sketchi/drawing";
 import { Schema, SchemaGetter } from "effect";
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 
-import { CommunityIconVerdict, PublishCommunityIconRequest } from "./contracts.js";
+import { CommunityIconVerdict, PublishCommunityIconRequest } from "./contracts";
 
 /** The public wire representation, shared by HTTP serving and generated clients. */
 export const CommunityIconResult = Schema.Struct({

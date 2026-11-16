@@ -1,8 +1,8 @@
 /** Owns native graph adjacency, feedback and selected rank orders, including nested group levels. */
-import { measureEdges } from "./measure.js";
-import { type LayoutEdge } from "./layout-types.js";
+import { measureEdges } from "./measure";
+import { type LayoutEdge } from "./layout-types";
 import { Graph, Option } from "effect";
-import type { GraphEdge, GraphGroup, GraphNode, GraphInput } from "./input.js";
+import type { GraphEdge, GraphGroup, GraphNode, GraphInput } from "./input";
 
 /** Native adjacency plus the declared nodes whose labels and kinds are measured.
  * Composite group endpoints may be graph vertices without being placed nodes. */

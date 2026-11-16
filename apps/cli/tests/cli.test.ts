@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 
 import { afterEach, assert, describe, it } from "@effect/vitest";
 
-import { clipboardTool } from "../src/terminal/clipboard.js";
+import { clipboardTool } from "../src/terminal/clipboard";
 
 const binary = resolve(process.cwd(), "apps/cli/dist/sketchi.js");
 const testParent = resolve(process.cwd(), ".memory/cli-tests");

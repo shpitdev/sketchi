@@ -1,18 +1,18 @@
 import { Effect } from "effect";
 
-import { resolveDiagramId } from "../diagram-catalog.js";
-import { CliShareError } from "../errors.js";
+import { resolveDiagramId } from "../diagram-catalog";
+import { CliShareError } from "../errors";
 import {
 	MAX_RENDER_CANVAS_AREA,
 	MAX_RENDER_CANVAS_DIMENSION,
 	MAX_RENDER_ELEMENT_DIMENSION,
 	MAX_RENDER_OUTPUT_PIXELS,
-} from "../render/limits.js";
-import { ExcalidrawShare, LinkOpener } from "../share/excalidraw.js";
-import { DiagramStore } from "../store/service.js";
-import { Command, Flag } from "../terminal/effect-cli.js";
-import { OutputWriter, reportFailure, reportSuccess } from "../terminal/output.js";
-import { diagramIdArgument, rootCommand } from "./root.js";
+} from "../render/limits";
+import { ExcalidrawShare, LinkOpener } from "../share/excalidraw";
+import { DiagramStore } from "../store/service";
+import { Command, Flag } from "../terminal/effect-cli";
+import { OutputWriter, reportFailure, reportSuccess } from "../terminal/output";
+import { diagramIdArgument, rootCommand } from "./root";
 
 const SHARE_HINT =
 	"this immutable link is a bearer snapshot: anyone with the full URL can decrypt it, so share it only with the intended user. Browser edits do not update this link; after editing, choose Save to… → Export to Link and return the new link for sketchi pull.";

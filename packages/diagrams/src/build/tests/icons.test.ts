@@ -1,4 +1,4 @@
-import { buildResponse } from "../operation.js";
+import { buildResponse } from "../operation";
 import {
 	CanvasSpec,
 	drawnIconSlug,

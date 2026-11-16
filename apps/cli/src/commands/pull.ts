@@ -1,19 +1,19 @@
 import { Effect } from "effect";
 
-import { resolveDiagramId } from "../diagram-catalog.js";
+import { resolveDiagramId } from "../diagram-catalog";
 import {
 	MAX_RENDER_CANVAS_AREA,
 	MAX_RENDER_CANVAS_DIMENSION,
 	MAX_RENDER_ELEMENT_DIMENSION,
 	MAX_RENDER_OUTPUT_PIXELS,
-} from "../render/limits.js";
-import { MAX_SHARE_LINK_LENGTH } from "../share/protocol.js";
-import { preflightPullTarget, pullIntoStore } from "../share/pull.js";
-import { Command, exactlyOnceStringFlag } from "../terminal/effect-cli.js";
-import { InputReader } from "../terminal/input.js";
-import { runReported } from "../terminal/output.js";
-import { revisionLocations } from "./present.js";
-import { diagramIdArgument, rootCommand } from "./root.js";
+} from "../render/limits";
+import { MAX_SHARE_LINK_LENGTH } from "../share/protocol";
+import { preflightPullTarget, pullIntoStore } from "../share/pull";
+import { Command, exactlyOnceStringFlag } from "../terminal/effect-cli";
+import { InputReader } from "../terminal/input";
+import { runReported } from "../terminal/output";
+import { revisionLocations } from "./present";
+import { diagramIdArgument, rootCommand } from "./root";
 
 const readLinkInput = Effect.fn("sketchi.cli.pull.readLink")(function* (link: string) {
 	if (link !== "-") return link;

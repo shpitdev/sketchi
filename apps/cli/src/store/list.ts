@@ -2,18 +2,12 @@ import { join } from "node:path";
 
 import { Effect, Result } from "effect";
 
-import { MANIFEST_FILE, type DiagramListEntry, summaryFromStored } from "../contracts.js";
-import {
-	BACKUP_PREFIX,
-	compareCodeUnits,
-	decodedId,
-	isVisibleRecord,
-	recordPath,
-} from "./entries.js";
-import type { makeLocks } from "./locks.js";
-import type { makeRecordReader } from "./record.js";
-import type { makeRecovery } from "./recovery.js";
-import type { StoreContext } from "./service.js";
+import { MANIFEST_FILE, type DiagramListEntry, summaryFromStored } from "../contracts";
+import { BACKUP_PREFIX, compareCodeUnits, decodedId, isVisibleRecord, recordPath } from "./entries";
+import type { makeLocks } from "./locks";
+import type { makeRecordReader } from "./record";
+import type { makeRecovery } from "./recovery";
+import type { StoreContext } from "./service";
 
 export function makeList(
 	{ fs, root }: StoreContext,

@@ -14,7 +14,7 @@ import {
 	type FocusBinding,
 	isExcalidrawBindableType,
 	type Point,
-} from "./excalidraw-binding.js";
+} from "./excalidraw-binding";
 
 /**
  * How far an end turns off an axis-aligned line that misses its shape's middle.

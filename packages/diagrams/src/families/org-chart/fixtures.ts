@@ -5,7 +5,7 @@ import {
 	orgChartDiagramType,
 	parseOrgChartDiagram,
 	resolveOrgChartShorthand,
-} from "./document.js";
+} from "./document";
 
 const FIRST = [
 	"Ada",

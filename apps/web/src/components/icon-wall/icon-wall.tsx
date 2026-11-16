@@ -1,6 +1,6 @@
 import { Button } from "@sketchi/ui/components/button";
 
-import { BrandIcon } from "../brand-icon/index.js";
+import { BrandIcon } from "../brand-icon/index";
 import { DEFAULT_WEB_SURFACE_URLS } from "../../lib/surface-urls";
 
 export interface IconWallProps {

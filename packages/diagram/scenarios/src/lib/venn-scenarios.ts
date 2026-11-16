@@ -13,8 +13,8 @@ import {
 	vennTextLineBoxes,
 } from "@sketchi/diagrams/families/venn/readout";
 
-import { type ScenarioCheck } from "./evaluate.js";
-import { type DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate";
+import { type DiagramScenarioDifficulty } from "./scenarios";
 
 /** A set the prompt names: the labels it may go by. */
 export interface VennScenarioSet {

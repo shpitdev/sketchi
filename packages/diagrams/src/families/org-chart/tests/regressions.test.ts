@@ -3,9 +3,9 @@ import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { type CanvasConnectorElement as ArrowSceneElement } from "@sketchi/drawing";
 
-import { parseOrgChartDiagram, resolveOrgChartShorthand } from "../document.js";
-import { orgChartLayoutIssues } from "../readout.js";
-import { renderOrgChartDiagram } from "../render.js";
+import { parseOrgChartDiagram, resolveOrgChartShorthand } from "../document";
+import { orgChartLayoutIssues } from "../readout";
+import { renderOrgChartDiagram } from "../render";
 
 /**
  * The Northwind Health scenario. The fuzz tolerates rare dotted-line shortfalls,

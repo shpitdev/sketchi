@@ -1,18 +1,18 @@
 import { Effect, Layer } from "effect";
 
-import { LocalFileSystem } from "../filesystem.js";
-import { makeCreate } from "./create.js";
-import { makeReplaceWithDetached } from "./detached.js";
-import { makeEdit } from "./edit.js";
-import { makeList } from "./list.js";
-import { makeLocks } from "./locks.js";
-import { makePatch } from "./patch.js";
-import { makeRead } from "./read.js";
-import { makeRecordReader } from "./record.js";
-import { makeRecovery } from "./recovery.js";
-import { makeRevisions } from "./revisions.js";
-import { DiagramStore, StorageRoot } from "./service.js";
-import { makeTransactions } from "./transaction.js";
+import { LocalFileSystem } from "../filesystem";
+import { makeCreate } from "./create";
+import { makeReplaceWithDetached } from "./detached";
+import { makeEdit } from "./edit";
+import { makeList } from "./list";
+import { makeLocks } from "./locks";
+import { makePatch } from "./patch";
+import { makeRead } from "./read";
+import { makeRecordReader } from "./record";
+import { makeRecovery } from "./recovery";
+import { makeRevisions } from "./revisions";
+import { DiagramStore, StorageRoot } from "./service";
+import { makeTransactions } from "./transaction";
 
 export const DiagramStoreLive = Layer.effect(
 	DiagramStore,

@@ -4,16 +4,16 @@ import { useHotkeys, type UseHotkeyDefinition } from "@tanstack/react-hotkeys";
 import { useCallback, useContext, useMemo, useRef, useState } from "react";
 
 import { formatCollectionLabel, type IconManifest, type SketchiIcon } from "@sketchi/icon-catalog";
-import { DRAWINGS_LIBRARY_PATH, type IconDrawings } from "../../lib/drawings.js";
-import { filterIcons, toggleCollection } from "./filter.js";
-import { PLAYGROUND_URL, REPO_URL, SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
-import type { PackShelfData } from "../../lib/packs-rpc.js";
-import { permanentSvgUrl } from "../../lib/permanent-svg-url.js";
+import { DRAWINGS_LIBRARY_PATH, type IconDrawings } from "../../lib/drawings";
+import { filterIcons, toggleCollection } from "./filter";
+import { PLAYGROUND_URL, REPO_URL, SKETCHI_WEB_HOME_URL } from "../../lib/home-url";
+import type { PackShelfData } from "../../lib/packs-rpc";
+import { permanentSvgUrl } from "../../lib/permanent-svg-url";
 import { RegistryContext, useAtom } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
-import { drawnNames } from "../browser/drawn-names.js";
-import { useLoadOnScroll } from "../browser/use-load-on-scroll.js";
-import { useModifierLabel } from "../browser/use-modifier-label.js";
+import { drawnNames } from "../browser/drawn-names";
+import { useLoadOnScroll } from "../browser/use-load-on-scroll";
+import { useModifierLabel } from "../browser/use-modifier-label";
 import {
 	applySelectionEvent,
 	describeSelectionNotice,
@@ -21,18 +21,18 @@ import {
 	SELECTION_LIMIT,
 	selectResultsLabel,
 	type SelectionEvent,
-} from "./selection.js";
-import { IconCard } from "./icon-card/icon-card.js";
-import { IconDetail } from "./icon-detail/icon-detail.js";
-import { NamesToggle } from "../../components/names-toggle/names-toggle.js";
-import { PackShelf } from "../packs/pack-shelf.js";
-import type { PreviewMode } from "../../components/preview-toggle/preview-toggle.js";
-import { CommandPalette, type IconCommand, type PaletteLink } from "./command-palette.js";
-import { IconsChrome } from "../../components/icons-chrome.js";
-import { IconToolbar } from "./icon-toolbar.js";
-import { SelectionBar } from "./selection-bar.js";
-import { type SelectionAction, useIconSources } from "./use-icon-sources.js";
-import { type IconView, ViewSwitch } from "./view-switch.js";
+} from "./selection";
+import { IconCard } from "./icon-card/icon-card";
+import { IconDetail } from "./icon-detail/icon-detail";
+import { NamesToggle } from "../../components/names-toggle/names-toggle";
+import { PackShelf } from "../packs/pack-shelf";
+import type { PreviewMode } from "../../components/preview-toggle/preview-toggle";
+import { CommandPalette, type IconCommand, type PaletteLink } from "./command-palette";
+import { IconsChrome } from "../../components/icons-chrome";
+import { IconToolbar } from "./icon-toolbar";
+import { SelectionBar } from "./selection-bar";
+import { type SelectionAction, useIconSources } from "./use-icon-sources";
+import { type IconView, ViewSwitch } from "./view-switch";
 
 export type { IconManifest, SketchiIcon } from "@sketchi/icon-catalog";
 

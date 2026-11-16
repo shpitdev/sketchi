@@ -9,7 +9,7 @@ import { Effect, Fiber } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { TestClock } from "effect/testing";
 
-import { publishIcon } from "../src/community-client.js";
+import { publishIcon } from "../src/community-client";
 
 const binary = resolve(process.cwd(), "apps/cli/dist/sketchi.js");
 const testParent = resolve(process.cwd(), ".memory/cli-icon-tests");

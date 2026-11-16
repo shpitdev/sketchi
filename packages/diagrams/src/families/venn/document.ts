@@ -8,7 +8,7 @@ import {
 	Option,
 	Result,
 } from "effect";
-import { cleanToolString, slug } from "../../clean-text.js";
+import { cleanToolString, slug } from "../../clean-text";
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 export const vennDiagramType = "venn" as const;
 /** Two or three overlapping sets; more stop reading as one symmetric diagram. */

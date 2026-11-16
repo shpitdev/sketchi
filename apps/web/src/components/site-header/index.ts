@@ -1,1 +1,1 @@
-export * from "./site-header.js";
+export * from "./site-header";

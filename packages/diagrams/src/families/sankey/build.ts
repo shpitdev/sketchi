@@ -1,6 +1,6 @@
-import { PublishedBuildIssue } from "../../build/result.js";
+import { PublishedBuildIssue } from "../../build/result";
 import { Array, Result } from "effect";
-import { defineBuild } from "../../build/operation.js";
+import { defineBuild } from "../../build/operation";
 import {
 	SankeyDocument,
 	SankeyDiagram,
@@ -10,9 +10,9 @@ import {
 	resolveSankeyShorthand,
 	validateSankeyDiagram,
 	counts,
-} from "./document.js";
-import { renderSankeyDiagram } from "./render.js";
-import { sankeyLayoutIssues } from "./readout.js";
+} from "./document";
+import { renderSankeyDiagram } from "./render";
+import { sankeyLayoutIssues } from "./readout";
 
 export const sankeyBuild = defineBuild({
 	publishedIssues: PublishedBuildIssue,

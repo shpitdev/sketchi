@@ -10,18 +10,18 @@ import {
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { describe, expect, it, vi } from "vitest";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts.js";
-import { buildMindmap } from "../../../build/builds.js";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime.js";
-import { buildResponse } from "../../../build/operation.js";
+import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { buildMindmap } from "../../../build/builds";
+import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { buildResponse } from "../../../build/operation";
 import {
 	type MindmapInputError,
 	type MindmapTopic,
 	mindmapLayoutIssues,
 	parseMindmap,
 	renderMindmap,
-} from "../index.js";
-import type { MindmapLayoutIssue } from "../readout.js";
+} from "../index";
+import type { MindmapLayoutIssue } from "../readout";
 
 // Count the box comparisons the layout packs subtrees with, and the label wraps
 // it measures with. Both are deterministic, so they bound layout work without a

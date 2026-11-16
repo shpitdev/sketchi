@@ -6,11 +6,11 @@ import { Dialog as Modal } from "radix-ui";
 
 import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
 
-import { formatBytes } from "../../../lib/format-bytes.js";
-import { IconMark } from "../../../components/icon-mark/icon-mark.js";
-import { DrawnIcon } from "../../../components/drawn-icon/drawn-icon.js";
-import { NamesToggle } from "../../../components/names-toggle/names-toggle.js";
-import { PreviewToggle } from "../../../components/preview-toggle/preview-toggle.js";
+import { formatBytes } from "../../../lib/format-bytes";
+import { IconMark } from "../../../components/icon-mark/icon-mark";
+import { DrawnIcon } from "../../../components/drawn-icon/drawn-icon";
+import { NamesToggle } from "../../../components/names-toggle/names-toggle";
+import { PreviewToggle } from "../../../components/preview-toggle/preview-toggle";
 
 export type IconDetailAction =
 	| "copy-data-uri"

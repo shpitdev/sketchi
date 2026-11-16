@@ -6,17 +6,13 @@ import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Result, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 
-import { type BuiltDiagram, type StoredDiagram } from "./contracts.js";
-import { decodeCanonicalDiagramDocument, documentId, validateStorageId } from "./document.js";
-import { CliGenerationError, CliValidationError } from "./errors.js";
-import { DiagramPatcher } from "./patch.js";
-import { decodeGenerate, diagramsClient } from "./diagrams-client.js";
-import {
-	boundedResponse,
-	GENERATE_REQUEST_TIMEOUT,
-	MAX_API_RESPONSE_BYTES,
-} from "./response-body.js";
-import { DiagramStore } from "./store/service.js";
+import { type BuiltDiagram, type StoredDiagram } from "./contracts";
+import { decodeCanonicalDiagramDocument, documentId, validateStorageId } from "./document";
+import { CliGenerationError, CliValidationError } from "./errors";
+import { DiagramPatcher } from "./patch";
+import { decodeGenerate, diagramsClient } from "./diagrams-client";
+import { boundedResponse, GENERATE_REQUEST_TIMEOUT, MAX_API_RESPONSE_BYTES } from "./response-body";
+import { DiagramStore } from "./store/service";
 
 export const DEFAULT_GENERATE_ENDPOINT = "https://playground.sketchi.app/api/v1/generate";
 export const SKETCHI_GENERATE_ENDPOINT_ENV = "SKETCHI_GENERATE_ENDPOINT";

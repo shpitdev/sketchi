@@ -1,18 +1,18 @@
-import { inputIssues, formatContractSchemaError } from "../../build/input.js";
+import { inputIssues, formatContractSchemaError } from "../../build/input";
 /** Owns Flowchart build policy; decoding, quality gates and artifact delivery use the common operation. */
 import { Array, Effect, Record, Result, Schema } from "effect";
-import { defineBuild } from "../../build/operation.js";
-import { CodeModeIssue, qualityIssues } from "../../build/result.js";
+import { defineBuild } from "../../build/operation";
+import { CodeModeIssue, qualityIssues } from "../../build/result";
 import {
 	BuildIconSource,
 	resolveFlowchartLogos,
 	fillGroupLogos,
 	embedSceneIcons,
-} from "../../build/icons.js";
-import { checkRequestCoverage, type CoverageIssueCode } from "../../generate/coverage.js";
-import { longNodeDescriptions } from "../../graph/compose.js";
-import { NODE_DESCRIPTION_MAX_LINES } from "../../graph/measure.js";
-import { FLOWCHART_COVERAGE_CODES } from "./coverage-codes.js";
+} from "../../build/icons";
+import { checkRequestCoverage, type CoverageIssueCode } from "../../generate/coverage";
+import { longNodeDescriptions } from "../../graph/compose";
+import { NODE_DESCRIPTION_MAX_LINES } from "../../graph/measure";
+import { FLOWCHART_COVERAGE_CODES } from "./coverage-codes";
 import {
 	FlowchartDocumentSchema,
 	NormalizedFlowchartSpecSchema,
@@ -25,9 +25,9 @@ import {
 	counts,
 	type FlowchartDocument,
 	type NormalizedFlowchartSpec,
-} from "./document.js";
-import { assessFlowchartQuality } from "./quality.js";
-import { renderFlowchartDiagram } from "./render.js";
+} from "./document";
+import { assessFlowchartQuality } from "./quality";
+import { renderFlowchartDiagram } from "./render";
 
 export const FLOWCHART_REQUEST_MAX_LENGTH = 20_000;
 export const FlowchartRequestText = Schema.NonEmptyString.check(

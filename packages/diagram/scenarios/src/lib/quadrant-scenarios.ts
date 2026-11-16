@@ -12,8 +12,8 @@ import {
 	readQuadrantScene,
 } from "@sketchi/diagrams/families/quadrant/readout";
 
-import { type ScenarioCheck } from "./evaluate.js";
-import { type DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate";
+import { type DiagramScenarioDifficulty } from "./scenarios";
 
 type End = "low" | "high";
 

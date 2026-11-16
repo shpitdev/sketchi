@@ -2,7 +2,7 @@ import { type CanvasSpec } from "@sketchi/drawing";
 
 import { Context, Effect, Layer } from "effect";
 
-import { HeadlessPngRenderError } from "./diagnostics.js";
+import { HeadlessPngRenderError } from "./diagnostics";
 
 export interface PngRenderInput {
 	readonly scene?: CanvasSpec;
@@ -24,7 +24,7 @@ export class CliPngRenderer extends Context.Service<
 function renderPng(input: PngRenderInput): Effect.Effect<Uint8Array, HeadlessPngRenderError> {
 	return Effect.tryPromise({
 		try: async () => {
-			const runtime = await import("./png-renderer-runtime.js");
+			const runtime = await import("./png-renderer-runtime");
 			return runtime.renderPngBytes(input);
 		},
 		catch: (cause) =>
@@ -43,7 +43,7 @@ function renderPng(input: PngRenderInput): Effect.Effect<Uint8Array, HeadlessPng
 function normalizeExcalidraw(input: unknown): Effect.Effect<unknown, HeadlessPngRenderError> {
 	return Effect.tryPromise({
 		try: async () => {
-			const runtime = await import("./png-renderer-runtime.js");
+			const runtime = await import("./png-renderer-runtime");
 			return runtime.normalizeExcalidrawArtifact(input);
 		},
 		catch: (cause) =>
@@ -64,4 +64,4 @@ export const CliPngRendererLive = Layer.succeed(CliPngRenderer, {
 	normalizeExcalidraw,
 });
 
-export { HeadlessPngRenderError } from "./diagnostics.js";
+export { HeadlessPngRenderError } from "./diagnostics";

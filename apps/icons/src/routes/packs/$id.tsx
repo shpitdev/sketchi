@@ -3,11 +3,11 @@ import { Array, Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
-import { PackPage } from "../../features/packs/pack-page.js";
-import { packQuery, queryError, queryStatus } from "../../lib/query-atoms.js";
-import { packPagePath } from "../../lib/packs.js";
-import { packDescription, packImage, pageMeta } from "../../lib/site-meta.js";
-import { getPackShelf } from "../../lib/packs-rpc.js";
+import { PackPage } from "../../features/packs/pack-page";
+import { packQuery, queryError, queryStatus } from "../../lib/query-atoms";
+import { packPagePath } from "../../lib/packs";
+import { packDescription, packImage, pageMeta } from "../../lib/site-meta";
+import { getPackShelf } from "../../lib/packs-rpc";
 
 export const Route = createFileRoute("/packs/$id")({
 	// @effect-diagnostics-next-line asyncFunction:off -- TanStack route loader owns this existing server-function Promise boundary.

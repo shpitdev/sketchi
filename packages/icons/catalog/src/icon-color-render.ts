@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
 
-import { type IconColor, iconColor } from "./color-mode.js";
+import { type IconColor, iconColor } from "./color-mode";
 
 // Build and test time only: the package build leaves this file out, so the
 // browser entry never pulls in the renderer.

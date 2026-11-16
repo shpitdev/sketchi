@@ -1,1 +1,1 @@
-export * from "./home-hero.js";
+export * from "./home-hero";

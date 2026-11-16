@@ -16,8 +16,8 @@ import {
 } from "@sketchi/diagrams/families/wireframe/render";
 import { wireframeLayoutIssues } from "@sketchi/diagrams/families/wireframe/readout";
 
-import { type ScenarioCheck } from "./evaluate.js";
-import { type DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate";
+import { type DiagramScenarioDifficulty } from "./scenarios";
 
 /** A screen the prompt states: the names it may go by (any, when it names none) and its device. */
 export interface WireframeScenarioScreen {

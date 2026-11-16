@@ -1,8 +1,8 @@
 import {
 	generationReliabilityScenarios,
 	type GenerationReliabilityScenario,
-} from "./generation-reliability.js";
-import { type DiagramScenario, diagramScenarios } from "./diagram-scenarios.js";
+} from "./generation-reliability";
+import { type DiagramScenario, diagramScenarios } from "./diagram-scenarios";
 
 export type RegisteredGenerationScenario = DiagramScenario | GenerationReliabilityScenario;
 

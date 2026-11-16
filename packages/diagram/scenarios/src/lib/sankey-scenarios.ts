@@ -18,8 +18,8 @@ import {
 	sankeyWeightedCrossings,
 } from "@sketchi/diagrams/families/sankey/readout";
 
-import { type ScenarioCheck } from "./evaluate.js";
-import { type DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate";
+import { type DiagramScenarioDifficulty } from "./scenarios";
 
 /** A node the prompt names, by every form its label may take. */
 export interface SankeyScenarioNode {
