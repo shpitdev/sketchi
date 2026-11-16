@@ -9,7 +9,6 @@ import {
 	EXCALIDRAW_LIBRARY_BACKEND,
 	type ExcalidrawPublishEnv,
 	handlePackPublish,
-	installLinkFromPullRequest,
 	loadPackExcalidrawStates,
 	packExcalidrawStates,
 	PULL_REQUEST_RECHECK_MS,
@@ -649,12 +648,29 @@ describe("pull request states", () => {
 });
 
 describe("install links", () => {
-	it("only trusts an install link of the collection's form", () => {
-		expect(installLinkFromPullRequest(`[Installation link](${INSTALL})`)).toBe(INSTALL);
-		expect(
-			installLinkFromPullRequest(
-				"[Installation link](https://excalidraw.com/#url=https://x.dev/a)",
-			),
-		).toBeUndefined();
+	const RAW_LIBRARY = new URL(INSTALL).searchParams.get("addLibrary")!;
+	it.each([
+		["a foreign host", `https://excalidraw.example/?addLibrary=${encodeURIComponent(RAW_LIBRARY)}`],
+		["plain http", `http://excalidraw.com/?addLibrary=${encodeURIComponent(RAW_LIBRARY)}`],
+		[
+			"a library outside the collection",
+			`https://excalidraw.com/?addLibrary=${encodeURIComponent("https://evil.example/libraries/jane/palantir.excalidrawlib")}`,
+		],
+		["a scene link", "https://excalidraw.com/#url=https://x.dev/a"],
+	])("neither returns nor stores an install link to %s", async (_case, untrusted) => {
+		backend({
+			pull: () =>
+				Response.json({
+					head: { ref: "jane-palantir-platform-icons-1" },
+					body: `Hand-drawn icons.\n\n[Installation link](${untrusted})\n`,
+				}),
+		});
+		const env = await environment();
+		const response = await publish(env);
+		expect(response.status).toBe(201);
+		expect(await response.json()).toEqual({ pullRequestUrl: PR });
+		expect(await submissionRows(env)).toMatchObject([
+			{ status: "submitted", pull_request_url: PR, install_url: null },
+		]);
 	});
 });
