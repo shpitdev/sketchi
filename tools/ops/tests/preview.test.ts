@@ -73,11 +73,28 @@ const deleteArgs = (project: string, pr: string) => [
 	pr,
 ];
 
+/**
+ * Runs `preview delete` past every URL check (12 checks, 10 s apart, each bounded to 10 s) on the
+ * test clock, so a run that goes on to delete or wait reaches its result and its assertion fails
+ * promptly instead of stalling on the clock.
+ */
+const deletePreview = (
+	account: ReturnType<typeof cloudflare>,
+	project: string,
+	pr: string,
+	env: Record<string, string> = CREDENTIALS,
+) =>
+	Effect.gen(function* () {
+		const run = yield* Effect.forkChild(account.run(deleteArgs(project, pr), env));
+		yield* TestClock.adjust("5 minutes");
+		return yield* Fiber.join(run);
+	});
+
 describe("preview delete", () => {
 	it.effect("deletes only this PR's Preview of this project's Worker", () =>
 		Effect.gen(function* () {
 			const account = cloudflare();
-			const exit = yield* account.run(deleteArgs("icons", "42"), CREDENTIALS);
+			const exit = yield* deletePreview(account, "icons", "42");
 			expect(failure(exit)).toBeUndefined();
 			const deletes = account.requests.filter(({ method }) => method === "DELETE");
 			expect(deletes.map(({ url }) => url)).toEqual([
@@ -114,7 +131,7 @@ describe("preview delete", () => {
 					["../web", "42"],
 				] as const) {
 					const account = cloudflare();
-					const exit = yield* account.run(deleteArgs(project, pr), CREDENTIALS);
+					const exit = yield* deletePreview(account, project, pr);
 					expect(Exit.isFailure(exit), `${project} ${pr}`).toBe(true);
 					expect(account.requests).toEqual([]);
 				}
@@ -127,7 +144,7 @@ describe("preview delete", () => {
 			Effect.gen(function* () {
 				for (const suffix of ["-sketchi-web.dimethyl.workers.dev", "-sketchi-icons.evil.example"]) {
 					const account = cloudflare({ suffixFor: () => suffix });
-					const exit = yield* account.run(deleteArgs("icons", "42"), CREDENTIALS);
+					const exit = yield* deletePreview(account, "icons", "42");
 					expect(failure(exit)).toMatch(/Cannot resolve the Preview URL of sketchi-icons/);
 					expect(account.requests.filter(({ method }) => method === "DELETE")).toEqual([]);
 					expect(account.previews.get("sketchi-icons")!.size).toBe(2);
@@ -138,9 +155,7 @@ describe("preview delete", () => {
 	it.effect("reports deletion-pending and fails when a deleted Preview keeps serving", () =>
 		Effect.gen(function* () {
 			const account = cloudflare({ lingers: 100 });
-			const run = yield* Effect.forkChild(account.run(deleteArgs("icons", "42"), CREDENTIALS));
-			yield* TestClock.adjust("5 minutes");
-			const exit = yield* Fiber.join(run);
+			const exit = yield* deletePreview(account, "icons", "42");
 			expect(failure(exit)).toMatch(/still serves after 12 checks/);
 			expect(account.requests.filter(({ url }) => url.includes(".workers.dev/"))).toHaveLength(12);
 			expect(account.outputs()["comment_status"]).toBe("deletion-pending");
@@ -150,9 +165,7 @@ describe("preview delete", () => {
 	it.effect("bounds a hung URL check instead of holding the job", () =>
 		Effect.gen(function* () {
 			const account = cloudflare({ hang: true });
-			const run = yield* Effect.forkChild(account.run(deleteArgs("icons", "42"), CREDENTIALS));
-			yield* TestClock.adjust("10 minutes");
-			const exit = yield* Fiber.join(run);
+			const exit = yield* deletePreview(account, "icons", "42");
 			expect(failure(exit)).toMatch(/still serves after 12 checks/);
 			expect(account.outputs()["comment_status"]).toBe("deletion-pending");
 		}),
@@ -161,9 +174,7 @@ describe("preview delete", () => {
 	it.effect("waits for a lingering hostname to retire before reporting deletion", () =>
 		Effect.gen(function* () {
 			const account = cloudflare({ lingers: 2 });
-			const run = yield* Effect.forkChild(account.run(deleteArgs("icons", "42"), CREDENTIALS));
-			yield* TestClock.adjust("1 minute");
-			expect(failure(yield* Fiber.join(run))).toBeUndefined();
+			expect(failure(yield* deletePreview(account, "icons", "42"))).toBeUndefined();
 			expect(account.requests.filter(({ url }) => url.includes(".workers.dev/"))).toHaveLength(3);
 			expect(account.outputs()["comment_status"]).toBe("deleted");
 		}),
@@ -173,7 +184,7 @@ describe("preview delete", () => {
 		Effect.gen(function* () {
 			const account = cloudflare();
 			account.previews.get("sketchi-icons")!.delete("pr-42");
-			expect(failure(yield* account.run(deleteArgs("icons", "42"), CREDENTIALS))).toBeUndefined();
+			expect(failure(yield* deletePreview(account, "icons", "42"))).toBeUndefined();
 			expect(account.outputs()["comment_status"]).toBe("deleted");
 		}),
 	);
@@ -181,7 +192,7 @@ describe("preview delete", () => {
 	it.effect("surfaces a failed delete without checking or reporting the URL", () =>
 		Effect.gen(function* () {
 			const account = cloudflare({ deleteStatus: 500 });
-			const exit = yield* account.run(deleteArgs("icons", "42"), CREDENTIALS);
+			const exit = yield* deletePreview(account, "icons", "42");
 			expect(failure(exit)).toMatch(/delete failed with HTTP 500/);
 			expect(account.requests.some(({ url }) => url.includes(".workers.dev/"))).toBe(false);
 			expect(account.outputs()).toEqual({});
@@ -191,7 +202,7 @@ describe("preview delete", () => {
 	it.effect("deletes nothing without Cloudflare credentials", () =>
 		Effect.gen(function* () {
 			const account = cloudflare();
-			expect(failure(yield* account.run(deleteArgs("icons", "42")))).toBeUndefined();
+			expect(failure(yield* deletePreview(account, "icons", "42", {}))).toBeUndefined();
 			expect(account.requests).toEqual([]);
 		}),
 	);
