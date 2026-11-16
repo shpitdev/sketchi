@@ -2,7 +2,7 @@ import { formatContractSchemaError } from "@sketchi/diagrams/build/input";
 import {
 	CreateCanvasRequest,
 	CreateCanvasResultSchema,
-} from "@sketchi/diagrams/build/code-mode/contract";
+} from "@sketchi/diagrams/canvas/create-contract";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Schema, SchemaIssue, Result } from "effect";
 
