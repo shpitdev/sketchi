@@ -165,7 +165,7 @@ jobs:
     if: >-
       github.event.action != 'closed' &&
       needs.resolve-preview-pr.outputs.projects != '[]'
-    runs-on: depot-ubuntu-24.04
+    runs-on: ubuntu-latest
     environment: staging
     strategy:
       fail-fast: false

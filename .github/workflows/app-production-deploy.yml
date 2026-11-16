@@ -51,7 +51,7 @@ jobs:
   deploy:
     needs: select
     if: needs.select.outputs.projects != '[]'
-    runs-on: depot-ubuntu-24.04
+    runs-on: ubuntu-latest
     environment: production
     strategy:
       fail-fast: false
