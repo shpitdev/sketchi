@@ -582,6 +582,36 @@ describe("class oracle", () => {
 			kind,
 		);
 	});
+
+	/** One broken scene per count the pinned routing ratchet reads. */
+	const brokenRouting: Record<
+		keyof ReturnType<typeof routingCounts>,
+		(scene: CanvasSpec) => CanvasSpec
+	> = {
+		// A line straight through the middle of another.
+		crossings: (scene) => {
+			const [from, to] = ends(find(scene, "edge:holds", "arrow"));
+			const x = (from.x + to.x) / 2;
+			return edit(scene, "edge:uses", route({ x, y: from.y - 40 }, { x, y: from.y + 40 }));
+		},
+		// A line that stops against another's arrowhead without crossing its shaft.
+		findings: (scene) => {
+			const [, head] = ends(find(scene, "edge:holds", "arrow"));
+			return edit(
+				scene,
+				"edge:uses",
+				route({ x: head.x - 10, y: head.y - 40 }, { x: head.x - 10, y: head.y - 4 }),
+			);
+		},
+	};
+
+	it.each(Object.entries(brokenRouting))("counts %s on a broken scene", (count, breakScene) => {
+		const scene = renderDiagram(shop).pipe(Result.getOrThrow);
+		expect(routingCounts(scene)).toEqual({ crossings: 0, findings: 0 });
+		expect(
+			routingCounts(breakScene(scene))[count as keyof ReturnType<typeof routingCounts>],
+		).toBeGreaterThan(0);
+	});
 });
 
 /**
