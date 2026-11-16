@@ -1,20 +1,161 @@
-// The checked-in DuckDB views over the span table, run by the real DuckDB CLI on local rows.
-import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+// The checked-in DuckDB init and views, run by the real DuckDB CLI on local rows and a local
+// Iceberg REST catalog.
+import { execFile, spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
 
 import { expect, test } from "vitest";
 
-import { INIT_SQL } from "../src/telemetry/db";
+import { duckdbCommand, INIT_SQL, VIEWS_SQL } from "../src/telemetry/db";
 
 const init = readFileSync(INIT_SQL, "utf8");
+const views = readFileSync(VIEWS_SQL, "utf8");
 const duckdb = spawnSync("duckdb", ["--version"], { encoding: "utf8" });
+const pinnedDuckdb = readFileSync(new URL("../../../mise.toml", import.meta.url), "utf8").match(
+	/^duckdb = "([\d.]+)"$/m,
+)?.[1];
+const CATALOG_HOST = "https://catalog.cloudflarestorage.com";
+const ACCOUNT = "75f9660f39e4dafe8b95980b87e7399a";
+const SPAN_COLUMNS = [
+	...["schema", "trace_id", "span_id", "parent_span_id", "name", "kind", "service"],
+	...["environment", "service_version", "start_time", "end_time", "duration_ms", "outcome"],
+	...["error_tag", "error_message", "error", "cause", "attributes", "events", "ray_id"],
+	...["run_id", "attempt_id", "part_index", "part_count", "__ingest_ts"],
+];
+const columnType = (name: string) =>
+	name.endsWith("_time") || name === "__ingest_ts"
+		? "timestamp"
+		: name === "duration_ms"
+			? "double"
+			: name.startsWith("part_")
+				? "int"
+				: "string";
+
+/** An Iceberg REST catalog on localhost whose every `observability.spans` table is empty. */
+async function emptySpanCatalog() {
+	const requests: { path: string; warehouse: string | null; authorization: string | undefined }[] =
+		[];
+	const metadata = {
+		"format-version": 2,
+		"table-uuid": "00000000-0000-4000-8000-000000000000",
+		location: "file:///nonexistent/spans",
+		"last-sequence-number": 0,
+		"last-updated-ms": 0,
+		"last-column-id": SPAN_COLUMNS.length,
+		"current-schema-id": 0,
+		schemas: [
+			{
+				type: "struct",
+				"schema-id": 0,
+				fields: SPAN_COLUMNS.map((name, index) => ({
+					id: index + 1,
+					name,
+					required: false,
+					type: columnType(name),
+				})),
+			},
+		],
+		"default-spec-id": 0,
+		"partition-specs": [{ "spec-id": 0, fields: [] }],
+		"last-partition-id": 999,
+		"default-sort-order-id": 0,
+		"sort-orders": [{ "order-id": 0, fields: [] }],
+		properties: {},
+		snapshots: [],
+		"snapshot-log": [],
+		"metadata-log": [],
+	};
+	const server = createServer((request, response) => {
+		const url = new URL(request.url ?? "/", "http://catalog");
+		requests.push({
+			path: url.pathname,
+			warehouse: url.searchParams.get("warehouse"),
+			authorization: request.headers.authorization,
+		});
+		response.setHeader("content-type", "application/json");
+		if (url.pathname.endsWith("/v1/config")) {
+			response.end(JSON.stringify({ defaults: {}, overrides: {} }));
+		} else if (url.pathname.endsWith("/v1/namespaces/observability/tables/spans")) {
+			response.end(
+				JSON.stringify({ "metadata-location": `${metadata.location}/v1.json`, metadata }),
+			);
+		} else {
+			response.statusCode = 404;
+			response.end(JSON.stringify({ error: { code: 404, message: "absent", type: "NotFound" } }));
+		}
+	});
+	await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+	const { port } = server.address() as AddressInfo;
+	return {
+		endpoint: `http://127.0.0.1:${port}`,
+		requests,
+		close: () => new Promise((resolve) => server.close(resolve)),
+	};
+}
+
+test.skipIf(duckdb.status !== 0).each(["preview", "production"] as const)(
+	"pnpm db opens the %s span catalog and the production usage history with the token",
+	async (environment) => {
+		// R2's span manifests need the pinned release: 1.5.2's iceberg extension aborts on them.
+		expect(duckdb.stdout, "run with the mise.toml DuckDB").toMatch(
+			new RegExp(`^v${pinnedDuckdb} `),
+		);
+		const catalog = await emptySpanCatalog();
+		const directory = mkdtempSync(join(tmpdir(), "sketchi-duckdb-init-"));
+		try {
+			const localInit = join(directory, "duckdb-init.sql");
+			writeFileSync(localInit, init.replaceAll(CATALOG_HOST, catalog.endpoint));
+			const sql = "SELECT getvariable('telemetry_env') AS env, (FROM spans SELECT count(*)) AS n";
+			const flags = environment === "preview" ? ["--preview"] : [];
+			const command = duckdbCommand([...flags, "-noheader", "-list", "-c", sql], true);
+			const { stdout } = await promisify(execFile)(
+				command.command,
+				command.args.map((arg) =>
+					arg === INIT_SQL ? localInit : arg.replaceAll(CATALOG_HOST, catalog.endpoint),
+				),
+				{ env: { ...process.env, ...command.env, R2_DATA_READ_TOKEN: "test-token", AI_AGENT: "" } },
+			);
+			expect(stdout.trim().split("\n").at(-1)).toBe(`${environment}|0`);
+			const bucket = `sketchi-telemetry-${environment}`;
+			const history = "sketchi-codemode-usage-analytics-production-v4";
+			// Only the selected span catalog opens, beside the production usage history.
+			expect(
+				new Set(
+					catalog.requests
+						.filter(({ path }) => path.endsWith("/v1/config"))
+						.map(({ path, warehouse }) => `${path}?warehouse=${warehouse}`),
+				),
+			).toEqual(
+				new Set([
+					`/${ACCOUNT}/${bucket}/v1/config?warehouse=${ACCOUNT}_${bucket}`,
+					`/${ACCOUNT}/${history}/v1/config?warehouse=${ACCOUNT}_${history}`,
+				]),
+			);
+			expect(
+				new Set(
+					catalog.requests.filter(({ path }) => path.includes("/tables/")).map(({ path }) => path),
+				),
+			).toEqual(new Set([`/${ACCOUNT}/${bucket}/v1/namespaces/observability/tables/spans`]));
+			expect(
+				catalog.requests.every(({ authorization }) => authorization === "Bearer test-token"),
+			).toBe(true);
+		} finally {
+			await catalog.close();
+			rmSync(directory, { force: true, recursive: true });
+		}
+	},
+);
 
 /** A marked section of the checked-in views, reading a local table instead of the catalog. */
 function section(name: string) {
-	const start = init.indexOf(`-- begin: ${name}`);
-	const end = init.indexOf(`-- end: ${name}`);
-	expect(start >= 0 && end > start, `duckdb-init.sql marks its ${name}`).toBe(true);
-	return init.slice(start, end).replaceAll("telemetry.observability.spans", "raw_spans");
+	const start = views.indexOf(`-- begin: ${name}`);
+	const end = views.indexOf(`-- end: ${name}`);
+	expect(start >= 0 && end > start, `duckdb-views.sql marks its ${name}`).toBe(true);
+	return views.slice(start, end).replaceAll("telemetry.observability.spans", "raw_spans");
 }
 
 const RAW_SPANS = `

@@ -13,13 +13,35 @@ import { optionalEnv } from "../outputs";
 import { opsError } from "../process";
 
 const INFISICAL_PROJECT_ID = "bb3fe729-e290-4740-84d4-304752f0d719";
-export const INIT_SQL = new URL("./duckdb-init.sql", import.meta.url).pathname;
+const ACCOUNT_ID = "75f9660f39e4dafe8b95980b87e7399a";
+export const INIT_SQL = decodeURIComponent(new URL("./duckdb-init.sql", import.meta.url).pathname);
+export const VIEWS_SQL = decodeURIComponent(
+	new URL("./duckdb-views.sql", import.meta.url).pathname,
+);
+
+/**
+ * Attaches the selected span catalog. DuckDB takes an ATTACH path only as a literal, so it runs
+ * between the init file, which creates the secret, and the views that read `telemetry`.
+ */
+function attachSpans(environment: "preview" | "production") {
+	const bucket = `sketchi-telemetry-${environment}`;
+	return `ATTACH '${ACCOUNT_ID}_${bucket}' AS telemetry (TYPE ICEBERG, ENDPOINT 'https://catalog.cloudflarestorage.com/${ACCOUNT_ID}/${bucket}', SECRET r2_data_read, READ_ONLY)`;
+}
 
 /** The DuckDB invocation for `pnpm db <args>`: direct with a token, through Infisical without. */
 export function duckdbCommand(args: readonly string[], hasToken: boolean) {
-	const preview = args.includes("--preview");
-	const duckdbArgs = ["-init", INIT_SQL, ...args.filter((arg) => arg !== "--preview")];
-	const env = { TELEMETRY_ENV: preview ? "preview" : "production" };
+	const environment = args.includes("--preview") ? "preview" : "production";
+	const duckdbArgs = [
+		"-init",
+		INIT_SQL,
+		"-cmd",
+		attachSpans(environment),
+		"-cmd",
+		// The DuckDB shell splits a dot command's arguments at spaces outside double quotes.
+		`.read "${VIEWS_SQL}"`,
+		...args.filter((arg) => arg !== "--preview"),
+	];
+	const env = { TELEMETRY_ENV: environment };
 	if (hasToken) return { command: "duckdb", args: duckdbArgs, env };
 	return {
 		command: "infisical",

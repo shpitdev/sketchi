@@ -176,7 +176,8 @@ to 128 MB files and expire snapshots older than 7 days, keeping at least 5.
 Pipelines ingestion is free. Delivery to Iceberg costs $0.06/GB after 50 GB a
 month, and R2 storage is billed as usual.
 
-`pnpm db` opens DuckDB with `tools/ops/src/telemetry/duckdb-init.sql`. It attaches the
+`pnpm db` opens the DuckDB release pinned in `mise.toml` with
+`tools/ops/src/telemetry/duckdb-init.sql` and the views in `duckdb-views.sql`. It attaches the
 spans catalog with a read-only `R2_DATA_READ_TOKEN`, which it takes from
 Infisical when the variable is unset. `pnpm db --preview` reads the preview
 spans catalog, and DuckDB arguments pass

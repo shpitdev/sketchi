@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { INIT_SQL } from "../src/telemetry/db";
+import { INIT_SQL, VIEWS_SQL } from "../src/telemetry/db";
 import { executable, runOps, scratch } from "./harness";
 
 function stubs() {
@@ -64,8 +64,16 @@ describe("telemetry", () => {
 		expect(direct.status, direct.stderr).toBe(0);
 		const viaInfisical = runOps(["db", "--"], { env: { ...stub.env, R2_DATA_READ_TOKEN: "" } });
 		expect(viaInfisical.status, viaInfisical.stderr).toBe(0);
+		const opening = (environment: string) => [
+			"-init",
+			INIT_SQL,
+			"-cmd",
+			expect.stringContaining(`_sketchi-telemetry-${environment}' AS telemetry`),
+			"-cmd",
+			`.read "${VIEWS_SQL}"`,
+		];
 		expect(stub.calls()).toEqual([
-			{ name: "duckdb", args: ["-init", INIT_SQL, "-c", "FROM spans"], env: "preview" },
+			{ name: "duckdb", args: [...opening("preview"), "-c", "FROM spans"], env: "preview" },
 			{
 				name: "infisical",
 				args: [
@@ -77,8 +85,7 @@ describe("telemetry", () => {
 					"--silent",
 					"--",
 					"duckdb",
-					"-init",
-					INIT_SQL,
+					...opening("production"),
 				],
 				env: "production",
 			},
