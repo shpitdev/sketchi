@@ -50,7 +50,7 @@ import {
 } from "../runtime/context.server";
 import { readBoundedJson } from "../runtime/request-body.server";
 
-const DEFAULT_JUDGE_MODEL = "google/gemini-3.8-flash";
+const DEFAULT_JUDGE_MODEL = "openai/gpt-6-sol";
 
 type IconDrawFailureStatus =
 	| "invalid_input"

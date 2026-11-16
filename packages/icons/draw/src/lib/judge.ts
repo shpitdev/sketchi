@@ -15,12 +15,6 @@ export const JUDGE_PROMPT = [
 	'Reply with JSON only: {"logo": <number 1-5>}.',
 ].join("\n");
 
-export const JUDGE_REPLY_SCHEMA = {
-	type: "OBJECT",
-	properties: { logo: { type: "INTEGER" } },
-	required: ["logo"],
-} as const;
-
 /** One logo the judge is shown: the source, or a catalog look-alike by slug. */
 export type JudgeCandidate =
 	| { readonly kind: "source" }

@@ -131,11 +131,13 @@ function throughGateway(
 	reply: (operation: "icon-author" | "icon-judge", signal: AbortSignal) => Promise<Response>,
 ) {
 	const dispatches = { "icon-author": 0, "icon-judge": 0 };
-	const run: CloudflareAiGateway["run"] = (_request, options) => {
+	const judgeQueries: unknown[] = [];
+	const run: CloudflareAiGateway["run"] = (request, options) => {
 		const operation = options?.gateway?.metadata?.["sketchiOperation"] as
 			| "icon-author"
 			| "icon-judge";
 		dispatches[operation]++;
+		if (operation === "icon-judge") judgeQueries.push(request.query);
 		return reply(operation, options!.signal!);
 	};
 	const models = IconDrawModelsGateway.pipe(
@@ -148,13 +150,13 @@ function throughGateway(
 					gatewayId: "test",
 					collectLog: false,
 					surface: "test",
-					judgeModel: "google/gemini-3.8-flash",
+					judgeModel: "openai/gpt-6-sol",
 					authorEffort: "low",
 				}),
 			),
 		),
 	);
-	return { layer: Layer.mergeAll(imaging, catalog, models), dispatches };
+	return { layer: Layer.mergeAll(imaging, catalog, models), dispatches, judgeQueries };
 }
 
 const authorWire = (reply: unknown) =>
@@ -167,6 +169,30 @@ const authorWire = (reply: unknown) =>
 		stop_reason: "end_turn",
 		stop_sequence: null,
 		usage: { input_tokens: 1, output_tokens: 1 },
+	});
+const judgeWire = (text: string) =>
+	Response.json({
+		id: "resp_test",
+		object: "response",
+		created_at: 0,
+		status: "completed",
+		model: "gpt-6-sol",
+		output: [
+			{
+				id: "msg_test",
+				type: "message",
+				status: "completed",
+				role: "assistant",
+				content: [{ type: "output_text", annotations: [], text }],
+			},
+		],
+		usage: {
+			input_tokens: 300,
+			input_tokens_details: { cached_tokens: 100 },
+			output_tokens: 40,
+			output_tokens_details: { reasoning_tokens: 30 },
+			total_tokens: 340,
+		},
 	});
 const unavailable = () => Response.json({ error: { message: "capacity" } }, { status: 503 });
 
@@ -240,6 +266,44 @@ describe("drawIcon", () => {
 			expect(mistaken.judged).toHaveLength(2);
 			expect(icon.recipe).toEqual(draft);
 		}),
+	);
+
+	it.effect(
+		"reads the judge's pick and usage from its provider, and an unreadable pick as none",
+		() =>
+			Effect.gen(function* () {
+				const drawThenAccept = (judgeText: string) => {
+					const authorReplies = [
+						{ accept: false, recipe: draft },
+						accept,
+						{ accept: false, recipe: draft },
+					];
+					return throughGateway(async (operation) =>
+						operation === "icon-author" ? authorWire(authorReplies.shift()) : judgeWire(judgeText),
+					);
+				};
+				const judged = drawThenAccept('{"logo":1}');
+				const result = yield* settle(draw(judged.layer));
+				if (result._tag !== "Success") throw new Error("draw failed");
+				const icon = result.success;
+				expect(icon.judge.picked).toBe(icon.judge.lineup[0]);
+				expect(icon.usage.byCall.filter((call) => call.role === "judge")[0]?.usage).toEqual({
+					inputTokens: 200,
+					cacheReadTokens: 100,
+					cacheWriteTokens: 0,
+					outputTokens: 40,
+				});
+				// Every image in the lineup goes at low detail, the judge's main spend.
+				const images = JSON.stringify(judged.judgeQueries[0]).match(/"detail":"[a-z]+"/g);
+				expect(images).toEqual(Array.from({ length: 6 }, () => '"detail":"low"'));
+
+				const unreadable = drawThenAccept("a logo");
+				const blank = yield* settle(draw(unreadable.layer));
+				if (blank._tag !== "Success") throw new Error("draw failed");
+				expect(blank.success.judge).toMatchObject({ recognizable: false, attempts: 1 });
+				expect(blank.success.judge.error).toBeUndefined();
+				expect(unreadable.dispatches["icon-judge"]).toBe(1);
+			}),
 	);
 });
 
@@ -326,6 +390,34 @@ describe("drawIcon spend bounds", () => {
 			expect(stalled.dispatches).toEqual({ "icon-author": 1, "icon-judge": 0 });
 			yield* TestClock.adjust("1000 seconds");
 			expect((yield* Fiber.join(fiber))._tag).toBe("Failure");
+
+			// The judge's 30 s deadline ends its stalled call the same way; the drawing comes back, marked.
+			let judgeAborted = false;
+			const authorReplies = [{ accept: false, recipe: draft }, accept];
+			const judgeStalled = throughGateway((operation, signal) =>
+				operation === "icon-author"
+					? Promise.resolve(authorWire(authorReplies.shift()))
+					: new Promise((_resolve, reject) =>
+							signal.addEventListener("abort", () => {
+								judgeAborted = true;
+								reject(new Error("aborted"));
+							}),
+						),
+			);
+			const judging = yield* Effect.forkChild(
+				draw(judgeStalled.layer, 1_000_000).pipe(
+					Effect.provideService(TelemetryCorrelation, {}),
+					Effect.result,
+				),
+			);
+			yield* TestClock.adjust("31 seconds");
+			yield* Effect.promise(() => new Promise((resolve) => setTimeout(resolve, 0)));
+			expect(judgeAborted).toBe(true);
+			const marked = yield* Fiber.join(judging);
+			if (marked._tag !== "Success") throw new Error("draw failed");
+			expect(marked.success.judge).toMatchObject({ recognizable: false, attempts: 1 });
+			expect(marked.success.judge.error).toContain("30 s");
+			expect(judgeStalled.dispatches["icon-judge"]).toBe(1);
 		}),
 	);
 });

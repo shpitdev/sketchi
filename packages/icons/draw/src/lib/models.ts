@@ -1,4 +1,4 @@
-import { CloudflareAiGatewayBinding, stripGoogleModelPrefix } from "@sketchi/cloudflare/ai-gateway";
+import { CloudflareAiGatewayBinding } from "@sketchi/cloudflare/ai-gateway";
 
 import { Array, Context, Effect, Layer, Option, Schedule, String } from "effect";
 
@@ -6,7 +6,7 @@ import { makeAuthorCall } from "./author-model.js";
 import type { Prompt } from "effect/ai";
 import { IconModelError } from "./errors.js";
 import { type IconSource, svgCurveSegments } from "./input.js";
-import { makeJudgeCall } from "./google-judge.js";
+import { makeJudgeCall, stripOpenAiModelPrefix } from "./judge-model.js";
 
 /** Author models a draw request may name. */
 export const ICON_AUTHOR_MODELS = [
@@ -104,6 +104,8 @@ export class IconDrawGatewayConfig extends Context.Service<
 export const AUTHOR_MAX_TOKENS = 8_192;
 const AUTHOR_TIMEOUT_MS = 75_000;
 const JUDGE_TIMEOUT_MS = 30_000;
+/** Output tokens one judge call may spend, reasoning included; a reply needs a few hundred. */
+export const JUDGE_MAX_OUTPUT_TOKENS = 1_024;
 
 const transientRetry = Schedule.exponential(500, 2).pipe(
 	Schedule.upTo({ times: 2 }),
@@ -131,18 +133,19 @@ export const IconDrawModelsGateway = Layer.effect(IconDrawModels)(
 			maxTokens: AUTHOR_MAX_TOKENS,
 		});
 
-		const judge = yield* makeJudgeCall({
+		const judge = makeJudgeCall({
 			gateway,
 			config,
 			timeoutMs: JUDGE_TIMEOUT_MS,
 			retry: transientRetry,
 			transient: isTransient,
+			maxOutputTokens: JUDGE_MAX_OUTPUT_TOKENS,
 		});
 
 		return IconDrawModels.of({
 			author,
 			judge,
-			judgeModel: stripGoogleModelPrefix(config.judgeModel),
+			judgeModel: stripOpenAiModelPrefix(config.judgeModel),
 		});
 	}),
 );

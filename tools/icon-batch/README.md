@@ -54,7 +54,7 @@ pnpm nx draw icon-batch -- recipe-sheets --collection palantir --theme dark
 - `draw` runs 4 draws at a time (`--concurrency`) and starts none that could
   take the run's spend past `--cap` (default $60). Each draw in flight holds
   the most it can cost: every author call the engine allows at its output
-  limit, about $0.42 on Sonnet and $0.81 on Opus (a draw whose author the
+  limit, about $0.46 on Sonnet and $0.85 on Opus (a draw whose author the
   source will choose holds Opus's), where a typical draw costs $0.02. A draw that does not fit waits for those in flight; the run leaves a
   mark pending only when nothing is in flight. Every attempt is written to
   `.memory/icon-batch/<run>/marks/<slug>.json` as it finishes, including one

@@ -87,8 +87,8 @@ encryption, and `pull` depends on Excalidraw share availability.
 `POST /api/v1/icons/draw` on the same Worker draws a logo by hand: an SVG or a
 PNG, JPEG or WebP and a name in, a checked recipe, PNG previews, an
 `.excalidrawlib` and a judge's verdict out. A Claude author drafts and revises
-against renders of its own recipe on the gateway's native Messages route; a
-Gemini judge picks the source among catalog look-alikes from the 28 px drawing.
+against renders of its own recipe on the gateway's native Messages route; an
+OpenAI judge picks the source among catalog look-alikes from the 28 px drawing.
 Browser Rendering's export harness decodes logos and exports the renders. Each
 client IP may send 6 draw requests a minute (the `ClientRateLimit` Durable
 Object, one per IP, counting each request exactly), and
