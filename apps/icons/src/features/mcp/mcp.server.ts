@@ -1,5 +1,5 @@
 import { mcpToolContent } from "@sketchi/cloudflare/mcp-content";
-import { type McpSessionNamespace, routeMcpSession } from "@sketchi/cloudflare/mcp-session";
+import { type McpWebHandler, serveStatelessMcp } from "@sketchi/cloudflare/mcp-http";
 import {
 	makeWorkersTelemetryLayer,
 	withTelemetryCorrelation,
@@ -19,7 +19,7 @@ import {
 import { corsPreflight, withCors } from "../../shared/cors";
 import { IconToolkit, IconToolHandlers } from "./toolkit.server";
 
-/** Request-owned export target, never captured in registrations or session state. */
+/** Request-owned export target, never captured in registrations. */
 class IconMcpExport extends Context.Service<IconMcpExport, TelemetryExportTarget>()(
 	"icons/McpExport",
 ) {}
@@ -47,15 +47,19 @@ export const IconMcpRegistrations = McpServer.toolkit(IconToolkit).pipe(
 	Layer.provide(content),
 );
 
-/** A Durable Object owns this server's scope. Construction performs no binding I/O. */
-export function makeIconMcpHandler(origin: string | null) {
+/** One request's native server; its icon source and export come from that request. */
+function makeIconMcpHandler(
+	request: Request,
+	env: IconsMcpEnv,
+	waitUntil: (promise: Promise<unknown>) => void,
+): McpWebHandler {
+	const origin = request.headers.get("origin");
 	const app = McpServer.layerHttp({
 		name: "sketchi-icons",
 		version: "1.0.0",
 		path: "/mcp",
 		protocols: [McpProtocol.v2025_11_25, McpProtocol.v2025_06_18, McpProtocol.v2025_03_26],
 		allowedOrigins: origin === null ? [] : [origin],
-		allowSessionTermination: true,
 		registrations: IconMcpRegistrations,
 	}).pipe(
 		Layer.provide(HttpServer.layerServices),
@@ -79,13 +83,18 @@ export function makeIconMcpHandler(origin: string | null) {
 	});
 	return {
 		dispose: runtime.dispose,
-		fetch(request: Request, env: IconsMcpEnv, waitUntil: (promise: Promise<unknown>) => void) {
+		fetch(request, { replay }) {
 			return runtime.handler(
 				request,
 				Context.make(IconSource, {
 					origin: new URL(request.url).origin,
 					sourceLoader: createIconSourceLoader(env.ASSETS),
-				}).pipe(Context.add(IconMcpExport, { pipeline: env.TELEMETRY_SPANS, waitUntil })),
+				}).pipe(
+					Context.add(IconMcpExport, {
+						pipeline: replay ? undefined : env.TELEMETRY_SPANS,
+						waitUntil,
+					}),
+				),
 			);
 		},
 	};
@@ -93,15 +102,22 @@ export function makeIconMcpHandler(origin: string | null) {
 
 export interface IconsMcpEnv {
 	readonly ASSETS: IconAssetsBinding;
-	readonly ICONS_MCP_SESSION: McpSessionNamespace;
 	readonly TELEMETRY_SPANS?: TelemetryPipeline;
 }
 
-/** Cloudflare fetch callback; native McpServer owns the HTTP protocol inside the session. */
-export const handleIconMcpRequest = (request: Request, env: IconsMcpEnv) =>
+/** Cloudflare fetch callback; native McpServer owns the HTTP protocol for each request. */
+export const handleIconMcpRequest = (
+	request: Request,
+	env: IconsMcpEnv,
+	waitUntil: (promise: Promise<unknown>) => void,
+) =>
 	request.method === "OPTIONS"
 		? Promise.resolve(corsPreflight())
 		: Effect.runPromise(
-				routeMcpSession(request, env.ICONS_MCP_SESSION).pipe(Effect.map(withCors)),
+				serveStatelessMcp(
+					request,
+					() => makeIconMcpHandler(request, env, waitUntil),
+					waitUntil,
+				).pipe(Effect.map(withCors)),
 				{ signal: request.signal },
 			);

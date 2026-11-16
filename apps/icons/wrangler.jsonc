@@ -30,7 +30,6 @@
 	// Publishing is public: one object per client IP counts its publishes, an exact limit.
 	"durable_objects": {
 		"bindings": [
-			{ "name": "ICONS_MCP_SESSION", "class_name": "IconsMcpSession" },
 			{
 				"name": "COMMUNITY_CLIENT_LIMIT",
 				"class_name": "ClientRateLimit"
@@ -41,8 +40,7 @@
 		{
 			"tag": "v1",
 			"new_sqlite_classes": ["ClientRateLimit"]
-		},
-		{ "tag": "mcp-v1", "new_sqlite_classes": ["IconsMcpSession"] }
+		}
 	],
 	"pipelines": [{ "binding": "TELEMETRY_SPANS", "stream": "e118fdd69a2548258389e82fb1ade1d6" }],
 	"workers_dev": true,
@@ -73,7 +71,6 @@
 		],
 		"durable_objects": {
 			"bindings": [
-				{ "name": "ICONS_MCP_SESSION", "class_name": "IconsMcpSession" },
 				{
 					"name": "COMMUNITY_CLIENT_LIMIT",
 					"class_name": "ClientRateLimit"

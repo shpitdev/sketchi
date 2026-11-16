@@ -6,7 +6,6 @@ export { ClientRateLimit } from "./features/icons/client-rate-limit.server";
 
 import { handleSketchiMcpRequest } from "./features/mcp/mcp.server";
 import type { StudioEnv } from "./server/studio-env.server";
-export { StudioMcpSession } from "./features/mcp/session.server";
 
 /** The diagrams HTTP API: builds, edits, canvases, artifacts and generation. */
 function isDiagramsApi(pathname: string): boolean {
@@ -23,9 +22,14 @@ async function serveDiagramsApi(request: Request): Promise<Response> {
 }
 
 export default {
-	fetch(request: Request, env: StudioEnv) {
+	fetch(
+		request: Request,
+		env: StudioEnv,
+		execution: { readonly waitUntil: (promise: Promise<unknown>) => void },
+	) {
 		const { pathname } = new URL(request.url);
-		if (pathname === "/mcp") return handleSketchiMcpRequest(request, env);
+		if (pathname === "/mcp")
+			return handleSketchiMcpRequest(request, env, (promise) => execution.waitUntil(promise));
 		if (isDiagramsApi(pathname)) return serveDiagramsApi(request);
 		return handler.fetch(request);
 	},

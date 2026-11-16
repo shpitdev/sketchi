@@ -7,9 +7,9 @@ and neither uses the MCP SDK:
   `search` and `execute` on Effect's `McpServer` from `effect/ai`.
 - Icons (`apps/icons/src/features/mcp/mcp.server.ts`) registers its read-only icon
   tools the same way.
-- Both route each session to a Durable Object (`StudioMcpSession`,
-  `IconsMcpSession`) through `routeMcpSession` in
-  `packages/cloudflare/src/mcp-session.ts`.
+- Both serve each request without a session through `serveStatelessMcp` in
+  `packages/cloudflare/src/mcp-http.ts`: no `Mcp-Session-Id` is issued, and a
+  client that initialized once keeps working after any idle gap or restart.
 
 No manifest declares `agents` or a `@modelcontextprotocol/*` package. The
 lockfile still resolves `@modelcontextprotocol/sdk@1.32.2` as an optional peer

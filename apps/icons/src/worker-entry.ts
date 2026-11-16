@@ -5,7 +5,6 @@ import handler from "@tanstack/react-start/server-entry";
 import { type IconsHttpEnv, makeIconsHttpHandler } from "./http.server";
 
 import { handleIconMcpRequest, type IconsMcpEnv } from "./features/mcp/mcp.server";
-export { IconsMcpSession } from "./features/mcp/session.server";
 
 export { ClientRateLimit } from "./features/community/client-rate-limit.server";
 
@@ -17,7 +16,8 @@ export default {
 		execution: { readonly waitUntil: (promise: Promise<unknown>) => void },
 	) {
 		const path = new URL(request.url).pathname;
-		if (path === "/mcp") return handleIconMcpRequest(request, env);
+		if (path === "/mcp")
+			return handleIconMcpRequest(request, env, (promise) => execution.waitUntil(promise));
 		return path === "/api/icons" ||
 			String.startsWith("/api/icons/")(path) ||
 			path === "/api/community" ||

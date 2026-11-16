@@ -1,58 +1,38 @@
 // @vitest-environment node
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
-import { McpProtocol, McpServer, McpTest } from "effect/ai";
+import { McpClient, McpProtocol } from "effect/ai";
+import { FetchHttpClient } from "effect/http";
 import ts from "typescript";
+import { vi } from "vitest";
 
-import {
-	PlaygroundBindings,
-	PlaygroundClockLive,
-	PlaygroundIdsLive,
-	PlaygroundRequestMetadata,
-} from "../../../server/context.server";
-import { StudioBuildHostLive } from "../../build/capabilities.server";
-import { PlaygroundCodeModeUsageLive } from "../../build/usage-events.server";
 import { generateCodeModeTypes } from "../mcp-docs/types";
 import { SKETCHI_CODE_MODE_TYPES } from "../mcp-docs.server";
-import { StudioMcpRegistrations } from "../mcp.server";
-import { CodeModeSandbox } from "../sandbox.server";
 
-const host = Layer.mergeAll(
-	StudioBuildHostLive,
-	PlaygroundClockLive,
-	PlaygroundIdsLive,
-	PlaygroundCodeModeUsageLive,
-);
-type HandlerServices =
-	| Layer.Success<typeof host>
-	| PlaygroundBindings
-	| PlaygroundRequestMetadata
-	| CodeModeSandbox;
-/** The toolkit the Worker registers, served over the MCP protocol with discovery-only services. */
-const registeredClient = McpTest.makeClient(
-	StudioMcpRegistrations.pipe(
-		Layer.provide(
-			McpServer.middleware<{ provides: HandlerServices }>()((effect) =>
-				effect.pipe(
-					Effect.provide(host),
-					Effect.provideService(PlaygroundBindings, {}),
-					Effect.provideService(PlaygroundRequestMetadata, {
-						request: new Request("https://studio.test/mcp"),
-						origin: "https://studio.test",
-						path: "/mcp",
-						method: "POST",
-						attemptId: "attempt-discovery",
-						runId: "run-discovery",
-						traceId: "trace-discovery",
-					}),
-					Effect.provideService(CodeModeSandbox, {
-						execute: () => Effect.die("discovery does not execute code"),
-					}),
-				),
-			).layer,
-		),
-	),
-	{ name: "studio-discovery", version: "1", protocols: [McpProtocol.v2025_11_25] },
+/** A fresh module graph, as on a cold isolate: nothing from earlier requests survives. */
+let worker: Promise<typeof import("../mcp.server")> | undefined;
+const coldStart = Effect.sync(() => {
+	vi.resetModules();
+	worker = undefined;
+});
+const sessionHeaders: string[] = [];
+const workerFetch = (input: RequestInfo | URL, init?: RequestInit) =>
+	(worker ??= import("../mcp.server"))
+		.then((module) => module.handleSketchiMcpRequest(new Request(input, init), {}, () => {}))
+		.then((response) => {
+			const session = response.headers.get("mcp-session-id");
+			if (session !== null) sessionHeaders.push(session);
+			return response;
+		});
+/** An unchanged 2025-11-25 client of the Worker's /mcp boundary. */
+const workerClient = McpClient.layerHttp({
+	name: "studio-continuity",
+	version: "1",
+	protocol: McpProtocol.v2025_11_25,
+	url: "https://studio.test/mcp",
+}).pipe(
+	Layer.provide(FetchHttpClient.layer),
+	Layer.provide(Layer.succeed(FetchHttpClient.Fetch, workerFetch)),
 );
 
 const declaration = (name: string) => {
@@ -133,19 +113,23 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 	});
 
 	it.effect(
-		"registers only docs, execute and search, keeps tools/list small, and serves each operation's types on demand",
+		"serves docs, execute and search to a client that initialized once, across cold starts, without a session",
 		() =>
 			Effect.gen(function* () {
-				const client = yield* registeredClient;
+				yield* coldStart;
+				const client = yield* McpClient.McpClient;
 				const tools = yield* client.listTools();
-				expect(tools.tools.map((tool) => tool.name).sort()).toEqual(["docs", "execute", "search"]);
-				// Every MCP session pays for discovery up front; per-family types come from docs on demand.
+				expect(tools.map((tool) => tool.name).sort()).toEqual(["docs", "execute", "search"]);
+				// Every client pays for discovery up front; per-family types come from docs on demand.
 				expect(new TextEncoder().encode(JSON.stringify(tools)).byteLength).toBeLessThan(30_000);
+				const docs = tools.find((tool) => tool.name === "docs")!;
 				for (const [topic, types] of onDemandTypes) {
-					const result = yield* client.callTool({ name: "docs", arguments: { topic } });
+					yield* coldStart;
+					const result = yield* client.callTool({ tool: docs, arguments: { topic } });
 					const text = result.content.map((part) => ("text" in part ? part.text : "")).join("\n");
 					for (const name of types) expect(text, `${topic} ${name}`).toContain(declaration(name));
 				}
-			}),
+				expect(sessionHeaders).toEqual([]);
+			}).pipe(Effect.provide(workerClient)),
 	);
 });

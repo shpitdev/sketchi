@@ -9,7 +9,6 @@ declare module "cloudflare:workers" {
     AI?: CloudflareAiGatewayProvider;
     ASSETS?: PlaygroundAssetsBinding;
     CODEMODE_PNG_RENDERER?: CodeModePngRendererNamespace;
-    STUDIO_MCP_SESSION?: import("@sketchi/cloudflare/mcp-session").McpSessionNamespace;
     LOADER?: import("./features/mcp/sandbox.server").SketchiWorkerLoader;
     SKETCHI_ARTIFACTS?: ArtifactObjectBucket;
     SKETCHI_AI_GATEWAY_ID?: string;

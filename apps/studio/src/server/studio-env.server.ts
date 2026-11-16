@@ -15,7 +15,6 @@ export interface StudioEnv {
 	AI?: CloudflareAiGatewayProvider & Partial<WorkersAiRunner>;
 	ASSETS?: PlaygroundAssetsBinding;
 	CODEMODE_PNG_RENDERER?: CodeModePngRendererNamespace;
-	STUDIO_MCP_SESSION?: import("@sketchi/cloudflare/mcp-session").McpSessionNamespace;
 	/** D1: the community icons the icons app publishes, which diagrams draw by slug. */
 	COMMUNITY_ICONS?: CommunityEnv["COMMUNITY_ICONS"];
 	LOADER?: import("../features/mcp/sandbox.server").SketchiWorkerLoader;
