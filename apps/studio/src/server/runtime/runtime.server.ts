@@ -10,7 +10,7 @@ import {
 	Predicate,
 } from "effect";
 import "@tanstack/react-start/server-only";
-import { type CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build";
+import { type BuildRuntimeEnvironment } from "@sketchi/diagrams/build";
 import {
 	makeWorkersTelemetryLayer,
 	SpanContent,
@@ -73,14 +73,14 @@ export type PlaygroundRequestEffect<A, E = never> = Effect.Effect<
 	A,
 	E,
 	| PlaygroundHostServices
-	| CodeModeRuntimeEnvironment
+	| BuildRuntimeEnvironment
 	| PlaygroundRequestServices
 	| PlaygroundRequestCallbacks
 >;
 export type PlaygroundCallbackEffect<A, E = never> = Effect.Effect<
 	A,
 	E,
-	PlaygroundHostServices | CodeModeRuntimeEnvironment | PlaygroundRequestServices
+	PlaygroundHostServices | BuildRuntimeEnvironment | PlaygroundRequestServices
 >;
 export type PlaygroundRequestRunner = <A, E>(effect: PlaygroundCallbackEffect<A, E>) => Promise<A>;
 export interface PlaygroundRequestCallbacksShape {

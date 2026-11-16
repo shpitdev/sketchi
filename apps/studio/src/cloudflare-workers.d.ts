@@ -1,5 +1,5 @@
 declare module "cloudflare:workers" {
-  import type { CodeModeObjectBucket } from "@sketchi/diagrams/build";
+  import type { ArtifactObjectBucket } from "@sketchi/diagrams/build";
   import type { CloudflareAiGatewayProvider } from "@sketchi/cloudflare/ai-gateway";
   import type { TelemetryPipeline } from "@sketchi/observability";
   import type { CodeModePngRendererNamespace } from "./features/render/browser-renderer.server";
@@ -11,7 +11,7 @@ declare module "cloudflare:workers" {
     CODEMODE_PNG_RENDERER?: CodeModePngRendererNamespace;
     STUDIO_MCP_SESSION?: import("@sketchi/cloudflare/mcp-session").McpSessionNamespace;
     LOADER?: import("./features/mcp/sandbox.server").SketchiWorkerLoader;
-    SKETCHI_ARTIFACTS?: CodeModeObjectBucket;
+    SKETCHI_ARTIFACTS?: ArtifactObjectBucket;
     SKETCHI_AI_GATEWAY_ID?: string;
     SKETCHI_AI_GENERATE_MODEL?: string;
     SKETCHI_STUDIO_MODEL?: string;

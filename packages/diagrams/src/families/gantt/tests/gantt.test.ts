@@ -12,22 +12,22 @@ import {
 
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { buildGantt } from "../../../build/builds";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { BuildRuntimeEnvironment } from "../../../build/runtime";
 import { applyDiagramPatch } from "../../../canvas/patch";
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { ArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
 
 const storage = makeMemoryArtifactStorage();
 function run<A, E extends BuildRejection<unknown>>(
-	effect: Effect.Effect<A, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+	effect: Effect.Effect<A, E, BuildRuntimeEnvironment | ArtifactStorage>,
 	artifactStorage = storage,
 ) {
 	let id = 0;
 	return Effect.runPromise(
 		buildResponse(effect).pipe(
-			Effect.provideService(CodeModeRuntimeEnvironment, {
+			Effect.provideService(BuildRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_gantt_${(id += 1)}`,
 			}),
-			Effect.provideService(CodeModeArtifactStorage, artifactStorage),
+			Effect.provideService(ArtifactStorage, artifactStorage),
 		),
 	);
 }

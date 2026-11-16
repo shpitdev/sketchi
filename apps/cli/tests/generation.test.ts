@@ -1,7 +1,4 @@
-import {
-	CodeModeArtifactStorageMemory,
-	makeCodeModeRuntimeEnvironmentLayer,
-} from "@sketchi/diagrams/build";
+import { ArtifactStorageMemory, makeBuildRuntimeEnvironmentLayer } from "@sketchi/diagrams/build";
 import { afterEach, assert, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Result } from "effect";
 import { TestClock } from "effect/testing";
@@ -18,8 +15,8 @@ import { flowchartInput, sequenceInput, swappableFetch } from "./fixtures";
 const builderLayer = DiagramBuilderLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
-			CodeModeArtifactStorageMemory,
-			makeCodeModeRuntimeEnvironmentLayer({
+			ArtifactStorageMemory,
+			makeBuildRuntimeEnvironmentLayer({
 				createId: (prefix) => `${prefix}_generate_test`,
 			}),
 		),

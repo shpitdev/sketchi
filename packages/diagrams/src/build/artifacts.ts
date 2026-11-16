@@ -34,46 +34,45 @@ export interface ArtifactWriteInput {
 
 const ArtifactStorageOperationSchema = Schema.Literals(["read", "readManifest", "write"]);
 
-export class CodeModeArtifactStorageError extends Schema.TaggedError<
-	CodeModeArtifactStorageError,
+export class ArtifactStorageError extends Schema.TaggedError<
+	ArtifactStorageError,
 	{ readonly brand: unique symbol }
->()("CodeModeArtifactStorageError", {
+>()("ArtifactStorageError", {
 	cause: Schema.Defect(),
 	message: Schema.String,
 	operation: ArtifactStorageOperationSchema,
 }) {}
 
-export interface CodeModeArtifactStorageShape {
+export interface ArtifactStorageShape {
 	readonly read: (
 		artifactId: string,
 		format: ArtifactFormat,
-	) => Effect.Effect<StoredArtifactFormat | null, CodeModeArtifactStorageError>;
+	) => Effect.Effect<StoredArtifactFormat | null, ArtifactStorageError>;
 	readonly readManifest: (
 		artifactId: string,
-	) => Effect.Effect<StoredArtifactManifest | null, CodeModeArtifactStorageError>;
+	) => Effect.Effect<StoredArtifactManifest | null, ArtifactStorageError>;
 	readonly write: (
 		input: ArtifactWriteInput,
-	) => Effect.Effect<ArtifactBundle, CodeModeArtifactStorageError>;
+	) => Effect.Effect<ArtifactBundle, ArtifactStorageError>;
 }
 
-export class CodeModeArtifactStorage extends Context.Service<
-	CodeModeArtifactStorage,
-	CodeModeArtifactStorageShape
->()("@sketchi/diagram-agent/CodeModeArtifactStorage") {}
+export class ArtifactStorage extends Context.Service<ArtifactStorage, ArtifactStorageShape>()(
+	"@sketchi/diagrams/ArtifactStorage",
+) {}
 
-export interface CodeModeObjectBucketObject {
+export interface ArtifactObjectBucketObject {
 	readonly size?: number;
 	arrayBuffer?(): Promise<ArrayBuffer>;
 	text(): Promise<string>;
 }
 
-export type CodeModeObjectBucketBody = string | ArrayBuffer | Uint8Array;
+export type ArtifactObjectBucketBody = string | ArrayBuffer | Uint8Array;
 
-export interface CodeModeObjectBucket {
-	get(key: string): Promise<CodeModeObjectBucketObject | null>;
+export interface ArtifactObjectBucket {
+	get(key: string): Promise<ArtifactObjectBucketObject | null>;
 	put(
 		key: string,
-		value: CodeModeObjectBucketBody,
+		value: ArtifactObjectBucketBody,
 		options?: {
 			httpMetadata?: {
 				contentType?: string;
@@ -141,7 +140,7 @@ function errorMessage(cause: unknown, fallback: string): string {
 
 function storageError(operation: "read" | "readManifest" | "write") {
 	return (cause: unknown) =>
-		CodeModeArtifactStorageError.make({
+		ArtifactStorageError.make({
 			cause,
 			message: errorMessage(
 				cause,
@@ -153,7 +152,7 @@ function storageError(operation: "read" | "readManifest" | "write") {
 
 interface MemoryArtifactStorageState {
 	readonly close: Effect.Effect<void>;
-	readonly storage: CodeModeArtifactStorageShape;
+	readonly storage: ArtifactStorageShape;
 }
 
 function makeMemoryArtifactStorageState(): MemoryArtifactStorageState {
@@ -219,11 +218,11 @@ function makeMemoryArtifactStorageState(): MemoryArtifactStorageState {
 	};
 }
 
-export function makeMemoryArtifactStorage(): CodeModeArtifactStorageShape {
+export function makeMemoryArtifactStorage(): ArtifactStorageShape {
 	return makeMemoryArtifactStorageState().storage;
 }
 
-export const CodeModeArtifactStorageMemory = Layer.effect(CodeModeArtifactStorage)(
+export const ArtifactStorageMemory = Layer.effect(ArtifactStorage)(
 	Effect.acquireRelease(Effect.sync(makeMemoryArtifactStorageState), (state) => state.close).pipe(
 		Effect.map((state) => state.storage),
 	),
@@ -284,7 +283,7 @@ function isArtifactProvenance(value: unknown): value is ArtifactProvenance {
 
 function bodyForArtifact(
 	artifact: StoredArtifactFormat,
-): Effect.Effect<CodeModeObjectBucketBody, CodeModeArtifactStorageError> {
+): Effect.Effect<ArtifactObjectBucketBody, ArtifactStorageError> {
 	if (artifact.format !== "png")
 		return Effect.try({
 			try: () => JSON.stringify(artifact.data),
@@ -297,7 +296,7 @@ function bodyForArtifact(
 }
 
 interface PreparedArtifactObject {
-	readonly body: CodeModeObjectBucketBody;
+	readonly body: ArtifactObjectBucketBody;
 	readonly bodyBytes: number;
 	readonly bodyMs: number;
 	readonly contentType: string;
@@ -306,14 +305,14 @@ interface PreparedArtifactObject {
 
 const bodyEncoder = new TextEncoder();
 
-function bodyByteLength(body: CodeModeObjectBucketBody): number {
+function bodyByteLength(body: ArtifactObjectBucketBody): number {
 	return typeof body === "string" ? bodyEncoder.encode(body).byteLength : body.byteLength;
 }
 
 const prepareArtifactObject = Effect.fnUntraced(function* (
 	format: ArtifactFormat | typeof MANIFEST_FORMAT,
 	contentType: string,
-	body: Effect.Effect<CodeModeObjectBucketBody, CodeModeArtifactStorageError>,
+	body: Effect.Effect<ArtifactObjectBucketBody, ArtifactStorageError>,
 ) {
 	const startedAt = yield* Clock.currentTimeMillis;
 	const prepared = yield* body;
@@ -328,12 +327,12 @@ const prepareArtifactObject = Effect.fnUntraced(function* (
 });
 
 function readBinaryArtifact(
-	object: CodeModeObjectBucketObject,
-): Effect.Effect<ArrayBuffer, CodeModeArtifactStorageError> {
+	object: ArtifactObjectBucketObject,
+): Effect.Effect<ArrayBuffer, ArtifactStorageError> {
 	const arrayBuffer = object.arrayBuffer?.bind(object);
 	if (!arrayBuffer) {
 		return Effect.fail(
-			CodeModeArtifactStorageError.make({
+			ArtifactStorageError.make({
 				cause: new Error("Artifact object does not support binary reads."),
 				message: "Artifact object does not support binary reads.",
 				operation: "read",
@@ -347,9 +346,9 @@ function readBinaryArtifact(
 }
 
 export function makeObjectBucketArtifactStorage(
-	bucket: CodeModeObjectBucket,
+	bucket: ArtifactObjectBucket,
 	options: ObjectBucketArtifactStorageOptions = {},
-): CodeModeArtifactStorageShape {
+): ArtifactStorageShape {
 	const prefix = normalizedPrefix(options.prefix);
 
 	return {

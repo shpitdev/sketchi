@@ -1,4 +1,4 @@
-import { CodeModeIconLoadError, makeCodeModeIconCatalog } from "@sketchi/diagrams/build";
+import { BuildIconLoadError, makeBuildIconCatalog } from "@sketchi/diagrams/build";
 import { iconManifest } from "@sketchi/icon-catalog/catalog";
 import { CONCEPT_ICONS } from "@sketchi/icon-catalog/concepts";
 import nativeIcons from "@sketchi/icon-catalog/native-icons";
@@ -19,7 +19,7 @@ function bundledNodeLogoSvgs(): Readonly<Record<string, string>> {
 }
 
 /** Offline node-logo catalog: the CLI bundles every hand-drawn recipe and normalized SVG. */
-export const cliIconCatalog = makeCodeModeIconCatalog({
+export const cliIconCatalog = makeBuildIconCatalog({
 	icons: iconManifest.icons,
 	concepts: CONCEPT_ICONS,
 	loadSvg: (icon) => {
@@ -27,7 +27,7 @@ export const cliIconCatalog = makeCodeModeIconCatalog({
 		const svg = Object.hasOwn(svgs, icon.slug) ? svgs[icon.slug] : undefined;
 		return svg === undefined
 			? Effect.fail(
-					CodeModeIconLoadError.make({
+					BuildIconLoadError.make({
 						cause: new Error(`Missing bundled node logo ${icon.slug}.`),
 						message: `Node logo ${icon.slug} is not bundled with this CLI.`,
 						slug: icon.slug,

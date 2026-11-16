@@ -10,7 +10,7 @@ import {
 	type CommunityIcon,
 	type CommunityEnv,
 } from "@sketchi/community-icons";
-import type { CodeModeCommunityIcons } from "@sketchi/diagrams/build";
+import type { BuildCommunityIcons } from "@sketchi/diagrams/build";
 import { Array, Effect, String } from "effect";
 
 /**
@@ -20,7 +20,7 @@ import { Array, Effect, String } from "effect";
  */
 export function studioCommunityIcons(
 	database: NonNullable<CommunityEnv["COMMUNITY_ICONS"]>,
-): CodeModeCommunityIcons {
+): BuildCommunityIcons {
 	const forDiagrams = <E extends { readonly _tag: string }>(
 		read: Effect.Effect<readonly CommunityIcon[], E, CommunityIconStore>,
 	) =>

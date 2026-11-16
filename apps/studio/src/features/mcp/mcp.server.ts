@@ -2,7 +2,7 @@ import "@tanstack/react-start/server-only";
 
 import { mcpToolContent } from "@sketchi/cloudflare/mcp-content";
 import { routeMcpSession } from "@sketchi/cloudflare/mcp-session";
-import { CodeModeArtifactStorage, CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build";
+import { ArtifactStorage, BuildRuntimeEnvironment } from "@sketchi/diagrams/build";
 import {
 	makeWorkersTelemetryLayer,
 	SpanContent,
@@ -32,7 +32,7 @@ class StudioMcpExport extends Context.Service<StudioMcpExport, TelemetryExportTa
 	"studio/McpExport",
 ) {}
 const buildCapabilities = McpServer.middleware<{
-	provides: CodeModeArtifactStorage | CodeModeRuntimeEnvironment;
+	provides: ArtifactStorage | BuildRuntimeEnvironment;
 }>()(
 	// @effect-diagnostics-next-line strictEffectProvide:off -- MCP request boundary assembles concrete build capabilities in this call scope.
 	(effect) => Effect.provide(effect, StudioBuildRequestLive),

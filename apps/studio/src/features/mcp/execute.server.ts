@@ -19,9 +19,9 @@ import "@tanstack/react-start/server-only";
 import {
 	bindBuild,
 	editFlowchart,
-	CodeModeRuntimeEnvironment,
+	BuildRuntimeEnvironment,
 	searchIcons,
-	CodeModeArtifactStorage,
+	ArtifactStorage,
 	buildResponse,
 } from "@sketchi/diagrams/build";
 import { type EditFlowchartResult, CodeModeIssue } from "@sketchi/diagrams/build/contract";
@@ -508,7 +508,7 @@ function withModelDelivery(request: unknown): unknown {
 		},
 	};
 }
-type BuildServices = CodeModeArtifactStorage | CodeModeRuntimeEnvironment;
+type BuildServices = ArtifactStorage | BuildRuntimeEnvironment;
 const makeSketchiFunctions = Effect.fn("studio.mcp.functions")(function* (
 	receipts: Ref.Ref<readonly ExecuteBuild[]>,
 	fibers: FiberSet.FiberSet<unknown, unknown>,
@@ -528,7 +528,7 @@ const makeSketchiFunctions = Effect.fn("studio.mcp.functions")(function* (
 		// This single per-build value cannot escape its invocation or mutate a receipt.
 		let unavailable: string | undefined;
 		const result = yield* workflow.pipe(
-			Effect.updateService(CodeModeRuntimeEnvironment, (capabilities) => ({
+			Effect.updateService(BuildRuntimeEnvironment, (capabilities) => ({
 				...capabilities,
 				fillNamedLogos: true,
 				...(defaulted

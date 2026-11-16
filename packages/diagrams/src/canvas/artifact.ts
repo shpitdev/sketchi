@@ -1,6 +1,6 @@
 import { Effect, Result, Schema } from "effect";
 
-import { CodeModeArtifactStorage, isInlineArtifactFormat } from "../build/artifacts";
+import { ArtifactStorage, isInlineArtifactFormat } from "../build/artifacts";
 import { boundary, type CodeModeWorkflowEffect } from "../build/boundary";
 import {
 	codeModeInputIssues,
@@ -10,7 +10,7 @@ import {
 	storageFailureIssue,
 	workflowFailure,
 } from "../build/issues";
-import { CodeModeRuntimeEnvironment } from "../build/runtime";
+import { BuildRuntimeEnvironment } from "../build/runtime";
 import {
 	GetArtifactRejected,
 	GetArtifactRequest,
@@ -40,8 +40,8 @@ const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(function*
 		});
 	}
 
-	const environment = yield* CodeModeRuntimeEnvironment;
-	const store = yield* CodeModeArtifactStorage;
+	const environment = yield* BuildRuntimeEnvironment;
+	const store = yield* ArtifactStorage;
 	const request = parsed.success;
 	const manifest = yield* store.readManifest(request.artifactId).pipe(
 		Effect.mapError((error) =>

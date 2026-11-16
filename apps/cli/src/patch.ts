@@ -1,6 +1,6 @@
 import { type CanvasSpec } from "@sketchi/drawing";
 import { formatContractSchemaError } from "@sketchi/diagrams/build/contract";
-import { CodeModeArtifactStorage, CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build";
+import { ArtifactStorage, BuildRuntimeEnvironment } from "@sketchi/diagrams/build";
 import { applyDiagramPatch } from "@sketchi/diagrams/canvas/patch";
 import { ApplyDiagramPatchRequest } from "@sketchi/diagrams/canvas/patch-contract";
 import { Context, Effect, Layer, Schema, Result } from "effect";
@@ -96,8 +96,8 @@ export class DiagramPatcher extends Context.Service<
 export const DiagramPatcherLive = Layer.effect(
 	DiagramPatcher,
 	Effect.gen(function* () {
-		const artifactStorage = yield* CodeModeArtifactStorage;
-		const environment = yield* CodeModeRuntimeEnvironment;
+		const artifactStorage = yield* ArtifactStorage;
+		const environment = yield* BuildRuntimeEnvironment;
 
 		const patch = Effect.fn("sketchi.cli.diagram.patch")(function* (
 			scene: CanvasSpec,

@@ -1,9 +1,9 @@
 import { scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
 import {
-	CodeModeArtifactStorage,
-	CodeModeArtifactStorageMemory,
+	ArtifactStorage,
+	ArtifactStorageMemory,
 	canonicalDocumentFromDiagram,
-	makeCodeModeRuntimeEnvironmentLayer,
+	makeBuildRuntimeEnvironmentLayer,
 } from "@sketchi/diagrams/build";
 import {
 	type CanonicalDiagram,
@@ -45,8 +45,8 @@ function documentFor(family: DiagramTypeValue): CanonicalDiagramDocument {
 const cliBuilderLayer = DiagramBuilderLive.pipe(
 	Layer.provideMerge(
 		Layer.mergeAll(
-			CodeModeArtifactStorageMemory,
-			makeCodeModeRuntimeEnvironmentLayer({ createId: (prefix) => `${prefix}_family` }),
+			ArtifactStorageMemory,
+			makeBuildRuntimeEnvironmentLayer({ createId: (prefix) => `${prefix}_family` }),
 		),
 	),
 );
@@ -69,7 +69,7 @@ describe("canonical diagram family consumers", () => {
 					expect(built.excalidraw).toMatchObject({ type: "excalidraw", version: 2 });
 					expect(built.excalidraw.elements.length).toBeGreaterThan(0);
 
-					const storage = yield* CodeModeArtifactStorage;
+					const storage = yield* ArtifactStorage;
 					const manifest = yield* storage.readManifest("artifact_family");
 					expect(manifest?.diagramId).toBe(fixture.id);
 					expect((yield* storage.read("artifact_family", "scene"))?.data).toEqual(built.scene);

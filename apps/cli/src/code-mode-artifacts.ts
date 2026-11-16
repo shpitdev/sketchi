@@ -1,7 +1,7 @@
 import { CanvasSpec } from "@sketchi/drawing";
 import { formatContractSchemaError, type CodeModeIssue } from "@sketchi/diagrams/build/contract";
 
-import { CodeModeArtifactStorage, CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build";
+import { ArtifactStorage, BuildRuntimeEnvironment } from "@sketchi/diagrams/build";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Schema, Result } from "effect";
 
@@ -12,8 +12,8 @@ const INLINE_FORMATS: Array<"scene" | "excalidraw"> = ["scene", "excalidraw"];
 
 /** Bind the offline artifact contract and the services captured by the layer. */
 export const withCodeMode = Effect.fn("sketchi.cli.codeMode.with")(function* <A, E, R>(
-	artifactStorage: typeof CodeModeArtifactStorage.Service,
-	environment: typeof CodeModeRuntimeEnvironment.Service,
+	artifactStorage: typeof ArtifactStorage.Service,
+	environment: typeof BuildRuntimeEnvironment.Service,
 	operation: (options: {
 		readonly artifactFormats: typeof INLINE_FORMATS;
 		readonly inlineArtifacts: typeof INLINE_FORMATS;
@@ -23,8 +23,8 @@ export const withCodeMode = Effect.fn("sketchi.cli.codeMode.with")(function* <A,
 		artifactFormats: [...INLINE_FORMATS],
 		inlineArtifacts: [...INLINE_FORMATS],
 	}).pipe(
-		Effect.provideService(CodeModeArtifactStorage, artifactStorage),
-		Effect.provideService(CodeModeRuntimeEnvironment, environment),
+		Effect.provideService(ArtifactStorage, artifactStorage),
+		Effect.provideService(BuildRuntimeEnvironment, environment),
 	);
 });
 

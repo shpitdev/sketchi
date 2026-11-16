@@ -5,7 +5,7 @@ import { type PublishedBuildIssue } from "./result";
 
 import { Effect, Result, Schema } from "effect";
 
-import { CodeModeArtifactStorage, type CodeModeArtifactStorageError } from "./artifacts";
+import { ArtifactStorage, type ArtifactStorageError } from "./artifacts";
 import { boundary, unknownRecord, type CodeModeWorkflowEffect } from "./boundary";
 import { runFamilyBuild } from "./builds";
 import {
@@ -36,8 +36,8 @@ const EditFlowchartFailure = workflowFailure(
 const storedFlowchartDocument = Effect.fn("codeMode.editFlowchart.readDocument")(function* (
 	artifactId: string,
 ) {
-	const store = yield* CodeModeArtifactStorage;
-	const readFailure = (error: CodeModeArtifactStorageError) =>
+	const store = yield* ArtifactStorage;
+	const readFailure = (error: ArtifactStorageError) =>
 		EditFlowchartFailure.new({
 			status: "storage_failed",
 			context: { issues: [storageFailureIssue(error, "storage_read_failed")] },

@@ -20,7 +20,7 @@ import {
 	responseRequestId,
 	workflowFailure,
 } from "../build/issues";
-import { CodeModeRuntimeEnvironment } from "../build/runtime";
+import { BuildRuntimeEnvironment } from "../build/runtime";
 import {
 	CreateCanvasRejected,
 	CreateCanvasRequest,
@@ -50,7 +50,7 @@ const RawCreateCanvasInput = Schema.Struct({
 const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(function* (
 	input: unknown,
 ) {
-	const environment = yield* CodeModeRuntimeEnvironment;
+	const environment = yield* BuildRuntimeEnvironment;
 	const buildId = yield* Effect.sync(() => environment.createId("build"));
 	const raw = Schema.decodeUnknownResult(RawCreateCanvasInput)(input);
 	const rawInput = Result.isSuccess(raw)

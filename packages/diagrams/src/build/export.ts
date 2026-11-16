@@ -18,27 +18,27 @@ import { Clock, Effect, Result, Schema } from "effect";
 
 import {
 	ARTIFACT_MIME_TYPES,
-	CodeModeArtifactStorage,
+	ArtifactStorage,
 	jsonSizeBytes,
 	type StoredArtifactFormat,
 } from "./artifacts";
 import { FailureContextSchema, issue, storageFailureIssue } from "./issues";
 import {
-	CodeModeArtifactRenderFailed,
-	CodeModeRuntimeEnvironment,
-	type CodeModeArtifactRenderer,
-	type CodeModeRuntimeOptions,
+	ArtifactRenderFailed,
+	BuildRuntimeEnvironment,
+	type ArtifactRenderer,
+	type BuildRuntimeOptions,
 } from "./runtime";
 
 const DEFAULT_BUILD_FORMATS: ArtifactFormat[] = ["excalidraw", "scene"];
 const DEFAULT_INLINE_FORMATS: InlineArtifactFormat[] = ["scene"];
 
-class CodeModeArtifactRendererNotConfigured extends Schema.TaggedError<
-	CodeModeArtifactRendererNotConfigured,
+class ArtifactRendererNotConfigured extends Schema.TaggedError<
+	ArtifactRendererNotConfigured,
 	{ readonly brand: unique symbol }
->()("CodeModeArtifactRendererNotConfigured", { message: Schema.String }) {}
+>()("ArtifactRendererNotConfigured", { message: Schema.String }) {}
 
-type ArtifactExportError = CodeModeArtifactRendererNotConfigured | CodeModeArtifactRenderFailed;
+type ArtifactExportError = ArtifactRendererNotConfigured | ArtifactRenderFailed;
 
 class ArtifactExportFailure extends Schema.TaggedError<
 	ArtifactExportFailure,
@@ -77,8 +77,8 @@ const storedArtifactsForFormats = Effect.fn("codeMode.artifacts.exportFormats")(
 	formats: readonly ArtifactFormat[];
 	scene: CanvasSpec;
 	excalidraw: ExcalidrawScene;
-	renderer?: CodeModeArtifactRenderer | undefined;
-	defaultPng?: CodeModeRuntimeOptions["defaultPng"];
+	renderer?: ArtifactRenderer | undefined;
+	defaultPng?: BuildRuntimeOptions["defaultPng"];
 }) {
 	const artifacts: StoredArtifactFormat[] = [];
 
@@ -123,7 +123,7 @@ function dataForArtifactFormat(
 	input: {
 		scene: CanvasSpec;
 		excalidraw: ExcalidrawScene;
-		renderer?: CodeModeArtifactRenderer | undefined;
+		renderer?: ArtifactRenderer | undefined;
 	},
 	format: ArtifactFormat,
 ): Effect.Effect<unknown, ArtifactExportError> {
@@ -137,7 +137,7 @@ function dataForArtifactFormat(
 
 	if (!input.renderer) {
 		return Effect.fail(
-			CodeModeArtifactRendererNotConfigured.make({
+			ArtifactRendererNotConfigured.make({
 				message: "PNG artifact rendering is not configured for this runtime.",
 			}),
 		);
@@ -148,11 +148,7 @@ function dataForArtifactFormat(
 			scene: input.scene,
 			excalidraw: input.excalidraw,
 		})
-		.pipe(
-			Effect.mapError((cause) =>
-				CodeModeArtifactRenderFailed.make({ cause, message: cause.message }),
-			),
-		);
+		.pipe(Effect.mapError((cause) => ArtifactRenderFailed.make({ cause, message: cause.message })));
 }
 
 function sizeBytesForArtifactData(data: unknown): number {
@@ -168,12 +164,12 @@ function artifactExportIssues(error: ArtifactExportError): CodeModeIssue[] {
 		issue({
 			code: "render_failed",
 			stage: "export",
-			...(error._tag === "CodeModeArtifactRendererNotConfigured"
+			...(error._tag === "ArtifactRendererNotConfigured"
 				? { ref: { kind: "artifact", path: "options.artifactFormats" } }
 				: {}),
 			message: error.message,
 			hint:
-				error._tag === "CodeModeArtifactRendererNotConfigured"
+				error._tag === "ArtifactRendererNotConfigured"
 					? "Use the hosted Studio Code Mode runtime with its Cloudflare Browser Run binding, or omit png from artifactFormats."
 					: "Retry the request; if it keeps failing, inspect the configured renderer.",
 		}),
@@ -215,7 +211,7 @@ export function withoutIconAssets(scene: CanvasSpec): CanvasSpec {
 
 function withArtifactUrls(
 	artifact: ArtifactBundle,
-	artifactUrl: CodeModeRuntimeOptions["artifactUrl"],
+	artifactUrl: BuildRuntimeOptions["artifactUrl"],
 ) {
 	if (!artifactUrl) {
 		return artifact;
@@ -258,8 +254,8 @@ export const exportAndStoreScene = Effect.fn("codeMode.artifacts.exportAndStore"
 		document?: unknown;
 		validationIssues: typeof exportIssues;
 	}) {
-		const environment = yield* CodeModeRuntimeEnvironment;
-		const store = yield* CodeModeArtifactStorage;
+		const environment = yield* BuildRuntimeEnvironment;
+		const store = yield* ArtifactStorage;
 		const { excalidraw, validation } = yield* Effect.sync(() => {
 			const excalidraw = convertSceneToExcalidraw(input.scene);
 			return { excalidraw, validation: validateExcalidrawScene(excalidraw) };
@@ -343,7 +339,7 @@ export const exportAndStoreScene = Effect.fn("codeMode.artifacts.exportAndStore"
 );
 
 export const artifactBuildCapabilities = Effect.gen(function* () {
-	const environment = yield* CodeModeRuntimeEnvironment;
+	const environment = yield* BuildRuntimeEnvironment;
 	return {
 		createId: environment.createId,
 		exportScene: (scene: CanvasSpec, request: BuildDelivery) =>
@@ -365,5 +361,5 @@ export const artifactBuildCapabilities = Effect.gen(function* () {
 							: scenePartial(scene),
 				})),
 			),
-	} satisfies ArtifactBuildCapabilities<CodeModeRuntimeEnvironment | CodeModeArtifactStorage>;
+	} satisfies ArtifactBuildCapabilities<BuildRuntimeEnvironment | ArtifactStorage>;
 });

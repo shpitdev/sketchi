@@ -4,7 +4,7 @@ import { sequenceBuild } from "./families/sequence/build";
 import { vennBuild } from "./families/venn/build";
 import { Effect, Result, Schema } from "effect";
 import type * as Builds from "./build/builds";
-import type { CodeModeRuntimeEnvironment } from "./build/runtime";
+import type { BuildRuntimeEnvironment } from "./build/runtime";
 import { docs as chartFamilyDocs } from "./families/chart/docs";
 import * as chartFamily from "./families/chart/document";
 import { chartBuild } from "./families/chart/build";
@@ -505,7 +505,7 @@ export interface FamilyOperation<A> {
 	) => Effect.Effect<
 		A,
 		import("./build/operation").BuildRejection<A>,
-		import("./build/artifacts").CodeModeArtifactStorage | CodeModeRuntimeEnvironment
+		import("./build/artifacts").ArtifactStorage | BuildRuntimeEnvironment
 	>;
 }
 

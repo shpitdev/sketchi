@@ -36,34 +36,34 @@ import { cleanToolString } from "../clean-text";
 import { type PublishedBuildIssue } from "./result";
 
 /** One catalog mark that diagrams may draw inside a node. */
-export interface CodeModeCatalogIcon {
+export interface BuildCatalogIcon {
 	readonly collection: string;
 	readonly name: string;
 	readonly slug: string;
 }
 
-export class CodeModeIconLoadError extends Schema.TaggedError<
-	CodeModeIconLoadError,
+export class BuildIconLoadError extends Schema.TaggedError<
+	BuildIconLoadError,
 	{ readonly brand: unique symbol }
->()("CodeModeIconLoadError", {
+>()("BuildIconLoadError", {
 	cause: Schema.Defect(),
 	message: Schema.String,
 	slug: Schema.String,
 }) {}
 
 /**
- * Node-logo catalog seen by Code Mode. Hosts supply SVG bytes from wherever
+ * Node-logo catalog seen by builds. Hosts supply SVG bytes from wherever
  * they keep them (Worker static assets, a bundled CLI map, test fixtures);
  * slug lookup and ranked search always come from the shared icon catalog.
  */
-export interface CodeModeIconCatalog {
+export interface BuildIconCatalog {
 	/** The eligible node-logo mark for an exact slug. */
-	readonly get: (slug: string) => CodeModeCatalogIcon | undefined;
+	readonly get: (slug: string) => BuildCatalogIcon | undefined;
 	/**
 	 * A wordmark for an exact slug, when this host serves them. Only a
 	 * standalone icon draws one; a node's logo never does.
 	 */
-	readonly wordmark: (slug: string) => CodeModeCatalogIcon | undefined;
+	readonly wordmark: (slug: string) => BuildCatalogIcon | undefined;
 	/**
 	 * Ranked node-logo search, shared with icons.sketchi.app, each result with
 	 * how it answers the query: the product's own mark, its vendor's, or weak.
@@ -71,7 +71,7 @@ export interface CodeModeIconCatalog {
 	readonly search: (
 		query: string,
 		limit: number,
-	) => readonly (CodeModeCatalogIcon & { readonly match: IconMatch })[];
+	) => readonly (BuildCatalogIcon & { readonly match: IconMatch })[];
 	/**
 	 * Whether a label leaves a vendor or platform mark unexplained: kubernetes
 	 * on "Ingress controller", not cloudflare on "Cloudflare Workers". A
@@ -83,18 +83,18 @@ export interface CodeModeIconCatalog {
 	 * names cloudflare); none for labels naming no product, several, or one
 	 * only by an everyday word ("Go to checkout").
 	 */
-	readonly logoNamedByLabel: (label: string) => CodeModeCatalogIcon | undefined;
+	readonly logoNamedByLabel: (label: string) => BuildCatalogIcon | undefined;
 	/**
 	 * The marks a label names in a diagram that asks for logos: every one it names, unmistakable
 	 * names first ("Next.js app hosted on Vercel" names nextjs, then vercel), and any its first
 	 * word may mean when that word starts step labels far more often ("Make payment").
 	 */
 	readonly labelLogos: (label: string) => {
-		readonly named: readonly CodeModeCatalogIcon[];
-		readonly possible: readonly CodeModeCatalogIcon[];
+		readonly named: readonly BuildCatalogIcon[];
+		readonly possible: readonly BuildCatalogIcon[];
 	};
 	/** Raw SVG source for an eligible mark. */
-	readonly loadSvg: (icon: CodeModeCatalogIcon) => Effect.Effect<string, CodeModeIconLoadError>;
+	readonly loadSvg: (icon: BuildCatalogIcon) => Effect.Effect<string, BuildIconLoadError>;
 	/** The hand-drawn recipe for an eligible mark, when the catalog has one. */
 	readonly recipe: (slug: string) => IconRecipe | undefined;
 	/**
@@ -104,7 +104,7 @@ export interface CodeModeIconCatalog {
 	readonly slugLookup: string;
 }
 
-function catalogIcon(icon: SketchiIcon): CodeModeCatalogIcon {
+function catalogIcon(icon: SketchiIcon): BuildCatalogIcon {
 	return { collection: icon.collection, name: icon.name, slug: icon.slug };
 }
 
@@ -125,12 +125,12 @@ function conceptSearchIcon(concept: ConceptIcon): SketchiIcon {
 }
 
 /** Whether a catalog icon is a generic concept, drawn only by hand and never named by a label. */
-export function isConceptIcon(icon: Pick<CodeModeCatalogIcon, "collection">): boolean {
+export function isConceptIcon(icon: Pick<BuildCatalogIcon, "collection">): boolean {
 	return icon.collection === CONCEPT_COLLECTION;
 }
 
 /** Whether an icon is drawn only by its recipe: a concept, community or drawn icon has no SVG. */
-function isRecipeOnlyIcon(icon: Pick<CodeModeCatalogIcon, "collection">): boolean {
+function isRecipeOnlyIcon(icon: Pick<BuildCatalogIcon, "collection">): boolean {
 	return (
 		isConceptIcon(icon) ||
 		icon.collection === COMMUNITY_ICON_COLLECTION ||
@@ -139,7 +139,7 @@ function isRecipeOnlyIcon(icon: Pick<CodeModeCatalogIcon, "collection">): boolea
 }
 
 /** A published community icon a diagram may draw by its `community/<slug>` slug. */
-export interface CodeModeCommunityIcon {
+export interface BuildCommunityIcon {
 	/** With the `community/` prefix. */
 	readonly slug: string;
 	readonly name: string;
@@ -151,20 +151,20 @@ export interface CodeModeCommunityIcon {
  * search: a host that cannot read its store returns none, and their slugs draw
  * nothing. Hidden icons are never returned.
  */
-export interface CodeModeCommunityIcons {
-	readonly load: (slugs: readonly string[]) => Effect.Effect<readonly CodeModeCommunityIcon[]>;
+export interface BuildCommunityIcons {
+	readonly load: (slugs: readonly string[]) => Effect.Effect<readonly BuildCommunityIcon[]>;
 	/**
 	 * A bounded set of icons whose name or slug contains the query, or a bare
 	 * query; the caller ranks and truncates it.
 	 */
-	readonly search: (query: string) => Effect.Effect<readonly CodeModeCommunityIcon[]>;
+	readonly search: (query: string) => Effect.Effect<readonly BuildCommunityIcon[]>;
 }
 
 /** The most community icons, and the most drawn icons, one request resolves. */
 const MAX_REQUEST_ICONS = 24;
 
 /** A drawn icon a request carries: the recipe and the name it draws under. */
-export interface CodeModeDrawnIcon {
+export interface BuildDrawnIcon {
 	readonly slug: string;
 	readonly name: string;
 	readonly recipe: IconRecipe;
@@ -177,8 +177,8 @@ const DRAWN_ICON_NAME = "Drawn icon";
  * `recipe` checks, keyed by the slug the recipe draws under. A diagram's own
  * `drawn/…` assets count too, so a scene keeps its drawn icons through edits.
  */
-export function drawnIconsIn(value: unknown): Map<string, CodeModeDrawnIcon> {
-	const found = new Map<string, CodeModeDrawnIcon>();
+export function drawnIconsIn(value: unknown): Map<string, BuildDrawnIcon> {
+	const found = new Map<string, BuildDrawnIcon>();
 	const visit = (entry: unknown, depth: number) => {
 		if (found.size >= MAX_REQUEST_ICONS || depth > 12 || entry === null) return;
 		if (Array.isArray(entry)) {
@@ -203,7 +203,7 @@ export function drawnIconsIn(value: unknown): Map<string, CodeModeDrawnIcon> {
 }
 
 /** An authored icon: a slug or product name, or a drawn icon's name and recipe. */
-export type CodeModeIconRef =
+export type BuildIconRef =
 	| string
 	| { readonly slug?: string; readonly name?: string; readonly recipe?: unknown };
 
@@ -212,7 +212,7 @@ export type CodeModeIconRef =
  * drawn slug; or why it draws nothing (a failed drawIcon result has no recipe).
  */
 export function iconRefSlug(
-	ref: CodeModeIconRef,
+	ref: BuildIconRef,
 ): { readonly slug: string } | { readonly problem: string } {
 	if (typeof ref === "string") return { slug: normalizeIconSlug(ref) };
 	if (ref.recipe !== undefined) {
@@ -241,7 +241,7 @@ export function undrawableIconIssue(input: {
 }
 
 /** What a host without a catalog draws from: only drawn icons. */
-const EMPTY_CATALOG: CodeModeIconCatalog = {
+const EMPTY_CATALOG: BuildIconCatalog = {
 	get: () => undefined,
 	wordmark: () => undefined,
 	search: () => [],
@@ -250,7 +250,7 @@ const EMPTY_CATALOG: CodeModeIconCatalog = {
 	labelLogos: () => ({ named: [], possible: [] }),
 	loadSvg: (icon) =>
 		Effect.fail(
-			CodeModeIconLoadError.make({
+			BuildIconLoadError.make({
 				cause: undefined,
 				message: "This host has no icon catalog.",
 				slug: icon.slug,
@@ -262,9 +262,9 @@ const EMPTY_CATALOG: CodeModeIconCatalog = {
 
 /** The catalog with a request's drawn icons added under their drawn slugs. */
 export function withDrawnIcons(
-	catalog: CodeModeIconCatalog | undefined,
-	drawn: ReadonlyMap<string, CodeModeDrawnIcon>,
-): CodeModeIconCatalog | undefined {
+	catalog: BuildIconCatalog | undefined,
+	drawn: ReadonlyMap<string, BuildDrawnIcon>,
+): BuildIconCatalog | undefined {
 	if (drawn.size === 0) return catalog;
 	const base = catalog ?? EMPTY_CATALOG;
 	const drawnIcon = (slug: string) => {
@@ -312,9 +312,9 @@ export function communityIconSlugsIn(value: unknown): string[] {
  * vendor checks see only the catalog, and a catalog slug always wins.
  */
 export function withCommunityIcons(
-	catalog: CodeModeIconCatalog,
-	icons: readonly CodeModeCommunityIcon[],
-): CodeModeIconCatalog {
+	catalog: BuildIconCatalog,
+	icons: readonly BuildCommunityIcon[],
+): BuildIconCatalog {
 	const community = new Map(
 		icons
 			.filter((icon) => isCommunityIconSlug(icon.slug) && isIconRecipe(icon.recipe))
@@ -338,8 +338,8 @@ export function withCommunityIcons(
  * request names, read once per build, and the drawn icons it carries.
  */
 export const catalogForRequest = Effect.fn("codeMode.icons.community")(function* (
-	catalog: CodeModeIconCatalog | undefined,
-	communityIcons: CodeModeCommunityIcons | undefined,
+	catalog: BuildIconCatalog | undefined,
+	communityIcons: BuildCommunityIcons | undefined,
 	request: unknown,
 ) {
 	const drawn = drawnIconsIn(request);
@@ -355,20 +355,20 @@ export const catalogForRequest = Effect.fn("codeMode.icons.community")(function*
 
 const WORDMARK_QUERY = /\bwordmarks?\b/iu;
 
-export function makeCodeModeIconCatalog(options: {
+export function makeBuildIconCatalog(options: {
 	readonly icons: readonly SketchiIcon[];
 	/**
 	 * Generic concepts (a database, a queue, a user) that search returns and a
 	 * slug attaches; only those with a drawable recipe are offered.
 	 */
 	readonly concepts?: readonly ConceptIcon[];
-	readonly loadSvg: (icon: CodeModeCatalogIcon) => Effect.Effect<string, CodeModeIconLoadError>;
+	readonly loadSvg: (icon: BuildCatalogIcon) => Effect.Effect<string, BuildIconLoadError>;
 	/** Hand-drawn recipes keyed by slug; undrawable ones are ignored. */
 	readonly recipes?: Readonly<Record<string, unknown>>;
 	readonly slugLookup: string;
 	/** Whether loadSvg serves wordmarks too, which standalone icons may draw. */
 	readonly wordmarks?: boolean;
-}): CodeModeIconCatalog {
+}): BuildIconCatalog {
 	const eligible = options.icons.filter(isNodeLogoEligible);
 	const wordmarkIcons = options.wordmarks ? options.icons.filter(isStandaloneWordmark) : [];
 	const wordmarks = new Map(wordmarkIcons.map((icon) => [icon.slug, catalogIcon(icon)] as const));
@@ -433,13 +433,10 @@ export function normalizeIconSlug(value: string): string {
 	return canonicalIconSlug(cleanToolString(value).toLowerCase());
 }
 
-function iconSuggestions(
-	catalog: CodeModeIconCatalog,
-	slug: string,
-): readonly CodeModeCatalogIcon[] {
+function iconSuggestions(catalog: BuildIconCatalog, slug: string): readonly BuildCatalogIcon[] {
 	const words = slug.split(/[-_\s]+/u).filter(Boolean);
 	const seen = new Set<string>();
-	const suggestions: CodeModeCatalogIcon[] = [];
+	const suggestions: BuildCatalogIcon[] = [];
 	// The whole phrase ranks first; single words rescue slugs with extra words.
 	for (const query of [words.join(" "), ...words]) {
 		if (!query) continue;
@@ -453,7 +450,7 @@ function iconSuggestions(
 	return suggestions.slice(0, SUGGESTION_LIMIT);
 }
 
-function suggestionHint(catalog: CodeModeIconCatalog, slug: string): string {
+function suggestionHint(catalog: BuildIconCatalog, slug: string): string {
 	const suggestions = iconSuggestions(catalog, slug);
 	return suggestions.length > 0
 		? `Use an exact slug, for example ${suggestions
@@ -463,7 +460,7 @@ function suggestionHint(catalog: CodeModeIconCatalog, slug: string): string {
 }
 
 function unknownIconIssue(input: {
-	readonly catalog: CodeModeIconCatalog | undefined;
+	readonly catalog: BuildIconCatalog | undefined;
 	readonly message: string;
 	readonly ref: (typeof PublishedBuildIssue.Type)["ref"];
 	readonly slug: string;
@@ -493,12 +490,12 @@ function unknownIconIssue(input: {
 export function resolveNodeIcons<
 	Node extends {
 		readonly id: string;
-		readonly icon?: Exclude<CodeModeIconRef, string>;
+		readonly icon?: Exclude<BuildIconRef, string>;
 		readonly label: string;
 	},
 >(
 	nodes: readonly Node[],
-	catalog: CodeModeIconCatalog | undefined,
+	catalog: BuildIconCatalog | undefined,
 	/** Sequence diagrams draw logos on participants rather than nodes. */
 	owner: { readonly noun: string; readonly path: string } = { noun: "node", path: "nodes" },
 	policy: { readonly fillNamedLogos?: boolean } = {},
@@ -577,10 +574,10 @@ export function resolveFlowchartLogos(
 	document: {
 		readonly logos?: boolean | "exact";
 		readonly nodes: Readonly<
-			Record<string, string | { readonly label: string; readonly icon?: CodeModeIconRef | null }>
+			Record<string, string | { readonly label: string; readonly icon?: BuildIconRef | null }>
 		>;
 	},
-	catalog: CodeModeIconCatalog | undefined,
+	catalog: BuildIconCatalog | undefined,
 ): {
 	readonly issues: (typeof PublishedBuildIssue.Type)[];
 	readonly icons: ReadonlyMap<string, string>;
@@ -702,7 +699,7 @@ export function fillGroupLogos(
 		| undefined,
 	/** Nodes as resolveNodeIcons left them. */
 	nodes: readonly { readonly group?: string; readonly icon?: { readonly slug: string } }[],
-	catalog: CodeModeIconCatalog | undefined,
+	catalog: BuildIconCatalog | undefined,
 	policy: { readonly fillNamedLogos?: boolean } = {},
 ): {
 	readonly issues: (typeof PublishedBuildIssue.Type)[];
@@ -754,7 +751,7 @@ export function fillGroupLogos(
 }
 
 function droppedIconIssue(input: {
-	readonly catalog: CodeModeIconCatalog | undefined;
+	readonly catalog: BuildIconCatalog | undefined;
 	readonly dropped: DroppedCanvasIcon;
 	readonly element: CanvasSpec["elements"][number] | undefined;
 	readonly known: boolean;
@@ -842,7 +839,7 @@ function droppedIconIssue(input: {
  */
 export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* (
 	scene: CanvasSpec,
-	catalog: CodeModeIconCatalog | undefined,
+	catalog: BuildIconCatalog | undefined,
 	options: { readonly exactIcons?: boolean } = {},
 ) {
 	const elements = scene.elements.map((element) => {
@@ -898,7 +895,7 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 							Effect.try({
 								try: () => normalizeNodeLogoSvg(svg),
 								catch: (cause) =>
-									CodeModeIconLoadError.make({
+									BuildIconLoadError.make({
 										cause,
 										message: `Node logo ${icon.slug} has unusable SVG.`,
 										slug: icon.slug,
@@ -907,7 +904,7 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 						),
 						Effect.map((svg) => [icon.slug, svg] as const),
 						// Only asset failures drop the icon; defects and interruption propagate.
-						Effect.catchTag("CodeModeIconLoadError", (error) =>
+						Effect.catchTag("BuildIconLoadError", (error) =>
 							Effect.logWarning("Code Mode icon asset unavailable", {
 								error_tag: error._tag,
 								slug: error.slug,
@@ -945,7 +942,7 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 export class BuildIconSource extends Context.Service<
 	BuildIconSource,
 	{
-		readonly catalog: (request: unknown) => Effect.Effect<CodeModeIconCatalog | undefined>;
+		readonly catalog: (request: unknown) => Effect.Effect<BuildIconCatalog | undefined>;
 		readonly fillNamedLogos: boolean;
 	}
 >()("@sketchi/diagrams/BuildIconSource") {}

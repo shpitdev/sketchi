@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { Effect, Result } from "effect";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { buildChart } from "../../../build/builds";
-import { CodeModeRuntimeEnvironment } from "../../../build/runtime";
+import { BuildRuntimeEnvironment } from "../../../build/runtime";
 import { applyDiagramPatch } from "../../../canvas/patch";
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
+import { ArtifactStorage, makeMemoryArtifactStorage } from "../../../build/artifacts";
 import {
 	CHART_MAX_CATEGORIES,
 	ChartValidationIssueCodeSchema,
@@ -15,15 +15,15 @@ import {
 
 const storage = makeMemoryArtifactStorage();
 function run<A, E extends BuildRejection<unknown>>(
-	effect: Effect.Effect<A, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+	effect: Effect.Effect<A, E, BuildRuntimeEnvironment | ArtifactStorage>,
 ) {
 	let id = 0;
 	return Effect.runPromise(
 		buildResponse(effect).pipe(
-			Effect.provideService(CodeModeRuntimeEnvironment, {
+			Effect.provideService(BuildRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_chart_${(id += 1)}`,
 			}),
-			Effect.provideService(CodeModeArtifactStorage, storage),
+			Effect.provideService(ArtifactStorage, storage),
 		),
 	);
 }

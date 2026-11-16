@@ -1,10 +1,7 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-import {
-	CodeModeArtifactStorageMemory,
-	makeCodeModeRuntimeEnvironmentLayer,
-} from "@sketchi/diagrams/build";
+import { ArtifactStorageMemory, makeBuildRuntimeEnvironmentLayer } from "@sketchi/diagrams/build";
 import { afterEach, assert, describe, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
@@ -18,11 +15,11 @@ import { DiagramStore, makeStorageRootLayer } from "../src/store/service";
 import { DiagramStoreLive } from "../src/store/live";
 import { builtDiagram, flowchartInput, localFileSystemLive, swappableFetch } from "./fixtures";
 
-const codeModeLayer = Layer.mergeAll(
-	CodeModeArtifactStorageMemory,
-	makeCodeModeRuntimeEnvironmentLayer({ createId: (prefix) => `${prefix}_revise_test` }),
+const buildServicesLayer = Layer.mergeAll(
+	ArtifactStorageMemory,
+	makeBuildRuntimeEnvironmentLayer({ createId: (prefix) => `${prefix}_revise_test` }),
 );
-const builderLayer = DiagramBuilderLive.pipe(Layer.provide(codeModeLayer));
+const builderLayer = DiagramBuilderLive.pipe(Layer.provide(buildServicesLayer));
 const build = (input: unknown) =>
 	Effect.runPromise(
 		Effect.gen(function* () {
