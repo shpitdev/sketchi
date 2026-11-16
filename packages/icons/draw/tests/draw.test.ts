@@ -112,10 +112,16 @@ function scripted(script: Script) {
 	return { layer: Layer.mergeAll(imaging, catalog, models), judged };
 }
 
-const draw = <E, R>(layer: Layer.Layer<IconImaging | IconCatalogSvgs | IconDrawModels, E, R>) =>
+const draw = <E, R>(
+	layer: Layer.Layer<IconImaging | IconCatalogSvgs | IconDrawModels, E, R>,
+	budgetMs?: number,
+) =>
 	prepareIconInput({ name: "Slack", svg: SLACK_SVG }).pipe(
 		Effect.flatMap((prepared) =>
-			drawIcon(prepared, { authorModel: "anthropic/claude-sonnet-5-5" }),
+			drawIcon(prepared, {
+				authorModel: "anthropic/claude-sonnet-5-5",
+				...(budgetMs === undefined ? {} : { budgetMs }),
+			}),
 		),
 		Effect.provide(layer),
 	);
@@ -294,10 +300,10 @@ describe("drawIcon spend bounds", () => {
 		}),
 	);
 
-	it.effect("aborts a model request that never answers", () =>
+	it.effect("aborts a stalled model call at its own deadline, under a larger caller budget", () =>
 		Effect.gen(function* () {
 			let aborted = false;
-			const { layer } = throughGateway(
+			const stalled = throughGateway(
 				(_operation, signal) =>
 					new Promise((_resolve, reject) =>
 						signal.addEventListener("abort", () => {
@@ -306,9 +312,20 @@ describe("drawIcon spend bounds", () => {
 						}),
 					),
 			);
-			const result = yield* settle(draw(layer));
-			expect(result._tag).toBe("Failure");
+			// Batch callers may allow a draw far longer than the default budget; the provider's
+			// 75 s deadline must still end the one stalled call, without a retry.
+			const fiber = yield* Effect.forkChild(
+				draw(stalled.layer, 1_000_000).pipe(
+					Effect.provideService(TelemetryCorrelation, {}),
+					Effect.result,
+				),
+			);
+			yield* TestClock.adjust("76 seconds");
+			yield* Effect.promise(() => new Promise((resolve) => setTimeout(resolve, 0)));
 			expect(aborted).toBe(true);
+			expect(stalled.dispatches).toEqual({ "icon-author": 1, "icon-judge": 0 });
+			yield* TestClock.adjust("1000 seconds");
+			expect((yield* Fiber.join(fiber))._tag).toBe("Failure");
 		}),
 	);
 });
