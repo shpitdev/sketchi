@@ -1,134 +1,12 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import {
-	acquireSlot,
-	assertSignoffReady,
-	nxFailedTasks,
-	nxTaskOutputs,
-	onlyVitestTimeouts,
-	runTests,
-} from "../ci-local.mjs";
-
-const timedOut = (file) =>
-	[
-		` ❯ ${file} (2 tests | 1 failed) 53ms`,
-		"⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯",
-		"",
-		` FAIL  ${file} > slow`,
-		"Error: Test timed out in 5000ms.",
-		'If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".',
-	].join("\n");
-const assertionFailed = (file) =>
-	[
-		` FAIL  ${file} > bad`,
-		"AssertionError: expected 1 to be 2 // Object.is equality",
-		"",
-		"- Expected",
-	].join("\n");
-const nxLog = (blocks, failed) =>
-	[
-		"\u001b[7m NX \u001b[27m  Running target test for 3 projects:",
-		...Object.entries(blocks).flatMap(([task, output]) => [
-			`\u001b[2m> \u001b[22m\u001b[2mnx run\u001b[22m ${task}`,
-			output,
-			"",
-		]),
-		` NX   Ran target test for 3 projects (4s)`,
-		"",
-		`   ✖  ${failed.length}/3 failed`,
-		"",
-		"   Failed tasks:",
-		"",
-		...failed.map((task) => `   - ${task}`),
-		"",
-		"   Hint: run with --verbose",
-	].join("\n");
-
-test("Nx static output splits into task blocks and failed tasks", () => {
-	const log = nxLog(
-		{ "a:test": timedOut("a.test.ts"), "b:test": "ok", "c:build": "error TS2304" },
-		["a:test", "c:build"],
-	);
-	const outputs = nxTaskOutputs(log);
-	assert.deepEqual([...outputs.keys()], ["a:test", "b:test", "c:build"]);
-	assert.match(outputs.get("a:test"), /Test timed out/);
-	assert.doesNotMatch(outputs.get("b:test"), /c:build|TS2304/);
-	assert.deepEqual(nxFailedTasks(log), ["a:test", "c:build"]);
-	assert.deepEqual(nxFailedTasks("no summary"), []);
-});
-
-test("Vitest output that failed only on test or hook timeouts is told apart", () => {
-	assert.ok(onlyVitestTimeouts(timedOut("a.test.ts")));
-	assert.ok(
-		onlyVitestTimeouts(" FAIL  a.test.ts [ a.test.ts ]\nError: Hook timed out in 10000ms.\n"),
-	);
-	assert.ok(!onlyVitestTimeouts(`${timedOut("a.test.ts")}\n${assertionFailed("b.test.ts")}`));
-	assert.ok(!onlyVitestTimeouts(`${timedOut("a.test.ts")}\n⎯⎯ Unhandled Errors ⎯⎯\nboom`));
-	assert.ok(!onlyVitestTimeouts("error TS2304: Cannot find name 'x'."));
-});
-
-function fakeTests(first, reruns = {}) {
-	const calls = [];
-	return {
-		calls,
-		runAll: async () => {
-			calls.push("all");
-			return { code: first.code, output: first.output, log: "test.log" };
-		},
-		runTask: async (task) => {
-			calls.push(task);
-			return { code: reruns[task] ?? 0, log: `${task}.log` };
-		},
-	};
-}
-
-test("a test task that only timed out is rerun alone and passes", async () => {
-	for (const task of ["a:test", "diagrams:test-quadrant"]) {
-		const fake = fakeTests({
-			code: 1,
-			output: nxLog({ [task]: timedOut("a.test.ts"), "b:test": "ok" }, [task]),
-		});
-		assert.deepEqual(await runTests(fake), {
-			ok: true,
-			reruns: [{ task, passed: true }],
-			logs: [],
-		});
-		assert.deepEqual(fake.calls, ["all", task]);
-	}
-});
-
-test("a test task that times out again when rerun alone fails the gate", async () => {
-	const fake = fakeTests(
-		{ code: 1, output: nxLog({ "a:test": timedOut("a.test.ts") }, ["a:test"]) },
-		{ "a:test": 1 },
-	);
-	assert.deepEqual(await runTests(fake), {
-		ok: false,
-		reruns: [{ task: "a:test", passed: false }],
-		logs: ["a:test.log"],
-	});
-});
-
-test("any other failure fails at once, even beside a timeout", async () => {
-	for (const output of [
-		nxLog({ "a:test": timedOut("a.test.ts"), "b:test": assertionFailed("b.test.ts") }, [
-			"a:test",
-			"b:test",
-		]),
-		nxLog({ "a:test": timedOut("a.test.ts"), "c:build": "error TS2304" }, ["a:test", "c:build"]),
-		"Nx crashed before listing failed tasks",
-	]) {
-		const fake = fakeTests({ code: 1, output });
-		assert.deepEqual(await runTests(fake), { ok: false, reruns: [], logs: ["test.log"] });
-		assert.deepEqual(fake.calls, ["all"]);
-	}
-});
+import { acquireSlot, assertSignoffReady } from "../ci-local.mjs";
 
 function scratch(t, prefix) {
 	const dir = mkdtempSync(join(tmpdir(), prefix));
@@ -298,6 +176,10 @@ import { appendFileSync } from "node:fs";
 const args = process.argv.slice(2);
 appendFileSync(process.env.GATE_CALLS, JSON.stringify({ command: ${JSON.stringify(name)}, args }) + "\\n");
 if (${JSON.stringify(name)} === "gh" && args[0] === "pr") console.log(JSON.stringify({ number: 7, state: "OPEN", headRefOid: process.env.GATE_HEAD }));
+if (args.includes("-t") && process.env.GATE_NX_FAILURE) {
+	console.log(process.env.GATE_NX_FAILURE);
+	process.exit(1);
+}
 `,
 			{ mode: 0o755 },
 		);
@@ -332,9 +214,9 @@ if (${JSON.stringify(name)} === "gh" && args[0] === "pr") console.log(JSON.strin
 			mkdirSync(join(repo.cwd, file, ".."), { recursive: true });
 			writeFileSync(join(repo.cwd, file), content);
 		},
-		run(args) {
+		run(args, { nxFailure, status = 0 } = {}) {
 			writeFileSync(calls, "");
-			const output = execFileSync(
+			const gate = spawnSync(
 				process.execPath,
 				[new URL("../ci-local.mjs", import.meta.url).pathname, ...args],
 				{
@@ -347,17 +229,19 @@ if (${JSON.stringify(name)} === "gh" && args[0] === "pr") console.log(JSON.strin
 						GATE_CALLS: calls,
 						GATE_HEAD: repo.head(),
 						CI_LOCAL_SLOTS: "1",
+						...(nxFailure && { GATE_NX_FAILURE: nxFailure }),
 					},
-					stdio: ["ignore", "pipe", "pipe"],
 				},
 			);
+			assert.equal(gate.status, status, gate.stderr);
 			const commands = readFileSync(calls, "utf8")
 				.trim()
 				.split("\n")
 				.filter(Boolean)
 				.map((line) => JSON.parse(line));
 			return {
-				output,
+				output: gate.stdout,
+				stderr: gate.stderr,
 				commands,
 				routing: commands.filter(({ args }) => args.includes("diagrams:routing-sample")),
 			};
@@ -427,10 +311,28 @@ test("origin/main, an equivalent explicit base, --all and signoff always run rou
 
 test("a unit base still cannot sign off, even with --all", (t) => {
 	const fixture = gateFixture(t);
-	assert.throws(
-		() => fixture.run(["--all", "--base", fixture.unitBase]),
-		(error) => /Signoff requires the full gate against origin\/main/.test(String(error.stderr)),
-	);
+	const { stderr } = fixture.run(["--all", "--base", fixture.unitBase], { status: 1 });
+	assert.match(stderr, /Signoff requires the full gate against origin\/main/);
+});
+
+test("a failed Nx checks run fails the gate once, even on a test timeout, keeping its log", (t) => {
+	const fixture = gateFixture(t);
+	const timeout = [
+		"> nx run a:test",
+		" FAIL  a.test.ts > slow",
+		"Error: Test timed out in 5000ms.",
+		"Failed tasks:",
+		"- a:test",
+	].join("\n");
+	const result = fixture.run([], { nxFailure: timeout, status: 1 });
+	const nx = result.commands.filter(({ args }) => args[0] === "nx" && args[1] !== "sync:check");
+	assert.equal(nx.length, 1, JSON.stringify(nx));
+	assert.ok(nx[0].args.includes("-t"));
+	assert.ok(!result.commands.some(({ args }) => args.includes("POST")));
+	assert.match(result.output, /✖ native Nx checks/);
+	const log = join(fixture.cwd, ".memory/ci-local/nx.log");
+	assert.match(result.stderr, /Test timed out in 5000ms/);
+	assert.match(readFileSync(log, "utf8"), /Test timed out in 5000ms/);
 });
 
 test("help explains sampled routing without executing checks", (t) => {

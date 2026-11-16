@@ -22,78 +22,6 @@ const DEFAULT_BASE = "origin/main";
 const STATUS_CONTEXT = "local-ci";
 const SQLITE_BUSY = 5;
 const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
-const VITEST_TIMEOUT = /^(?:Error: )?(?:Test|Hook) timed out in \d+ms/;
-
-/** Each `> nx run <task>` block of Nx's static output, keyed by task. */
-export function nxTaskOutputs(log) {
-	const outputs = new Map();
-	let task;
-	for (const line of log.replace(ANSI, "").split("\n")) {
-		const header = /^> nx run (\S+)/.exec(line);
-		if (header) {
-			task = header[1];
-			outputs.set(task, "");
-		} else if (task) {
-			outputs.set(task, `${outputs.get(task)}${line}\n`);
-		}
-	}
-	return outputs;
-}
-
-/** The tasks Nx lists under "Failed tasks:". */
-export function nxFailedTasks(log) {
-	const lines = log.replace(ANSI, "").split("\n");
-	const start = lines.findIndex((line) => line.trim() === "Failed tasks:");
-	if (start === -1) return [];
-	const failed = [];
-	for (const line of lines.slice(start + 1)) {
-		const item = /^\s*-\s+(\S+)/.exec(line);
-		if (item) failed.push(item[1]);
-		else if (line.trim() && failed.length > 0) break;
-	}
-	return failed;
-}
-
-/** Whether a Vitest run failed only because tests or hooks hit their timeout. */
-export function onlyVitestTimeouts(output) {
-	const lines = output.split("\n");
-	if (lines.some((line) => /Unhandled Errors?/.test(line))) return false;
-	const errors = [];
-	lines.forEach((line, index) => {
-		if (!/^\s*FAIL\s+\S/.test(line)) return;
-		errors.push(
-			lines
-				.slice(index + 1)
-				.find((next) => next.trim())
-				?.trim() ?? "",
-		);
-	});
-	return errors.length > 0 && errors.every((error) => VITEST_TIMEOUT.test(error));
-}
-
-/**
- * Runs the test targets. When every failed task failed only on Vitest timeouts, each is rerun
- * once on its own; any other failure fails without a rerun.
- */
-export async function runTests({ runAll, runTask }) {
-	const first = await runAll();
-	if (first.code === 0) return { ok: true, reruns: [], logs: [] };
-	const failed = nxFailedTasks(first.output);
-	const outputs = nxTaskOutputs(first.output);
-	const onlyTimeouts =
-		failed.length > 0 &&
-		failed.every(
-			(task) => /:test(?:-|$)/.test(task) && onlyVitestTimeouts(outputs.get(task) ?? ""),
-		);
-	if (!onlyTimeouts) return { ok: false, reruns: [], logs: [first.log] };
-	const reruns = [];
-	for (const task of failed) {
-		const rerun = await runTask(task);
-		reruns.push({ task, passed: rerun.code === 0 });
-		if (rerun.code !== 0) return { ok: false, reruns, logs: [rerun.log] };
-	}
-	return { ok: true, reruns, logs: [] };
-}
 
 function readSlotOwner(info) {
 	try {
@@ -242,8 +170,7 @@ On success it posts a "${STATUS_CONTEXT}" commit status on the pushed PR head.
                 staging head require --no-signoff. Readiness and signoff require the full gate
                 against origin/main; a different base cannot post a local-ci status.
 
-At most CI_LOCAL_SLOTS (default 2) gates run at once on this machine. A test task that failed
-only on Vitest timeouts is rerun once on its own before the gate fails.`;
+At most CI_LOCAL_SLOTS (default 2) gates run at once on this machine.`;
 
 // A failed check, already reported. Exiting through exitCode instead of process.exit lets a piped
 // stdout flush the report first.
@@ -374,39 +301,25 @@ async function main(argv) {
 		const result = await run(args[0], args.slice(1), logFile(name));
 		return { ok: result.code === 0, logs: [result.log] };
 	};
-	const checks = async () => {
-		const result = await runTests({
-			runAll: async () => {
-				const first = await run(
-					"pnpm",
-					["nx", ...nxScope, "-t", targets.join(","), "--parallel=4", "--outputStyle=static"],
-					logFile("nx"),
-				);
-				return { ...first, output: readFileSync(first.log, "utf8") };
-			},
-			runTask: (task) =>
-				run(
-					"pnpm",
-					["nx", "run", task, "--outputStyle=static"],
-					logFile(`rerun-${task.replace(/[^\w-]/g, "_")}`),
-				),
-		});
-		return {
-			...result,
-			notes: result.reruns.map(
-				({ task, passed }) =>
-					`    ↻ ${task} timed out under load; ${passed ? "passed" : "failed again"} when rerun alone`,
-			),
-		};
-	};
-	/** @type {[string, () => Promise<{ ok: boolean, logs: string[], notes?: string[] }>][]} */
+	/** @type {[string, () => Promise<{ ok: boolean, logs: string[] }>][]} */
 	const steps = [
 		[
 			"pnpm install",
 			command("pnpm-install", ["pnpm", "install", "--frozen-lockfile", "--prefer-offline"]),
 		],
 		["TypeScript reference sync", command("sync", ["pnpm", "nx", "sync:check"])],
-		["native Nx checks", checks],
+		[
+			"native Nx checks",
+			command("nx", [
+				"pnpm",
+				"nx",
+				...nxScope,
+				"-t",
+				targets.join(","),
+				"--parallel=4",
+				"--outputStyle=static",
+			]),
+		],
 	];
 	if (full || all) {
 		steps.push([
@@ -425,12 +338,8 @@ async function main(argv) {
 		console.log(`→ ${label}`);
 		const stepStarted = Date.now();
 		const result = await step();
-		const line = [label, ...(result.notes ?? [])].join("\n");
-		if (!result.ok) fail(line, result.logs);
-		report.push(
-			`✓ ${label} in ${formatDuration(Date.now() - stepStarted)}`,
-			...(result.notes ?? []),
-		);
+		if (!result.ok) fail(label, result.logs);
+		report.push(`✓ ${label} in ${formatDuration(Date.now() - stepStarted)}`);
 	}
 
 	const duration = formatDuration(Date.now() - started);
@@ -441,10 +350,6 @@ async function main(argv) {
 	if (assertSignoffReady({ cwd, pr }) !== head) {
 		throw new Error("HEAD moved while the gate ran; rerun pnpm ci:local.");
 	}
-	const notes = [
-		all && "all projects",
-		report.some((line) => line.includes("↻")) && "after a timeout rerun",
-	].filter(Boolean);
 	execFileSync(
 		"gh",
 		[
@@ -457,7 +362,7 @@ async function main(argv) {
 			"-f",
 			`context=${STATUS_CONTEXT}`,
 			"-f",
-			`description=Passed in ${duration} on ${os.hostname()}${notes.length ? ` (${notes.join(", ")})` : ""}`.slice(
+			`description=Passed in ${duration} on ${os.hostname()}${all ? " (all projects)" : ""}`.slice(
 				0,
 				140,
 			),
