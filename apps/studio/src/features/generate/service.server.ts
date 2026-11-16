@@ -29,10 +29,10 @@ import { workersAiFamilyNarrowingLayer } from "@sketchi/diagrams/generate/family
 import { type WorkersAiRunner } from "@sketchi/diagrams/generate/jev-workers-ai";
 import { Context, Effect, Layer } from "effect";
 
-import { aiEnvironment } from "../bindings/ai-env.server";
-import { logosNamedIn } from "../../features/build/icon-catalog.server";
-import type { StudioEnv } from "../bindings/studio-env.server";
-import { PlaygroundBindings } from "../runtime/context.server";
+import { aiEnvironment } from "../../server/ai-env.server";
+import { logosNamedIn } from "../build/icon-catalog.server";
+import type { StudioEnv } from "../../server/studio-env.server";
+import { PlaygroundBindings } from "../../server/context.server";
 
 export interface GenerateDiagramServiceInput {
 	/** The current diagram a revision starts from, as canonical diagram JSON. */

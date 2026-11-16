@@ -4,7 +4,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
 import { resourceError } from "@/features/projects/client";
 
-import { diagramDrawing } from "@/features/studio/diagram-drawing";
+import { diagramDrawing } from "@/features/projects/diagram-drawing";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
 import { StudioHeader } from "@/components/studio-header";
 

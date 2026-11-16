@@ -45,8 +45,8 @@ vi.mock("@sketchi/diagrams/canvas/patch", () => ({
 	applyDiagramPatch: () => Effect.succeed(runtimeResults.getApplyDiagramPatch()),
 }));
 
-import { type StudioEnv } from "../../../server/bindings/studio-env.server";
-import { runPlaygroundEffect } from "../../../server/runtime/runtime.server";
+import { type StudioEnv } from "../../../server/studio-env.server";
+import { runPlaygroundEffect } from "../../../server/runtime.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
 	return {

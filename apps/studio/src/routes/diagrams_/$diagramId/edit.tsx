@@ -5,8 +5,8 @@ import { StudioHeader } from "@/components/studio-header";
 import { useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
 import { resourceError } from "@/features/projects/client";
-import { editableDiagramDrawing } from "@/features/studio/diagram-drawing";
-import { DiagramEditor } from "@/features/studio/diagram-editor";
+import { editableDiagramDrawing } from "@/features/projects/diagram-drawing";
+import { DiagramEditor } from "@/features/projects/diagram-editor";
 
 export const Route = createFileRoute("/diagrams_/$diagramId/edit")({
 	component: DiagramEditRoute,

@@ -4,9 +4,9 @@ import { lookAlikeMarks } from "@sketchi/icon-catalog/look-alikes";
 import type { IconImagingJob } from "@sketchi/icon-draw";
 import { describe, expect, it, vi } from "vitest";
 
-import type { StudioEnv } from "../../bindings/studio-env.server";
-import type { CodeModePngRendererNamespace } from "../../../features/render/browser-renderer.server";
-import { runPlaygroundEffect } from "../../runtime/runtime.server";
+import type { StudioEnv } from "../../../server/studio-env.server";
+import type { CodeModePngRendererNamespace } from "../../render/browser-renderer.server";
+import { runPlaygroundEffect } from "../../../server/runtime.server";
 import { IconDrawBudget } from "../budget-object.server";
 import { handleDrawIconRequest } from "../draw.server";
 

@@ -5,8 +5,8 @@ import type { LanguageModel } from "effect/ai";
 import { HttpClient } from "effect/http";
 import { makeGatewayHttpClient } from "@sketchi/cloudflare/ai-gateway";
 import { DIAGRAM_AGENT_TEMPERATURE, MAX_AGENT_OUTPUT_TOKENS } from "@sketchi/diagrams/build/policy";
-import { aiEnvironment } from "../../server/bindings/ai-env.server";
-import { PlaygroundBindings, PlaygroundRequestMetadata } from "../../server/runtime/context.server";
+import { aiEnvironment } from "../../server/ai-env.server";
+import { PlaygroundBindings, PlaygroundRequestMetadata } from "../../server/context.server";
 import { preserveOutputLimit } from "./response-stream.server";
 
 export class StudioAiModelError extends Schema.TaggedError<

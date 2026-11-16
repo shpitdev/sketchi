@@ -21,34 +21,31 @@ import {
 import { limitClient } from "@sketchi/community-icons";
 import { Clock, Effect, Layer, Result } from "effect";
 
-import { aiEnvironment } from "../bindings/ai-env.server";
-import type { StudioEnv } from "../bindings/studio-env.server";
+import { aiEnvironment } from "../../server/ai-env.server";
+import type { StudioEnv } from "../../server/studio-env.server";
 import {
 	browserRenderingRetrySchedule,
 	BrowserRenderingFailure,
 	browserFailure,
-} from "../../features/render/browser-render-pool.server";
+} from "../render/browser-render-pool.server";
 import {
 	browserRunCaller,
 	browserRunHarnessUrl,
 	type CodeModePngRendererNamespace,
-} from "../../features/render/browser-renderer.server";
-import {
-	NODE_LOGO_ASSET_PATH,
-	type PlaygroundAssetsBinding,
-} from "../../features/build/icon-catalog.server";
-import { rendererOptions } from "../../features/build/capabilities.server";
+} from "../render/browser-renderer.server";
+import { NODE_LOGO_ASSET_PATH, type PlaygroundAssetsBinding } from "../build/icon-catalog.server";
+import { rendererOptions } from "../build/capabilities.server";
 import {
 	codeModeUsageResponseHeaders,
 	type CodeModeUsageContext,
 	PlaygroundCodeModeUsage,
-} from "../../features/build/usage-events.server";
+} from "../build/usage-events.server";
 import {
 	PlaygroundBindings,
 	PlaygroundClock,
 	PlaygroundRequestMetadata,
-} from "../runtime/context.server";
-import { readBoundedJson } from "../runtime/request-body.server";
+} from "../../server/context.server";
+import { readBoundedJson } from "../../server/request-body.server";
 
 const DEFAULT_JUDGE_MODEL = "openai/gpt-6-sol";
 

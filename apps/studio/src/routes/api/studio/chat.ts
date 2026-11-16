@@ -9,9 +9,9 @@ export const Route = createFileRoute("/api/studio/chat")({
 					{ handleStudioAgentRequest },
 					{ runPlaygroundEffect },
 				] = await Promise.all([
-					import("@/server/bindings/cloudflare-bindings.server"),
+					import("@/server/cloudflare-bindings.server"),
 					import("@/features/chat/agent.server"),
-					import("@/server/runtime/runtime.server"),
+					import("@/server/runtime.server"),
 				]);
 				const boundary = getPlaygroundRequestBoundary(request);
 				return runPlaygroundEffect(handleStudioAgentRequest(request), boundary);

@@ -2,7 +2,7 @@ import "@tanstack/react-start/server-only";
 
 import { Clock, Context, Effect, Layer } from "effect";
 
-import type { StudioEnv } from "../bindings/studio-env.server";
+import type { StudioEnv } from "./studio-env.server";
 
 export interface PlaygroundRequestMetadataShape {
 	/** From `x-sketchi-attempt-id`, or created when the request started. */

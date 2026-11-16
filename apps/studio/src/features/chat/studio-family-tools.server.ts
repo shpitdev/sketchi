@@ -5,7 +5,7 @@ import { type OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";
 import "@tanstack/react-start/server-only";
 import { buildResponse, bindBuild } from "@sketchi/diagrams/build";
 import { toCodeModeJsonSchema } from "@sketchi/diagrams/build/contract";
-import type { PlaygroundCallbackEffect } from "../../server/runtime/runtime.server";
+import type { PlaygroundCallbackEffect } from "../../server/runtime.server";
 import {
 	makeStudioFlowchartToolExecutor,
 	makeStudioSequenceToolExecutor,

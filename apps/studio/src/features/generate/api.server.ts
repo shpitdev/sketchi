@@ -39,8 +39,8 @@ import { listAlternatives } from "@sketchi/diagrams/generate/messages";
 import { type DiagramPatchOperation } from "@sketchi/diagrams/canvas/patch-contract";
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { applyDiagramPatch } from "@sketchi/diagrams/canvas/patch";
-import { type JsonBody } from "../../features/build/json-body.server";
-import { PlaygroundBindings, PlaygroundRequestMetadata } from "../runtime/context.server";
+import { type JsonBody } from "../build/json-body.server";
+import { PlaygroundBindings, PlaygroundRequestMetadata } from "../../server/context.server";
 import { PlaygroundGeneration } from "./service.server";
 
 const decodeGenerateRequest = Schema.decodeUnknownResult(GenerateRequest, { errors: "all" });

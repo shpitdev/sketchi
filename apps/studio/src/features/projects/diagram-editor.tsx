@@ -4,8 +4,8 @@ import { downloadBlob, DrawingEditor } from "@sketchi/editor";
 import { RegistryContext, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { Effect, Schema, Stream, String as Str } from "effect";
 import { Atom, AsyncResult } from "effect/reactivity";
-import { StudioRecordIdSchema } from "../projects/contracts";
-import { StudioApi, projectsRuntime } from "../projects/client";
+import { StudioRecordIdSchema } from "./contracts";
+import { StudioApi, projectsRuntime } from "./client";
 import { useCallback, useContext, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { IconActionBar, IconButton } from "@/components/sketch-icons";
