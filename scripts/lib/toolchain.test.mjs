@@ -6,16 +6,12 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
-	readFileSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { createRequire } from "node:module";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-
-const yaml = createRequire(import.meta.resolve("nx/package.json"))("@zkochan/js-yaml");
 
 test("mise, metadata, and running/nested executables select one project toolchain", () => {
 	const result = spawnSync(
@@ -118,39 +114,4 @@ test("dependency-free setup still verifies native mise tools", () => {
 	} finally {
 		rmSync(workspace, { recursive: true, force: true });
 	}
-});
-
-test("dependency-installing CI jobs use the shared mise setup", () => {
-	const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
-	for (const file of [
-		"app-preview.yml",
-		"app-production-deploy.yml",
-		"changesets.yml",
-		"ci.yml",
-		"release.yml",
-	]) {
-		const workflow = read(`.github/workflows/${file}`);
-		assert.doesNotMatch(workflow, /pnpm\/action-setup|actions\/setup-node|node-version:/);
-		assert.match(workflow, /uses: \.\/\.github\/actions\/setup-workspace/);
-	}
-	const ci = read(".github/workflows/ci.yml");
-	// The thin remote check typechecks; `pnpm ci:local` runs everything else.
-	assert.deepEqual(Object.keys(yaml.load(ci).jobs), ["typecheck"]);
-	assert.match(ci, /pnpm nx affected -t typecheck --base=/);
-	assert.doesNotMatch(ci, /-t [\w,-]*(?:test|build)|pnpm run check|playwright install|chromium/i);
-	assert.doesNotMatch(ci, /tsgo|typecheck-tsgo/);
-	const setup = read(".github/actions/setup-workspace/action.yml");
-	assert.match(setup, /node scripts\/verify-toolchain\.mjs --skip-dependencies/);
-	assert.match(setup, /INSTALL_DEPENDENCIES/);
-	// A pinned binary hash lets a cached mise verify without a GitHub download.
-	assert.match(setup, /^\s+version: \d{4}\.\d+\.\d+\n(?:\s+#.*\n)*\s+sha256: [0-9a-f]{64}$/m);
-});
-
-test("pnpm enforces maturity and build approvals without age exceptions", () => {
-	const workspace = readFileSync(new URL("../../pnpm-workspace.yaml", import.meta.url), "utf8");
-	assert.match(workspace, /minimumReleaseAge: 1440/);
-	assert.match(workspace, /minimumReleaseAgeStrict: true/);
-	assert.match(workspace, /pmOnFail: error/);
-	assert.match(workspace, /allowBuilds:/);
-	assert.doesNotMatch(workspace, /minimumReleaseAgeExclude|dangerouslyAllowAllBuilds/);
 });

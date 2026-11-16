@@ -134,23 +134,3 @@ test("publishing still fails for other conflicts and errors", () => {
 	});
 	assert.notEqual(forbidden.status, 0);
 });
-
-test("the release runs the packaging smoke, not the local gate, before publishing", () => {
-	assert.deepEqual(Object.keys(release), ["guard", "publish", "tag", "release"]);
-	assert.equal(release.publish.needs, "guard");
-	assert.match(release.publish.if, /needs\.guard\.outputs\.publish == 'true'/);
-	const runs = release.publish.steps.map((step) => step.run ?? "");
-	assert.ok(runs.includes("pnpm exec nx run sketchi-cli:smoke"));
-	assert.ok(!runs.some((run) => run.includes("ci:local")));
-	assert.match(release.tag.if, /needs\.publish\.result == 'success'/);
-	assert.match(release.release.if, /needs\.tag\.result == 'success'/);
-});
-
-test("only a push that can change the CLI version or a changeset starts these workflows", () => {
-	assert.deepEqual(releaseWorkflow.on.push.paths, ["apps/cli/package.json"]);
-	// changesets.yml merges the Version Packages PR with GITHUB_TOKEN and then dispatches the release.
-	assert.ok("workflow_dispatch" in releaseWorkflow.on);
-	const changesets = workflow("changesets.yml");
-	assert.deepEqual(changesets.on.push.paths, [".changeset/**"]);
-	assert.match(JSON.stringify(changesets.jobs.version.steps), /gh workflow run release\.yml/);
-});

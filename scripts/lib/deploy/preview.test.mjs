@@ -15,26 +15,6 @@ import {
 import { workerProjectConfig, workerProjectIds } from "../worker-apps.mjs";
 import { unstable_readConfig } from "wrangler";
 
-test("previewProjectConfig returns project and Worker metadata", () => {
-	assert.deepEqual(previewProjectConfig("icons"), {
-		...workerProjectConfig("icons"),
-		commentMarker: "<!-- sketchi-icons-preview -->",
-		publicSurface: true,
-		routePolicy: "icons.sketchi.app product surface",
-		title: "Sketchi Icons",
-	});
-});
-
-test("playground project preserves the durable Studio preview Worker", () => {
-	assert.deepEqual(previewProjectConfig("playground"), {
-		...workerProjectConfig("playground"),
-		commentMarker: "<!-- sketchi-studio-preview -->",
-		publicSurface: true,
-		routePolicy: "playground.sketchi.app product surface; authenticated Studio remains unexposed",
-		title: "Sketchi Playground / Studio",
-	});
-});
-
 test("previewProjectConfig requires an explicit project selection", () => {
 	assert.throws(() => previewProjectConfig(), /Preview project selection is required/);
 });

@@ -14,14 +14,14 @@ test("a docs-only unit change skips every conditional gate", () => {
 	});
 });
 
-test("an affected project runs workspace-wide type and graph checks", () => {
+test("an affected project runs workspace-wide type checks", () => {
 	const scope = unitScope(["packages/diagrams/src/render.ts"], ["diagrams", "editor"]);
 	assert.equal(scope.code, true);
 	assert.equal(scope.storybook, true);
 });
 
 test("root workspace and tooling files count as code without an affected project", () => {
-	for (const file of ["tools/project-graph.test.ts", "pnpm-lock.yaml", "tsconfig.json"]) {
+	for (const file of ["tools/local-dev-ports.ts", "pnpm-lock.yaml", "tsconfig.json"]) {
 		assert.equal(unitScope([file]).code, true, file);
 	}
 	assert.equal(unitScope(["apps/web/README.md"]).storybook, false);
