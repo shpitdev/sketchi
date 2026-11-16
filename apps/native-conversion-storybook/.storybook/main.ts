@@ -36,6 +36,8 @@ const config: StorybookConfig = {
 				"../../../packages/drawing/src/excalidraw/index.ts",
 				import.meta.url,
 			).pathname,
+			"@sketchi/drawing/svg": new URL("../../../packages/drawing/src/svg/index.ts", import.meta.url)
+				.pathname,
 			"@sketchi/drawing/artifacts": new URL(
 				"../../../packages/drawing/src/artifacts.ts",
 				import.meta.url,
@@ -51,10 +53,6 @@ const config: StorybookConfig = {
 				import.meta.url,
 			).pathname,
 			"@sketchi/editor": new URL("../../../packages/editor/src/index.ts", import.meta.url).pathname,
-			"@sketchi/svg-excalidraw": new URL(
-				"../../../packages/svg-excalidraw/src/index.ts",
-				import.meta.url,
-			).pathname,
 		};
 		return viteConfig;
 	},

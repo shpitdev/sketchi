@@ -29,8 +29,8 @@ export default defineConfig({
 				replacement: source("../../packages/editor/src/index.ts"),
 			},
 			{
-				find: "@sketchi/svg-excalidraw",
-				replacement: source("../../packages/svg-excalidraw/src/index.ts"),
+				find: "@sketchi/drawing/svg",
+				replacement: source("../../packages/drawing/src/svg/index.ts"),
 			},
 		],
 	},

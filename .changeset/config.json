@@ -22,7 +22,6 @@
 		"@sketchi/editor",
 		"@sketchi/observability",
 		"@sketchi/studio-projects",
-		"@sketchi/svg-excalidraw",
 		"@sketchi/generators",
 		"@sketchi/diagrams",
 		"@sketchi/cloudflare"

@@ -1,4 +1,4 @@
-import type { Matrix, Point, SvgDiagnostic } from "./types";
+import type { Matrix, Point, SvgDiagnostic } from "./types.js";
 
 export const IDENTITY_MATRIX: Matrix = [1, 0, 0, 1, 0, 0];
 

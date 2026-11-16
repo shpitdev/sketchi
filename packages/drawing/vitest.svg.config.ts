@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig(() => ({
 	root: import.meta.dirname,
-	cacheDir: "../../node_modules/.vite/packages/svg-excalidraw",
+	cacheDir: "../../node_modules/.vite/packages/drawing-svg",
 	resolve: {
 		alias: {
 			"@excalidraw/excalidraw": new URL(
@@ -13,7 +13,7 @@ export default defineConfig(() => ({
 		conditions: ["development"],
 	},
 	test: {
-		name: "svg-excalidraw",
+		name: "drawing-svg",
 		watch: false,
 		globals: true,
 		environment: "jsdom",
@@ -22,12 +22,12 @@ export default defineConfig(() => ({
 				inline: true as const,
 			},
 		},
-		setupFiles: ["./tests/setup-excalidraw.ts"],
-		include: ["{src,tests}/**/*.{test,spec}.{ts,mts,tsx}"],
-		exclude: ["tests/native-corpus-renderer.test.ts"],
+		setupFiles: ["./src/svg/tests/setup-excalidraw.ts"],
+		include: ["src/svg/**/*.test.ts"],
+		exclude: ["src/svg/tests/native-corpus-renderer.test.ts"],
 		reporters: ["default"],
 		coverage: {
-			reportsDirectory: "../../coverage/packages/svg-excalidraw",
+			reportsDirectory: "../../coverage/packages/drawing/svg",
 			provider: "v8" as const,
 		},
 	},

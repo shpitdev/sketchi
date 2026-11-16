@@ -16,7 +16,7 @@ export default defineConfig({
 	test: {
 		name: "drawing",
 		include: ["packages/drawing/src/**/*.test.ts"],
-		exclude: ["**/node_modules/**"],
+		exclude: ["**/node_modules/**", "packages/drawing/src/svg/**"],
 		testTimeout: 60_000,
 	},
 });

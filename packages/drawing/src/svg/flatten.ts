@@ -1,9 +1,9 @@
 import { SVGPathData, SVGPathDataTransformer, type SVGCommand } from "svg-pathdata";
 
-import { pointToSegmentDistance, signedArea, squaredDistance } from "./geometry";
-import { parseLength, viewportDiagonal, type SvgViewport } from "./length";
-import type { SvgAttributes } from "./style";
-import { parseNumberList, transformPoint } from "./transform";
+import { pointToSegmentDistance, signedArea, squaredDistance } from "./geometry.js";
+import { parseLength, viewportDiagonal, type SvgViewport } from "./length.js";
+import type { SvgAttributes } from "./style.js";
+import { parseNumberList, transformPoint } from "./transform.js";
 import type {
 	CanonicalSubpath,
 	EffectiveAdaptiveFlatteningOptions,
@@ -11,7 +11,7 @@ import type {
 	Point,
 	SvgDiagnostic,
 	SvgPrimitiveName,
-} from "./types";
+} from "./types.js";
 
 interface MutableFlatteningMetrics {
 	arcSegments: number;

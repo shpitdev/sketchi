@@ -6,7 +6,6 @@
 		"@excalidraw/excalidraw": "0.18.1",
 		"@sketchi/drawing": "workspace:*",
 		"@sketchi/editor": "workspace:*",
-		"@sketchi/svg-excalidraw": "workspace:*",
 		"@effect/atom-react": "catalog:",
 		"effect": "catalog:",
 		"scheduler": "catalog:",

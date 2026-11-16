@@ -1,6 +1,9 @@
-import { fnv1a32 } from "@sketchi/drawing";
+import { fnv1a32 } from "../hash.js";
 
-import { type ExcalidrawLibraryItemInput, type SerializeExcalidrawLibraryOptions } from "./types";
+import {
+	type ExcalidrawLibraryItemInput,
+	type SerializeExcalidrawLibraryOptions,
+} from "./types.js";
 
 const DEFAULT_LIBRARY_SOURCE = "https://sketchi.app";
 

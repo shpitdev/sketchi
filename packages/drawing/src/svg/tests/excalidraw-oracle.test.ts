@@ -5,7 +5,7 @@ import {
 } from "@excalidraw/excalidraw";
 import { describe, expect, it } from "vitest";
 
-import { convertSvgToExcalidraw, parseSvg, serializeExcalidrawLibrary } from "../src";
+import { convertSvgToExcalidraw, parseSvg, serializeExcalidrawLibrary } from "..";
 import { corpusFixtures } from "./corpus-fixtures";
 
 function mustParse(source: string, sourceName = "inline.svg") {

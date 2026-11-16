@@ -1,4 +1,4 @@
-# `@sketchi/svg-excalidraw`
+# `@sketchi/drawing/svg`
 
 Self-contained SVG-to-native-Excalidraw conversion boundary. The parser and
 production native backend are synchronous, pure, deterministic, and DOM-free:
@@ -73,15 +73,15 @@ Run the fast package proof, including representative fixtures and Chromium
 cross-runtime determinism, with:
 
 ```sh
-pnpm nx run svg-excalidraw:typecheck
-pnpm nx run svg-excalidraw:test
-pnpm nx run svg-excalidraw:build
+pnpm nx run drawing:typecheck
+pnpm nx run drawing:test
+pnpm nx run drawing:build
 ```
 
 The full corpus renderer is intentionally separate. It writes an untracked JSON
 report under `.memory/svg-native-corpus/`. Neither CI nor the local gate runs it;
-run it when this package or the corpus inputs change:
+run it when this folder or the corpus inputs change:
 
 ```sh
-pnpm nx run svg-excalidraw:corpus-renderer
+pnpm nx run drawing:corpus-renderer
 ```

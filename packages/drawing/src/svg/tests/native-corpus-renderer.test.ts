@@ -5,13 +5,9 @@ import { exportToSvg, restoreElements } from "@excalidraw/excalidraw";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
-import { convertSvgToExcalidraw, parseSvg, type CanonicalSvgDocument } from "../src";
-import { isBlockingSvgDiagnostic } from "../src/lib/capabilities";
-import {
-	contoursAreNestedOrDisjoint,
-	keyholeBridgeIsSafe,
-	regionsFromRings,
-} from "../src/lib/geometry";
+import { convertSvgToExcalidraw, parseSvg, type CanonicalSvgDocument } from "..";
+import { isBlockingSvgDiagnostic } from "../capabilities";
+import { contoursAreNestedOrDisjoint, keyholeBridgeIsSafe, regionsFromRings } from "../geometry";
 
 const RASTER_SIZE = 128;
 // 2,793 of 2,941 catalog files (95.0%) render natively.
@@ -19,7 +15,7 @@ const NATIVE_SHARE_FLOOR = 0.94;
 
 function readKnownBlocked(): readonly string[] {
 	return readFileSync(
-		resolve(process.cwd(), "packages/svg-excalidraw/tests/fixtures/native-corpus-blocked.txt"),
+		resolve(process.cwd(), "packages/drawing/src/svg/tests/fixtures/native-corpus-blocked.txt"),
 		"utf8",
 	)
 		.split("\n")
