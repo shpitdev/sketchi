@@ -83,7 +83,7 @@ export interface TelemetrySpan {
 	readonly trace_id: string;
 }
 
-/** The stream's record: `scripts/telemetry/spans.schema.json`. */
+/** The stream's record: `packages/observability/spans.schema.json`. */
 export interface TelemetrySpanRow {
 	readonly attempt_id?: string;
 	readonly attributes: string;
