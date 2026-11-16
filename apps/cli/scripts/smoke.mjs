@@ -311,6 +311,7 @@ try {
 					JSON.stringify({
 						ok: true,
 						status: "generated",
+						issues: [],
 						diagram: {
 							document: generatedFlowchart,
 							scene: generatedScene,

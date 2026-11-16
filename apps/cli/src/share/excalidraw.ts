@@ -1,6 +1,6 @@
-import { spawn } from "node:child_process";
-
 import { Context, Effect, Layer, Schema } from "effect";
+import { Aead, SecureRandom } from "effect/crypto";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { CliShareError } from "../errors.js";
 import { readBoundedBody, readBoundedText } from "../response-body.js";
@@ -127,34 +127,6 @@ export class LinkOpener extends Context.Service<
 	{ readonly open: (link: string) => Effect.Effect<OpenResult> }
 >()("@sketchi/cli/LinkOpener") {}
 
-interface OpenerChild {
-	onError(listener: () => void): void;
-	onExit(listener: (code: number | null) => void): void;
-	kill(signal: NodeJS.Signals): boolean;
-}
-
-type SpawnOpener = (
-	command: string,
-	args: ReadonlyArray<string>,
-	options: { readonly shell: false; readonly stdio: "ignore" },
-) => OpenerChild;
-
-const terminateOpener = Effect.fn("sketchi.cli.share.terminateOpener")((child: OpenerChild) =>
-	Effect.callback<void>((resume) => {
-		child.onExit(() => resume(Effect.void));
-		child.onError(() => resume(Effect.void));
-		if (!child.kill("SIGTERM")) resume(Effect.void);
-	}).pipe(
-		Effect.timeoutOrElse({
-			duration: "250 millis",
-			orElse: () =>
-				Effect.sync(() => {
-					child.kill("SIGKILL");
-				}),
-		}),
-	),
-);
-
 function openerCommand(
 	link: string,
 	platform: NodeJS.Platform,
@@ -175,59 +147,57 @@ function openerCommand(
 	}
 }
 
+/**
+ * Runs the platform opener with the link as an argument, never through a shell. A clean exit
+ * releases the opener's process group so a browser it started keeps running; a failed exit,
+ * timeout or interruption terminates the whole group, TERM then KILL.
+ */
 export function makeLinkOpenerLayer(
-	spawnOpener: SpawnOpener = (command, args, options) => {
-		const child = spawn(command, [...args], options);
-		return {
-			onError: (listener) => {
-				child.once("error", listener);
-			},
-			onExit: (listener) => {
-				child.once("exit", listener);
-			},
-			kill: (signal) => child.kill(signal),
-		};
-	},
 	platform: NodeJS.Platform = process.platform,
 	waitMs: number = OPENER_WAIT_MS,
 ) {
-	return Layer.succeed(LinkOpener, {
-		open: (link) =>
-			Effect.callback<OpenResult>((resume) => {
+	return Layer.effect(
+		LinkOpener,
+		Effect.gen(function* () {
+			const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+			const open = Effect.fn("sketchi.cli.share.openLink")(function* (link: string) {
 				const target = openerCommand(link, platform);
-				const child = spawnOpener(target.command, target.args, {
-					shell: false,
-					stdio: "ignore",
-				});
-				child.onError(() =>
-					resume(
-						Effect.succeed({
-							status: "unconfirmed",
-							reason: "missing_executable",
-						}),
-					),
+				const run = Effect.scoped(
+					Effect.gen(function* () {
+						const spawned = yield* Effect.result(
+							ChildProcess.make(target.command, target.args, {
+								stdin: "ignore",
+								stdout: "ignore",
+								stderr: "ignore",
+								killSignal: "SIGTERM",
+								forceKillAfter: "250 millis",
+							}),
+						);
+						if (spawned._tag === "Failure") {
+							return { status: "unconfirmed", reason: "missing_executable" } satisfies OpenResult;
+						}
+						const handle = spawned.success;
+						// A signal exit has no code and fails exitCode; both are a failed opener.
+						const code = yield* handle.exitCode.pipe(Effect.orElseSucceed(() => undefined));
+						if (code !== 0) {
+							return { status: "unconfirmed", reason: "nonzero_exit" } satisfies OpenResult;
+						}
+						// The returned re-reference is never needed: the opener has already exited.
+						yield* Effect.ignore(handle.unref);
+						return { status: "accepted" } satisfies OpenResult;
+					}),
 				);
-				child.onExit((code) =>
-					resume(
-						Effect.succeed(
-							code === 0
-								? { status: "accepted" }
-								: { status: "unconfirmed", reason: "nonzero_exit" },
-						),
-					),
+				return yield* run.pipe(
+					Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+					Effect.timeoutOrElse({
+						duration: waitMs,
+						orElse: () => Effect.succeed<OpenResult>({ status: "unconfirmed", reason: "timeout" }),
+					}),
 				);
-				return terminateOpener(child);
-			}).pipe(
-				Effect.timeoutOrElse({
-					duration: waitMs,
-					orElse: () =>
-						Effect.succeed<OpenResult>({
-							status: "unconfirmed",
-							reason: "timeout",
-						}),
-				}),
-			),
-	});
+			});
+			return LinkOpener.of({ open });
+		}),
+	);
 }
 
 export const LinkOpenerLive = makeLinkOpenerLayer();
@@ -244,17 +214,18 @@ export const ExcalidrawShareLive = Layer.effect(
 	ExcalidrawShare,
 	Effect.gen(function* () {
 		const transport = yield* ShareTransport;
+		const crypto = yield* Effect.context<Aead.Aead | SecureRandom.SecureRandom>();
 		const share = Effect.fn("sketchi.cli.share.upload")(function* (artifact: unknown) {
 			const serialized = yield* serializeForShare(artifact);
-			const key = generateShareKey();
-			const body = yield* encodeSharePayload(serialized, key);
+			const key = yield* generateShareKey.pipe(Effect.provideContext(crypto));
+			const body = yield* encodeSharePayload(serialized, key).pipe(Effect.provideContext(crypto));
 			const id = yield* transport.upload(body);
 			return { link: formatShareLink({ id, key }) };
 		});
 		const pull = Effect.fn("sketchi.cli.share.pull")(function* (link: string) {
 			const parts = yield* parseShareLink(link);
 			const body = yield* transport.download(parts.id);
-			return yield* decodeSharePayload(body, parts.key);
+			return yield* decodeSharePayload(body, parts.key).pipe(Effect.provideContext(crypto));
 		});
 		return { share, pull };
 	}),

@@ -1,5 +1,3 @@
-import { constants } from "node:fs";
-import { open } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Context, Effect, FileSystem, Layer, Option, type PlatformError } from "effect";
@@ -79,59 +77,91 @@ function platformCause(error: PlatformError.PlatformError): unknown {
 	return error.reason.cause ?? error;
 }
 
-/** Node stat follows links; probe readLink first so entry classification does not. */
+/**
+ * Native no-follow open refuses a symlink at the final path component on POSIX. Windows has
+ * no O_NOFOLLOW, so there the open follows links as releases up to 0.42.3 did; `kind` and the
+ * store's tree checks still refuse the links they see.
+ */
+const NO_FOLLOW = process.platform !== "win32";
+const READ_CHUNK_BYTES = 64 * 1024;
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+
+function kindOf(info: FileSystem.File.Info): LocalEntryKind {
+	switch (info.type) {
+		case "File":
+			return "file";
+		case "Directory":
+			return "directory";
+		case "SymbolicLink":
+			return "symbolic-link";
+		default:
+			return "other";
+	}
+}
+
+/** Reads an open descriptor to end of file, not to a size taken before the read. */
+const readToEnd = Effect.fnUntraced(function* (file: FileSystem.File) {
+	const chunks: Uint8Array[] = [];
+	let size = 0;
+	while (true) {
+		const chunk = yield* file.readAlloc(READ_CHUNK_BYTES);
+		if (Option.isNone(chunk)) break;
+		chunks.push(chunk.value);
+		size += chunk.value.byteLength;
+	}
+	const bytes = new Uint8Array(size);
+	let offset = 0;
+	for (const chunk of chunks) {
+		bytes.set(chunk, offset);
+		offset += chunk.byteLength;
+	}
+	return bytes;
+});
+
 export function makeLocalFileSystem(fs: FileSystem.FileSystem): typeof LocalFileSystem.Service {
-	const kind = Effect.fn("sketchi.cli.fs.kind")(function* (path: string) {
-		const link = yield* fs.readLink(path).pipe(Effect.result);
-		if (link._tag === "Success") return "symbolic-link";
-		const cause = platformCause(link.failure);
-		if (hasCode(cause, "ENOENT")) return "missing";
-		if (hasCode(cause, "ELOOP")) return "symbolic-link";
-		if (!hasCode(cause, "EINVAL")) return yield* filesystemError("stat", path, cause);
-		return yield* fs.stat(path).pipe(
-			Effect.map((info): LocalEntryKind => {
-				if (info.type === "File") return "file";
-				if (info.type === "Directory") return "directory";
-				if (info.type === "SymbolicLink") return "symbolic-link";
-				return "other";
-			}),
-			Effect.catch((error) => {
-				const cause = platformCause(error);
-				if (hasCode(cause, "ENOENT")) return Effect.succeed<LocalEntryKind | "missing">("missing");
-				if (hasCode(cause, "ELOOP"))
-					return Effect.succeed<LocalEntryKind | "missing">("symbolic-link");
-				return Effect.fail(filesystemError("stat", path, cause));
-			}),
-		);
-	});
 	const mapError = (operation: string, path: string) => (error: PlatformError.PlatformError) =>
 		filesystemError(operation, path, platformCause(error));
+	const kind = Effect.fn("sketchi.cli.fs.kind")((path: string) =>
+		fs.lstat(path).pipe(
+			Effect.map((info): LocalEntryKind | "missing" => kindOf(info)),
+			Effect.catch((error) => {
+				const cause = platformCause(error);
+				if (hasCode(cause, "ENOENT")) return Effect.succeed("missing" as const);
+				// A looping parent link is still a link the store must refuse.
+				if (hasCode(cause, "ELOOP")) return Effect.succeed("symbolic-link" as const);
+				return Effect.fail(filesystemError("stat", path, cause));
+			}),
+		),
+	);
+	const readNoFollow = (path: string) =>
+		Effect.scoped(
+			fs.open(path, { flag: "r", noFollow: NO_FOLLOW }).pipe(Effect.flatMap(readToEnd)),
+		).pipe(Effect.mapError(mapError("read", path)));
+	/** One no-follow descriptor, owner-only, synced before it closes. */
+	const writeNoFollow = (path: string, bytes: Uint8Array, flag: "w" | "wx") =>
+		Effect.scoped(
+			Effect.gen(function* () {
+				const file = yield* fs.open(path, { flag, mode: 0o600, noFollow: NO_FOLLOW });
+				yield* file.writeAll(bytes);
+				yield* file.sync;
+			}),
+		);
+	const write = (path: string, bytes: Uint8Array, replace: boolean) =>
+		writeNoFollow(path, bytes, replace ? "w" : "wx").pipe(Effect.mapError(mapError("write", path)));
 	return {
 		makeDirectory: (path, recursive = false) =>
 			fs.makeDirectory(path, { recursive }).pipe(Effect.mapError(mapError("make-directory", path))),
 		tryWriteText: (path, value) =>
-			Effect.tryPromise({
-				try: async (signal) => {
-					try {
-						const handle = await open(
-							path,
-							constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
-							0o600,
-						);
-						try {
-							await handle.writeFile(value, { encoding: "utf8", signal });
-							await handle.sync();
-						} finally {
-							await handle.close();
-						}
-						return true;
-					} catch (cause) {
-						if (hasCode(cause, "EEXIST")) return false;
-						throw cause;
-					}
-				},
-				catch: (cause) => filesystemError("write-exclusive", path, cause),
-			}),
+			writeNoFollow(path, textEncoder.encode(value), "wx").pipe(
+				Effect.as(true),
+				Effect.catch((error) => {
+					const cause = platformCause(error);
+					return hasCode(cause, "EEXIST")
+						? Effect.succeed(false)
+						: Effect.fail(filesystemError("write-exclusive", path, cause));
+				}),
+			),
 		tryLinkFile: (source, destination) =>
 			fs.link(source, destination).pipe(
 				Effect.as(true),
@@ -167,66 +197,10 @@ export function makeLocalFileSystem(fs: FileSystem.FileSystem): typeof LocalFile
 				Effect.map((info) => Option.getOrUndefined(info.mtime)?.getTime()),
 				Effect.mapError(mapError("stat", path)),
 			),
-		readText: (path) =>
-			Effect.tryPromise({
-				try: async (signal) => {
-					const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
-					try {
-						return await handle.readFile({ encoding: "utf8", signal });
-					} finally {
-						await handle.close();
-					}
-				},
-				catch: (cause) => filesystemError("read", path, cause),
-			}),
-		readBytes: (path) =>
-			Effect.tryPromise({
-				try: async (signal) => {
-					const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
-					try {
-						return new Uint8Array(await handle.readFile({ signal }));
-					} finally {
-						await handle.close();
-					}
-				},
-				catch: (cause) => filesystemError("read", path, cause),
-			}),
-		writeText: (path, value, replace = false) =>
-			Effect.tryPromise({
-				try: async (signal) => {
-					const flags =
-						constants.O_WRONLY |
-						constants.O_CREAT |
-						constants.O_NOFOLLOW |
-						(replace ? constants.O_TRUNC : constants.O_EXCL);
-					const handle = await open(path, flags, 0o600);
-					try {
-						await handle.writeFile(value, { encoding: "utf8", signal });
-						await handle.sync();
-					} finally {
-						await handle.close();
-					}
-				},
-				catch: (cause) => filesystemError("write", path, cause),
-			}),
-		writeBytes: (path, value, replace = false) =>
-			Effect.tryPromise({
-				try: async (signal) => {
-					const flags =
-						constants.O_WRONLY |
-						constants.O_CREAT |
-						constants.O_NOFOLLOW |
-						(replace ? constants.O_TRUNC : constants.O_EXCL);
-					const handle = await open(path, flags, 0o600);
-					try {
-						await handle.writeFile(value, { signal });
-						await handle.sync();
-					} finally {
-						await handle.close();
-					}
-				},
-				catch: (cause) => filesystemError("write", path, cause),
-			}),
+		readText: (path) => readNoFollow(path).pipe(Effect.map((bytes) => textDecoder.decode(bytes))),
+		readBytes: readNoFollow,
+		writeText: (path, value, replace = false) => write(path, textEncoder.encode(value), replace),
+		writeBytes: (path, value, replace = false) => write(path, value, replace),
 		rename: (source, destination) =>
 			fs
 				.rename(source, destination)

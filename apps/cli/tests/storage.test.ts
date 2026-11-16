@@ -460,6 +460,34 @@ describe("diagram storage", () => {
 		),
 	);
 
+	// A link swapped in after the store's own checks: only the no-follow open stops it.
+	it.effect.skipIf(process.platform === "win32")(
+		"never reads or writes through a final-component symlink",
+		() =>
+			withTestRoot((root) =>
+				Effect.gen(function* () {
+					const target = join(root, "outside.json");
+					const link = join(root, "document.json");
+					yield* Effect.promise(async () => {
+						await writeFile(target, "outside\n");
+						await symlink(target, link);
+					});
+					const attempts = [
+						localFileSystemLive.readText(link),
+						localFileSystemLive.readBytes(link),
+						localFileSystemLive.writeText(link, "replaced\n", true),
+						localFileSystemLive.writeBytes(link, new Uint8Array([1]), true),
+					];
+					for (const attempt of attempts) {
+						const error = yield* Effect.flip(attempt);
+						assert.strictEqual(error._tag, "CliFilesystemError");
+					}
+					assert.isFalse(yield* localFileSystemLive.tryWriteText(link, "replaced\n"));
+					assert.strictEqual(yield* Effect.promise(() => readFile(target, "utf8")), "outside\n");
+				}),
+			),
+	);
+
 	it.effect("rejects a symlinked diagrams root without mutating its target", () =>
 		withTestRoot((sandbox) => {
 			const diagramsRoot = join(sandbox, "diagrams");

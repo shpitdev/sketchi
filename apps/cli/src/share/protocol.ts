@@ -1,7 +1,8 @@
 import { inflateSync } from "node:zlib";
 
 import { CANVAS_LIMITS } from "@sketchi/drawing";
-import { Effect } from "effect";
+import { Effect, Layer } from "effect";
+import { Aead, SecureRandom } from "effect/crypto";
 import { Deflate } from "pako";
 
 import { CliShareError } from "../errors.js";
@@ -125,19 +126,19 @@ function keyBytes(key: string): Uint8Array {
 	return bytes;
 }
 
-function importKey(key: string, usage: "encrypt" | "decrypt") {
-	return crypto.subtle.importKey(
-		"raw",
-		Uint8Array.from(keyBytes(key)),
-		{ name: "AES-GCM", length: 128 },
-		false,
-		[usage],
+/** AES-128-GCM on WebCrypto (128-bit tag, no associated data) and the randomness for keys and IVs. */
+export const ShareCryptoLive = Layer.provideMerge(Aead.layerWebCrypto, SecureRandom.layerWebCrypto);
+
+function shareKey(key: string, failure: () => CliShareError) {
+	return Effect.try({ try: () => keyBytes(key), catch: failure }).pipe(
+		Effect.flatMap((bytes) => Aead.key(Aead.aes128Gcm, bytes).pipe(Effect.mapError(failure))),
 	);
 }
 
-export function generateShareKey(): string {
-	return Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
-}
+export const generateShareKey = Effect.gen(function* () {
+	const random = yield* SecureRandom.SecureRandom;
+	return Buffer.from(yield* random.randomBytes(16)).toString("base64url");
+});
 
 export function formatShareLink(parts: ShareLinkParts): string {
 	return `https://excalidraw.com/#json=${parts.id},${parts.key}`;
@@ -423,45 +424,40 @@ export function serializeForShare(value: unknown): Effect.Effect<Uint8Array, Cli
 	);
 }
 
-export function encodeSharePayload(
+function encryptFailure() {
+	return invalid(
+		"share_crypto_failed",
+		"The Excalidraw share payload could not be encrypted.",
+		"Retry the command. If it persists, inspect the local artifact.",
+	);
+}
+
+export const encodeSharePayload = Effect.fn("sketchi.cli.share.encode")(function* (
 	data: Uint8Array,
 	key: string,
 	fixedIv?: Uint8Array,
-): Effect.Effect<Uint8Array, CliShareError> {
-	return Effect.tryPromise({
-		try: async () => {
-			if (data.byteLength > MAX_DECOMPRESSED_BYTES - 16) {
-				throw invalid(
-					"share_payload_too_large",
-					"The Excalidraw share contents exceed 16 MiB.",
-					"Reduce the drawing size and retry.",
-				);
-			}
-			const maximumCompressedBytes =
-				MAX_SHARE_BODY_BYTES - (4 + 3 * 4) - ENCODING_METADATA.byteLength - 12 - 16;
-			const compressed = deflateShareContents(data, maximumCompressedBytes);
-			const iv = Uint8Array.from(fixedIv ?? crypto.getRandomValues(new Uint8Array(12)));
-			if (iv.byteLength !== 12) throw new Error("invalid IV length");
-			const encrypted = new Uint8Array(
-				await crypto.subtle.encrypt(
-					{ name: "AES-GCM", iv: Uint8Array.from(iv) },
-					await importKey(key, "encrypt"),
-					Uint8Array.from(compressed),
-				),
-			);
-			const body = concatBuffers([ENCODING_METADATA, iv, encrypted]);
-			return body;
-		},
-		catch: (cause) =>
-			cause instanceof CliShareError
-				? cause
-				: invalid(
-						"share_crypto_failed",
-						"The Excalidraw share payload could not be encrypted.",
-						"Retry the command. If it persists, inspect the local artifact.",
-					),
+) {
+	if (data.byteLength > MAX_DECOMPRESSED_BYTES - 16) {
+		return yield* invalid(
+			"share_payload_too_large",
+			"The Excalidraw share contents exceed 16 MiB.",
+			"Reduce the drawing size and retry.",
+		);
+	}
+	const maximumCompressedBytes =
+		MAX_SHARE_BODY_BYTES - (4 + 3 * 4) - ENCODING_METADATA.byteLength - 12 - 16;
+	const compressed = yield* Effect.try({
+		try: () => deflateShareContents(data, maximumCompressedBytes),
+		catch: (cause) => (cause instanceof CliShareError ? cause : encryptFailure()),
 	});
-}
+	const iv = fixedIv ?? (yield* (yield* SecureRandom.SecureRandom).randomBytes(12));
+	const aead = yield* Aead.Aead;
+	const cryptoKey = yield* shareKey(key, encryptFailure);
+	const encrypted = yield* aead
+		.encrypt(cryptoKey, compressed, { nonce: iv })
+		.pipe(Effect.mapError(encryptFailure));
+	return concatBuffers([ENCODING_METADATA, iv, encrypted]);
+});
 
 function uint32Buffer(value: number): Uint8Array {
 	const output = new Uint8Array(4);
@@ -532,23 +528,36 @@ function assertJsonDepth(bytes: Uint8Array): void {
 	if (depth !== 0 || inString) throw new Error("incomplete JSON structure");
 }
 
-export function decodeSharePayload(
+function decodeFailure() {
+	return invalid(
+		"share_crypto_failed",
+		"The Excalidraw share payload could not be decrypted or decoded.",
+		"Verify that the complete bearer link is correct and uses current format v2.",
+	);
+}
+
+function decompressedTooLarge() {
+	return invalid(
+		"share_payload_too_large",
+		"The decompressed Excalidraw share payload exceeds 16 MiB.",
+		"Use a smaller supported Excalidraw link.",
+	);
+}
+
+export const decodeSharePayload = Effect.fn("sketchi.cli.share.decode")(function* (
 	body: Uint8Array,
 	key: string,
-): Effect.Effect<unknown, CliShareError> {
+) {
 	if (body.byteLength > MAX_SHARE_BODY_BYTES) {
-		return Effect.fail(
-			invalid(
-				"share_payload_too_large",
-				"The Excalidraw share payload exceeds 2 MiB.",
-				"Use a smaller supported Excalidraw link.",
-			),
+		return yield* invalid(
+			"share_payload_too_large",
+			"The Excalidraw share payload exceeds 2 MiB.",
+			"Use a smaller supported Excalidraw link.",
 		);
 	}
-	return Effect.tryPromise({
-		try: async () => {
-			const outer = splitBuffers(body, 3);
-			const [metadata, iv, encrypted] = outer;
+	const { iv, encrypted } = yield* Effect.try({
+		try: () => {
+			const [metadata, iv, encrypted] = splitBuffers(body, 3);
 			if (!metadata || !iv || !encrypted || iv.byteLength !== 12) {
 				throw new Error("invalid encrypted payload chunks");
 			}
@@ -561,18 +570,23 @@ export function decodeSharePayload(
 			) {
 				throw new Error("unsupported encoding metadata");
 			}
-			const compressed = new Uint8Array(
-				await crypto.subtle.decrypt(
-					{ name: "AES-GCM", iv: Uint8Array.from(iv) },
-					await importKey(key, "decrypt"),
-					Uint8Array.from(encrypted),
-				),
-			);
+			return { iv, encrypted };
+		},
+		catch: decodeFailure,
+	});
+	const aead = yield* Aead.Aead;
+	const cryptoKey = yield* shareKey(key, decodeFailure);
+	const compressed = yield* aead
+		.decrypt(cryptoKey, encrypted, { nonce: iv })
+		.pipe(Effect.mapError(decodeFailure));
+	return yield* Effect.try({
+		try: (): unknown => {
+			// node:zlib caps output while inflating; pako has no output bound.
 			const inflated = inflateSync(compressed, {
 				maxOutputLength: MAX_DECOMPRESSED_BYTES + 1,
 			});
 			if (inflated.byteLength > MAX_DECOMPRESSED_BYTES) {
-				throw new Error("decompressed payload exceeds 16 MiB");
+				throw new RangeError("decompressed payload exceeds 16 MiB");
 			}
 			const inner = splitBuffers(inflated, 2);
 			if (!inner[0] || !inner[1]) {
@@ -584,22 +598,11 @@ export function decodeSharePayload(
 			assertJsonDepth(inner[1]);
 			return JSON.parse(fatalTextDecoder.decode(inner[1]));
 		},
-		catch: (cause) => {
-			const exceeded =
-				cause instanceof RangeError ||
-				(cause instanceof Error &&
-					(cause.message.includes("maxOutputLength") || cause.message.includes("larger than")));
-			return exceeded
-				? invalid(
-						"share_payload_too_large",
-						"The decompressed Excalidraw share payload exceeds 16 MiB.",
-						"Use a smaller supported Excalidraw link.",
-					)
-				: invalid(
-						"share_crypto_failed",
-						"The Excalidraw share payload could not be decrypted or decoded.",
-						"Verify that the complete bearer link is correct and uses current format v2.",
-					);
-		},
+		catch: (cause) =>
+			cause instanceof RangeError ||
+			(cause instanceof Error &&
+				(cause.message.includes("maxOutputLength") || cause.message.includes("larger than")))
+				? decompressedTooLarge()
+				: decodeFailure(),
 	});
-}
+});
