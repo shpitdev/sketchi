@@ -17,6 +17,6 @@ export default defineConfig({
 		coverage: {
 			reportsDirectory: "../../coverage/apps/icons",
 		},
-		include: ["apps/icons/src/**/*.test.{ts,tsx}"],
+		include: ["apps/icons/tests/**/*.test.{ts,tsx}"],
 	},
 });

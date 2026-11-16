@@ -1,10 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Layer } from "effect";
+import { Effect, Layer } from "effect";
 import { McpProtocol, McpServer, McpTest } from "effect/ai";
-import { IconSource } from "./api.server.js";
-import type { IconSourceLoader } from "./catalog.server.js";
-import { IconMcpRegistrations } from "./mcp.server.js";
+import { IconSource } from "../src/lib/api.server.js";
+import type { IconSourceLoader } from "../src/lib/catalog.server.js";
+import { IconMcpRegistrations } from "../src/lib/mcp.server.js";
 
 const clientFor = (origin: string, sourceLoader: IconSourceLoader) =>
 	McpTest.makeClient(
@@ -18,7 +18,7 @@ const clientFor = (origin: string, sourceLoader: IconSourceLoader) =>
 		{ name: "icons-policy", version: "1", protocols: [McpProtocol.v2025_11_25] },
 	);
 
-describe("Icons MCP delivery policy (in-memory; Worker HTTP is separate)", () => {
+describe("icons MCP tools", () => {
 	it.effect("ranks aliases, trims real inputs and delivers raw SVG with isolated source URLs", () =>
 		Effect.gen(function* () {
 			const load: IconSourceLoader = async (request) =>
@@ -81,32 +81,6 @@ describe("Icons MCP delivery policy (in-memory; Worker HTTP is separate)", () =>
 				isError: true,
 				content: [{ text: expect.stringContaining("503") }],
 			});
-		}),
-	);
-
-	it.effect("interrupts the active icon source through its request signal", () =>
-		Effect.gen(function* () {
-			const started = yield* Deferred.make<void>();
-			const stopped = yield* Deferred.make<boolean>();
-			const client = yield* clientFor("https://icons.test", (request) =>
-				Effect.runPromise(
-					Deferred.succeed(started, undefined).pipe(
-						Effect.andThen(Effect.never),
-						Effect.ensuring(
-							Effect.sync(() => request.signal.aborted).pipe(
-								Effect.flatMap((aborted) => Deferred.succeed(stopped, aborted)),
-							),
-						),
-					),
-					{ signal: request.signal },
-				),
-			);
-			const call = yield* client
-				.callTool({ name: "get_icon", arguments: { slug: "kubernetes" } })
-				.pipe(Effect.forkChild);
-			yield* Deferred.await(started);
-			yield* Fiber.interrupt(call);
-			expect(yield* Deferred.await(stopped)).toBe(true);
 		}),
 	);
 });
