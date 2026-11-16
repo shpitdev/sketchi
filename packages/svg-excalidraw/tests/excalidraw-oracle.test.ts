@@ -5,11 +5,7 @@ import {
 } from "@excalidraw/excalidraw";
 import { describe, expect, it } from "vitest";
 
-import {
-	convertSvgToExcalidraw,
-	parseSvg,
-	serializeExcalidrawLibrary,
-} from "../src";
+import { convertSvgToExcalidraw, parseSvg, serializeExcalidrawLibrary } from "../src";
 import { corpusFixtures } from "./corpus-fixtures";
 
 function mustParse(source: string, sourceName = "inline.svg") {
@@ -145,5 +141,4 @@ describe("real Excalidraw renderer oracle", { timeout: 60_000 }, () => {
 			y: edited.y,
 		});
 	});
-
 });
