@@ -52,8 +52,15 @@ export function studioReplyStream<E, R>(options: {
 							ranOut = part.reason === "length" && !calledTool && text.trim() === "";
 							const turn = yield* options.outcome;
 							const reject = !calledTool && held.length > 0 && turn.attempts > 0 && !turn.saved;
-							const released = reject ? textParts(studioRejectedReply(turn.rejected)) : held;
-							told ||= reject;
+							const incomplete =
+								part.reason === "length" && !calledTool && !turn.saved && text.trim() !== "";
+							const reply = reject
+								? studioRejectedReply(turn.rejected)
+								: incomplete
+									? STUDIO_RAN_OUT_REPLY
+									: undefined;
+							const released = reply ? textParts(reply) : held;
+							told ||= reply !== undefined;
 							held = [];
 							text = "";
 							calledTool = false;

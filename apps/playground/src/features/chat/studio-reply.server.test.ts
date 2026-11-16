@@ -95,7 +95,16 @@ describe("Studio reply policy", () => {
 			const exhausted = yield* collect([[finish("length")], [finish("length")]]);
 			expect(exhausted.runs).toBe(2);
 			expect(words(exhausted.parts)).toBe(STUDIO_RAN_OUT_REPLY);
-			expect((yield* collect([[...text("Partial"), finish("length")]])).runs).toBe(1);
+			const partial = yield* collect([[...text("Partial"), finish("length")]]);
+			expect(partial.runs).toBe(1);
+			expect(words(partial.parts)).toBe(STUDIO_RAN_OUT_REPLY);
+			const saved = yield* collect([[...text("Saved."), finish("length")]], {
+				...noBuild,
+				attempts: 1,
+				saved: true,
+			});
+			expect(saved.runs).toBe(1);
+			expect(words(saved.parts)).toBe("Saved.");
 		}),
 	);
 	it.effect("cancellation interrupts the source and never retries", () =>

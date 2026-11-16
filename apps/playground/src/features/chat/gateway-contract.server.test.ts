@@ -573,89 +573,110 @@ it("keeps secure JSON rejection on the native parser even with an output limit",
 	expect(result.calls).toHaveLength(1);
 	expect(result.body).toContain('"type":"RUN_ERROR"');
 });
-it("cancels the gateway stream while a malformed completion awaits its terminal reason", async () => {
-	const read = Deferred.makeUnsafe<void>();
-	const cancelled = Deferred.makeUnsafe<void>();
-	const abort = new AbortController();
-	let signal: AbortSignal | undefined;
-	let calls = 0;
-	const request = new Request("https://studio.test/api/studio/chat", {
-		method: "POST",
-		signal: abort.signal,
-		body: JSON.stringify({
-			threadId: "studio",
-			runId: "cancel",
-			messages: [{ id: "u", role: "user", content: "Draw a flowchart" }],
-		}),
-	});
-	const response = await runPlaygroundEffect(handleStudioAgentRequest(request), {
-		request,
-		platform: { waitUntilPromise: () => undefined },
-		env: {
-			AI: {
-				gateway: () => ({
-					getUrl: async () => "",
-					run: async (_data, options) => {
-						calls++;
-						signal = options?.signal;
-						const events = toolEvents(partial, 1).map(event);
-						return new Response(
-							new ReadableStream<Uint8Array>({
-								pull(controller) {
-									const next = events.shift();
-									if (next) controller.enqueue(new TextEncoder().encode(next));
-									else {
-										Effect.runSync(Deferred.succeed(read, undefined));
-										return new Promise<void>(() => {});
-									}
-								},
-								cancel() {
-									Effect.runSync(Deferred.succeed(cancelled, undefined));
-								},
-							}),
-							{ headers: { "content-type": "text/event-stream" } },
-						);
-					},
-				}),
+it.each(["request", "response body"])(
+	"cancels the gateway stream through %s while awaiting the terminal reason",
+	async (boundary) => {
+		const read = Deferred.makeUnsafe<void>();
+		const cancelled = Deferred.makeUnsafe<void>();
+		const abort = new AbortController();
+		let signal: AbortSignal | undefined;
+		let calls = 0;
+		const request = new Request("https://studio.test/api/studio/chat", {
+			method: "POST",
+			signal: abort.signal,
+			body: JSON.stringify({
+				threadId: "studio",
+				runId: "cancel",
+				messages: [{ id: "u", role: "user", content: "Draw a flowchart" }],
+			}),
+		});
+		const response = await runPlaygroundEffect(handleStudioAgentRequest(request), {
+			request,
+			platform: { waitUntilPromise: () => undefined },
+			env: {
+				AI: {
+					gateway: () => ({
+						getUrl: async () => "",
+						run: async (_data, options) => {
+							calls++;
+							signal = options?.signal;
+							const events = toolEvents(partial, 1).map(event);
+							return new Response(
+								new ReadableStream<Uint8Array>({
+									pull(controller) {
+										const next = events.shift();
+										if (next) controller.enqueue(new TextEncoder().encode(next));
+										else {
+											Effect.runSync(Deferred.succeed(read, undefined));
+											return new Promise<void>(() => {});
+										}
+									},
+									cancel() {
+										Effect.runSync(Deferred.succeed(cancelled, undefined));
+									},
+								}),
+								{ headers: { "content-type": "text/event-stream" } },
+							);
+						},
+					}),
+				},
 			},
-		},
-	});
-	const body = response.text();
-	await Effect.runPromise(Deferred.await(read));
-	abort.abort();
-	await Effect.runPromise(Deferred.await(cancelled));
-	await body;
-	expect(signal?.aborted).toBe(true);
-	expect(calls).toBe(1);
-});
+		});
+		const reader = response.body?.getReader();
+		if (!reader) throw new Error("Expected the chat response stream.");
+		const body = (async () => {
+			while (!(await reader.read()).done) {
+				// Consume the real handler's SSE until the test cancels it.
+			}
+		})();
+		await Effect.runPromise(Deferred.await(read));
+		if (boundary === "request") abort.abort();
+		else await reader.cancel();
+		await Effect.runPromise(Deferred.await(cancelled));
+		await body;
+		expect(signal?.aborted).toBe(true);
+		expect(calls).toBe(1);
+	},
+);
 
-it("keeps text after truncated arguments and does not classify it as empty output", async () => {
+it.each([
+	"I’ll sketch Meridian Infrastructure’s complete reporting tree, preserving each person’s full name, title, department, and manager exactly as provided.",
+	"I saved your diagram successfully.",
+])("explains a length finish with unfinished tool arguments instead of %s", async (preamble) => {
 	const item = {
 		type: "message",
 		id: "text-1",
 		role: "assistant",
-		status: "incomplete",
+		status: "completed",
 		content: [],
 	};
 	const result = await runWire((round) =>
 		wireResponse([
-			...toolEvents(partial, round),
-			{ type: "response.output_item.added", output_index: 1, item },
+			{ type: "response.output_item.added", output_index: 0, item },
 			{
 				type: "response.output_text.delta",
 				item_id: item.id,
-				output_index: 1,
+				output_index: 0,
 				content_index: 0,
-				delta: "Partial explanation.",
+				delta: preamble,
 			},
-			{ type: "response.output_item.done", output_index: 1, item },
+			{ type: "response.output_item.done", output_index: 0, item },
+			...toolEvents(
+				'{"spec":{"title":"Meridian Infrastructure","people":[{"id":"e000","name":"Employee',
+				round,
+				true,
+				"build_org_chart",
+			).map((part) => ({ ...part, output_index: 1 })),
 			terminal("max_output_tokens"),
 		]),
 	);
 	expect(result.calls).toHaveLength(1);
-	expect(result.body).toContain("Partial explanation.");
-	expect(result.body).not.toContain(STUDIO_RAN_OUT_REPLY);
+	expect(result.body).not.toContain(preamble);
+	expect(result.body).toContain(STUDIO_RAN_OUT_REPLY);
 	expect(result.body).not.toContain('"type":"RUN_ERROR"');
+	expect(result.body).not.toContain('"type":"TOOL_CALL_RESULT"');
+	expect(result.body).toContain('"type":"RUN_FINISHED"');
+	expect(result.write).not.toHaveBeenCalled();
 });
 it("preserves failure ordering before a subsequent valid completion when the response completes", async () => {
 	const [added, delta, done] = toolEvents(partial, 1);
