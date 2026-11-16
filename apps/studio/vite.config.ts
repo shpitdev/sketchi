@@ -2,39 +2,14 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig } from "vite";
 
 import { localInspectorPort, localViteCacheDir } from "../../tools/local-dev-ports";
 import { excalidrawFonts } from "../../scripts/lib/excalidraw-fonts.mjs";
+import { clientServerBoundary } from "../../scripts/lib/client-server-boundary.mjs";
 import { workerProjectConfig } from "../../scripts/lib/worker-apps.mjs";
 
 const workerProject = workerProjectConfig("playground");
-
-const playgroundServerSourceSegment = "/apps/studio/src/server/";
-
-function enforceClientServerBoundary(): Plugin {
-	return {
-		name: "playground-client-server-boundary",
-		apply: "build",
-		applyToEnvironment: (environment) => environment.name === "client",
-		generateBundle(_options, bundle) {
-			const serverModuleIds = Object.values(bundle)
-				.flatMap((output) => (output.type === "chunk" ? Object.keys(output.modules) : []))
-				.map((moduleId) => moduleId.replaceAll("\\", "/"))
-				.filter(
-					(moduleId) =>
-						moduleId.includes(playgroundServerSourceSegment) ||
-						/\/apps\/playground\/src\/features\/.*\.server\./.test(moduleId),
-				);
-
-			if (serverModuleIds.length > 0) {
-				this.error(
-					`Playground server modules entered the client bundle:\n${serverModuleIds.join("\n")}`,
-				);
-			}
-		},
-	};
-}
 
 export default defineConfig({
 	root: new URL(".", import.meta.url).pathname,
@@ -55,7 +30,7 @@ export default defineConfig({
 	publicDir: new URL("./public", import.meta.url).pathname,
 	plugins: [
 		excalidrawFonts(),
-		enforceClientServerBoundary(),
+		clientServerBoundary(workerProject.projectId),
 		cloudflare({
 			configPath: new URL("./wrangler.jsonc", import.meta.url).pathname,
 			inspectorPort: localInspectorPort(6210),
