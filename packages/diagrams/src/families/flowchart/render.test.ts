@@ -8,7 +8,7 @@ import { SKETCHI_DIAGRAM_STYLE, getCanvasValidationIssues } from "@sketchi/drawi
 
 import { describe, expect, it } from "vitest";
 
-import { flowchartFixture, pharmaBatchDispositionFlowchart } from "./fixtures.js";
+import { flowchartFixture, pharmaBatchDispositionFlowchart } from "./fixtures/index.js";
 
 import { renderFlowchartDiagram } from "./render";
 

@@ -72,8 +72,8 @@
 			"default": "./dist/families/er/rules.js"
 		},
 		"./families/flowchart/crossing-fixtures": {
-			"types": "./dist/families/flowchart/crossing-fixtures.d.ts",
-			"default": "./dist/families/flowchart/crossing-fixtures.js"
+			"types": "./dist/families/flowchart/fixtures/crossing-fixtures.d.ts",
+			"default": "./dist/families/flowchart/fixtures/crossing-fixtures.js"
 		},
 		"./families/flowchart/document": {
 			"types": "./dist/families/flowchart/document.d.ts",
@@ -84,28 +84,28 @@
 			"default": "./dist/families/flowchart/edits.js"
 		},
 		"./families/flowchart/group-fixtures": {
-			"types": "./dist/families/flowchart/group-fixtures.d.ts",
-			"default": "./dist/families/flowchart/group-fixtures.js"
+			"types": "./dist/families/flowchart/fixtures/group-fixtures.d.ts",
+			"default": "./dist/families/flowchart/fixtures/group-fixtures.js"
 		},
 		"./families/flowchart/label-fixtures": {
-			"types": "./dist/families/flowchart/label-fixtures.d.ts",
-			"default": "./dist/families/flowchart/label-fixtures.js"
+			"types": "./dist/families/flowchart/fixtures/label-fixtures.d.ts",
+			"default": "./dist/families/flowchart/fixtures/label-fixtures.js"
 		},
 		"./families/flowchart/lane-fixtures": {
-			"types": "./dist/families/flowchart/lane-fixtures.d.ts",
-			"default": "./dist/families/flowchart/lane-fixtures.js"
+			"types": "./dist/families/flowchart/fixtures/lane-fixtures.d.ts",
+			"default": "./dist/families/flowchart/fixtures/lane-fixtures.js"
 		},
 		"./families/flowchart/routing-fixtures": {
-			"types": "./dist/families/flowchart/routing-fixtures.d.ts",
-			"default": "./dist/families/flowchart/routing-fixtures.js"
+			"types": "./dist/families/flowchart/fixtures/routing-fixtures.d.ts",
+			"default": "./dist/families/flowchart/fixtures/routing-fixtures.js"
 		},
 		"./families/flowchart/rules": {
 			"types": "./dist/families/flowchart/rules.d.ts",
 			"default": "./dist/families/flowchart/rules.js"
 		},
 		"./families/flowchart/zone-fixtures": {
-			"types": "./dist/families/flowchart/zone-fixtures.d.ts",
-			"default": "./dist/families/flowchart/zone-fixtures.js"
+			"types": "./dist/families/flowchart/fixtures/zone-fixtures.d.ts",
+			"default": "./dist/families/flowchart/fixtures/zone-fixtures.js"
 		},
 		"./families/gantt/document": {
 			"types": "./dist/families/gantt/document.d.ts",
@@ -384,8 +384,8 @@
 			"default": "./dist/families/flowchart/issues.js"
 		},
 		"./families/flowchart/fixtures": {
-			"types": "./dist/families/flowchart/fixtures.d.ts",
-			"default": "./dist/families/flowchart/fixtures.js"
+			"types": "./dist/families/flowchart/fixtures/index.d.ts",
+			"default": "./dist/families/flowchart/fixtures/index.js"
 		},
 		"./families/flowchart/render": {
 			"types": "./dist/families/flowchart/render.d.ts",

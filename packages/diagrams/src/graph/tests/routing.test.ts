@@ -5,7 +5,7 @@ import { parseFlowchartDiagram } from "../../families/flowchart/document";
 import {
 	flowchartFixture,
 	pharmaBatchDispositionFlowchart,
-} from "../../families/flowchart/fixtures";
+} from "../../families/flowchart/fixtures/index";
 import { type GraphInput } from "../input";
 import { renderGraphDiagram } from "../scene";
 import {
@@ -14,7 +14,7 @@ import {
 	segmentsOverlapInterior,
 	segmentCrossesBoundsInterior,
 } from "@sketchi/drawing";
-import { routingFixtures } from "../../families/flowchart/routing-fixtures";
+import { routingFixtures } from "../../families/flowchart/fixtures/routing-fixtures";
 import { renderFlowchartDiagram } from "../../families/flowchart/render";
 import {
 	convertSceneToExcalidraw,

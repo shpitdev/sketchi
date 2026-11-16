@@ -1,11 +1,11 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Result } from "effect";
-import { parseFlowchartDiagram } from "./document.js";
-import competingBranchLabels from "./fixtures/labels/competing-branch-labels.js";
-import identifierLabels from "./fixtures/labels/identifier-labels.js";
-import longBranchLabels from "./fixtures/labels/long-branch-labels.js";
-import multilineLabels from "./fixtures/labels/multiline-labels.js";
-import unresolvedLabels from "./fixtures/labels/unresolved-labels.js";
+import { parseFlowchartDiagram } from "../document.js";
+import competingBranchLabels from "./labels/competing-branch-labels.js";
+import identifierLabels from "./labels/identifier-labels.js";
+import longBranchLabels from "./labels/long-branch-labels.js";
+import multilineLabels from "./labels/multiline-labels.js";
+import unresolvedLabels from "./labels/unresolved-labels.js";
 
 function flowchart(fixture: object) {
 	return parseFlowchartDiagram({

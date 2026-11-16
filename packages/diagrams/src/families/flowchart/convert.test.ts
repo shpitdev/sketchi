@@ -5,9 +5,9 @@ import { describe, expect, it } from "vitest";
 import { generateKeyBetween } from "fractional-indexing";
 
 import { FlowchartDiagram, parseFlowchartDiagram } from "./document";
-import { flowchartFixture, pharmaBatchDispositionFlowchart } from "./fixtures";
-import { groupFixtures } from "./group-fixtures";
-import { zoneFixtures } from "./zone-fixtures";
+import { flowchartFixture, pharmaBatchDispositionFlowchart } from "./fixtures/index";
+import { groupFixtures } from "./fixtures/group-fixtures";
+import { zoneFixtures } from "./fixtures/zone-fixtures";
 import { type CanvasSpec, getCanvasValidationIssues } from "@sketchi/drawing";
 import { renderFlowchartDiagram } from "./render";
 

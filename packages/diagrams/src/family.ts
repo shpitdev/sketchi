@@ -50,7 +50,7 @@ import { docs as wireframeFamilyDocs } from "./families/wireframe/docs.js";
 import * as wireframeFamily from "./families/wireframe/document.js";
 import { wireframeBuild } from "./families/wireframe/build.js";
 import { renderFlowchartDiagram } from "./families/flowchart/render.js";
-import { flowchartFixture } from "./families/flowchart/fixtures.js";
+import { flowchartFixture } from "./families/flowchart/fixtures/index.js";
 
 function canonical<S extends Schema.Top & { readonly Type: { readonly type: string } }, E, RE>(
 	schema: S,

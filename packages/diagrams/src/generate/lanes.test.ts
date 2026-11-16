@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { laneFixtures } from "../families/flowchart/lane-fixtures.js";
+import { laneFixtures } from "../families/flowchart/fixtures/lane-fixtures.js";
 
 import { candidateFromText } from "./candidates.js";
 

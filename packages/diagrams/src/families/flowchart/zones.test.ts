@@ -31,7 +31,7 @@ import {
 	syncedHybridFlowchart,
 	zoneFixtures,
 	zoneStressFixtures,
-} from "./zone-fixtures.js";
+} from "./fixtures/zone-fixtures.js";
 
 import { parseFlowchartDiagram, FlowchartDiagram } from "./document.js";
 import { arrowCrossings } from "../../graph/readability";

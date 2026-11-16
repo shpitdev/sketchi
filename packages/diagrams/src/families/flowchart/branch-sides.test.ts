@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { crossingFixtures, sideFixtures } from "./crossing-fixtures.js";
+import { crossingFixtures, sideFixtures } from "./fixtures/crossing-fixtures.js";
 import {
 	leftToRightIncidentFlowchart,
 	receiptReturnFlowchart,
 	routingFixtures,
-} from "./routing-fixtures.js";
-import { queriedArchitectureFlowchart } from "./zone-fixtures.js";
+} from "./fixtures/routing-fixtures.js";
+import { queriedArchitectureFlowchart } from "./fixtures/zone-fixtures.js";
 import {
 	routingQualityScale,
 	sharedSegments,

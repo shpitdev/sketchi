@@ -1,14 +1,14 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { crossingFixtures, sideFixtures } from "../../families/flowchart/crossing-fixtures";
+import { crossingFixtures, sideFixtures } from "../../families/flowchart/fixtures/crossing-fixtures";
 import { parseFlowchartDiagram } from "../../families/flowchart/document";
-import { groupFixtures } from "../../families/flowchart/group-fixtures";
-import { laneFixtures } from "../../families/flowchart/lane-fixtures";
+import { groupFixtures } from "../../families/flowchart/fixtures/group-fixtures";
+import { laneFixtures } from "../../families/flowchart/fixtures/lane-fixtures";
 import {
 	fanInChecksFlowchart,
 	leftToRightIncidentFlowchart,
 	routingFixtures,
-} from "../../families/flowchart/routing-fixtures";
-import { zoneFixtures } from "../../families/flowchart/zone-fixtures";
+} from "../../families/flowchart/fixtures/routing-fixtures";
+import { zoneFixtures } from "../../families/flowchart/fixtures/zone-fixtures";
 import { renderFlowchartDiagram } from "../../families/flowchart/render";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";

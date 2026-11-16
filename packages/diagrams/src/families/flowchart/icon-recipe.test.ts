@@ -9,7 +9,7 @@ import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasElement as SceneElement,
 } from "@sketchi/drawing";
-import { deployPipelineLogoFlowchart } from "./fixtures";
+import { deployPipelineLogoFlowchart } from "./fixtures/index";
 import { renderFlowchartDiagram } from "./render";
 
 import {

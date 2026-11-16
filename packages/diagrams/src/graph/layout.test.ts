@@ -10,8 +10,8 @@ import {
 	type CanvasPoint as ScenePoint,
 } from "@sketchi/drawing";
 import { parseFlowchartDiagram } from "../families/flowchart/document.js";
-import { flowchartFixture } from "../families/flowchart/fixtures.js";
-import { routingFixtures } from "../families/flowchart/routing-fixtures.js";
+import { flowchartFixture } from "../families/flowchart/fixtures/index.js";
+import { routingFixtures } from "../families/flowchart/fixtures/routing-fixtures.js";
 import { renderFlowchartDiagram } from "../families/flowchart/render";
 
 const directions = ["TB", "BT", "LR", "RL"] as const;

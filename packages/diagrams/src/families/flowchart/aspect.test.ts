@@ -2,7 +2,7 @@ import { routingQualityFindings, routingQualityScale } from "@sketchi/drawing";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { FlowchartDiagram } from "./document.js";
-import { flowchartFixture } from "./fixtures.js";
+import { flowchartFixture } from "./fixtures/index.js";
 import { renderFlowchartDiagram } from "./render.js";
 import { arrowCrossings } from "../../graph/readability.js";
 import { exportAspect } from "../../../test/readability-helpers.js";

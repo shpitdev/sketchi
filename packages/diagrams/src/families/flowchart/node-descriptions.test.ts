@@ -17,7 +17,7 @@ import { FlowchartDiagram } from "./document.js";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { describedArchitectureFlowchart } from "./zone-fixtures.js";
+import { describedArchitectureFlowchart } from "./fixtures/zone-fixtures.js";
 import { type GraphInput } from "../../graph/input.js";
 
 import { longNodeDescriptions } from "../../graph/compose";
