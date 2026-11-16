@@ -75,11 +75,6 @@ previous two-compiler declaration-assignability proof remains useful evidence;
 it is not a permanent duplicate gate. Receipts are in
 `.memory/effect-native-retirement/receipt.md` and `.memory/effect-nx/receipt.md`.
 
-`scripts/lib/effect-toolchain.test.mjs` exercises the actual workspace compiler
-configuration: error/warning exit behavior, executable emit, and a separate
-consumer that succeeds with the correct declaration type and fails with the
-wrong one after the original source has been removed.
-
 ## Nx references and generation
 
 Root references name project directories. Libraries expose empty solution configs
