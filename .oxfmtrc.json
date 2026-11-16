@@ -23,7 +23,7 @@
 		"pnpm-lock.yaml",
 		"packages/icons/catalog/src/generated/**",
 		// Byte-exact fixtures and frozen compatibility corpora
-		"apps/playground/src/features/build/fixtures/**",
+		"apps/playground/src/features/build/tests/fixtures/**",
 		// Vendored shadcn and AI Elements registry components
 		"apps/playground/src/components/ai-elements/**",
 		"packages/ui/src/components/**",
