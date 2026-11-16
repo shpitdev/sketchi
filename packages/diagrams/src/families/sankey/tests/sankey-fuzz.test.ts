@@ -3,10 +3,10 @@ import { Result } from "effect";
 import { writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { getCanvasValidationIssues, type CanvasSpec } from "@sketchi/drawing";
-import { parseSankeyDiagram, SANKEY_MAX_LINKS, type SankeyDiagram } from "./document";
-import { layoutSankeyDiagram, SANKEY_MIN_BAND } from "./layout";
-import { readSankeyScene, sankeyLayoutIssues, sankeyWeightedCrossings } from "./readout";
-import { renderSankeyDiagram } from "./render";
+import { parseSankeyDiagram, SANKEY_MAX_LINKS, type SankeyDiagram } from "../document";
+import { layoutSankeyDiagram, SANKEY_MIN_BAND } from "../layout";
+import { readSankeyScene, sankeyLayoutIssues, sankeyWeightedCrossings } from "../readout";
+import { renderSankeyDiagram } from "../render";
 
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
