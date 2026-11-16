@@ -23,7 +23,12 @@ import {
 	wireframeFixture,
 	WireframeValidationIssueCodeSchema,
 } from "../document.js";
-import { wireframeBoxIssues, wireframeLayoutIssues } from "../readout.js";
+import {
+	type WireframeBoxIssue,
+	wireframeBoxIssues,
+	type WireframeLayoutIssue,
+	wireframeLayoutIssues,
+} from "../readout.js";
 import { renderWireframeDiagram } from "../render.js";
 
 const storage = makeMemoryArtifactStorage();
@@ -185,9 +190,7 @@ const bad: Record<string, unknown[]> = {
 
 describe("wireframe validator", () => {
 	it("covers every issue code it can raise", () => {
-		expect(new Set(Object.keys(bad))).toEqual(
-			new Set(WireframeValidationIssueCodeSchema.literals),
-		);
+		expect(new Set(Object.keys(bad))).toEqual(new Set(WireframeValidationIssueCodeSchema.literals));
 	});
 
 	it.each(Object.entries(bad))("raises %s for a minimal bad wireframe", (code, screens) => {
@@ -197,4 +200,124 @@ describe("wireframe validator", () => {
 		} as WireframeDiagram);
 		expect(issues.map((issue) => issue.code)).toContain(code);
 	});
+});
+
+/** Two phone screens: a heading, a button that opens the second, and a row of two buttons. */
+const navigation = parseWireframeDiagram({
+	id: "nav",
+	title: "Nav",
+	type: "wireframe",
+	screens: [
+		{
+			id: "a",
+			name: "A",
+			device: "mobile",
+			children: [
+				{ type: "heading", text: "Hello" },
+				{ type: "button", text: "Next", target: "b" },
+				{
+					type: "row",
+					children: [
+						{ type: "button", text: "One" },
+						{ type: "button", text: "Two" },
+					],
+				},
+			],
+		},
+		{ id: "b", name: "B", device: "mobile", children: [{ type: "heading", text: "Bye" }] },
+	],
+}).pipe(Result.getOrThrow);
+
+type Loose = Record<string, unknown> & { x: number; y: number };
+const at = (scene: CanvasSpec, id: string) => {
+	const element = scene.elements.find((candidate) => candidate.id === id);
+	if (!element) throw new Error(`No element ${id}.`);
+	return element as unknown as Loose;
+};
+
+/** One deliberately broken drawing per issue the fuzz oracle reads from the scene. */
+const brokenScene: Record<WireframeLayoutIssue["code"], (scene: CanvasSpec) => void> = {
+	"frames-overlap": (scene) => {
+		at(scene, "frame:b").x = 40;
+	},
+	"outside-frame": (scene) => {
+		at(scene, "wf:a:1:box").x = -500;
+	},
+	"shapes-overlap": (scene) => {
+		at(scene, "wf:a:2.1:box").x = 100;
+	},
+	"text-crosses-shape": (scene) => {
+		Object.assign(at(scene, "wf:a:0:text"), { x: 136, y: 149 });
+	},
+	"texts-overlap": (scene) => {
+		Object.assign(at(scene, "wf:a:0:text"), { x: 96, y: 209 });
+	},
+	"text-outside-component": (scene) => {
+		at(scene, "wf:a:1:label").fontSize = 80;
+	},
+	"arrow-crosses": (scene) => {
+		at(scene, "nav:a:1").points = [
+			{ x: 0, y: 209 },
+			{ x: 1000, y: 209 },
+		];
+	},
+};
+
+type Layout = ReturnType<typeof renderWireframeDiagram>["layout"];
+type LooseBox = { x: number; y: number; width: number; height: number };
+const component = (layout: Layout, path: string) =>
+	layout.screens[0]!.components.find((entry) => entry.path === path) as unknown as {
+		box: LooseBox;
+		flow?: { gap: number };
+	};
+
+/** One deliberately broken placement per issue the fuzz oracle reads from the layout. */
+const brokenLayout: Record<WireframeBoxIssue["code"], (layout: Layout) => void> = {
+	"outside-screen": (layout) => {
+		component(layout, "1").box.x = -500;
+	},
+	"outside-parent": (layout) => {
+		component(layout, "2.0").box.y = 400;
+	},
+	"siblings-overlap": (layout) => {
+		component(layout, "2.1").box.x = 100;
+	},
+	"gap-off-scale": (layout) => {
+		component(layout, "2").flow!.gap = 13;
+	},
+	"uneven-gap": (layout) => {
+		component(layout, "2.1").box.x = 160;
+	},
+	"small-touch-target": (layout) => {
+		component(layout, "1").box.height = 30;
+	},
+	"screen-widened": (layout) => {
+		(layout.screens[0] as { widened?: boolean }).widened = true;
+	},
+};
+
+describe("wireframe layout readout", () => {
+	it("reads the clean drawing as clean", () => {
+		const { scene, layout } = renderWireframeDiagram(navigation);
+		expect(wireframeLayoutIssues(scene)).toEqual([]);
+		expect(wireframeBoxIssues(layout)).toEqual([]);
+	});
+
+	it.each(Object.entries(brokenScene))(
+		"reports %s on a drawing broken that way",
+		(code, breakIt) => {
+			const scene = structuredClone(renderWireframeDiagram(navigation).scene);
+			breakIt(scene);
+			expect(wireframeLayoutIssues(scene).map((issue) => issue.code)).toContain(code);
+		},
+	);
+
+	it.each(Object.entries(brokenLayout))(
+		"reports %s on a placement broken that way",
+		(code, breakIt) => {
+			const layout = structuredClone(renderWireframeDiagram(navigation).layout);
+			breakIt(layout);
+			expect(wireframeBoxIssues(layout).map((issue) => issue.code)).toContain(code);
+		},
+	);
 });
