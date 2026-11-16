@@ -1,40 +1,33 @@
 # MCP SDK compatibility
 
-Sketchi pins `agents@0.32.0` with the MCP packages its peers ask for:
-`@modelcontextprotocol/sdk@1.32.2`, `@modelcontextprotocol/client@2.4.0` and
-`@modelcontextprotocol/server@2.4.0`. `agents/mcp` imports all three, so the
-root manifest declares them instead of relying on optional peers being
-installed.
+Sketchi's two deployed MCP servers are inbound and authless, and neither uses
+the MCP SDK:
 
-The SDK must stay at 1.31.0 or later. `GHSA-6qxp-vccf-f47h` affects SDK versions
-from 1.12.0 up to, but not including, 1.31.0. The vulnerability is in the HTTP
-OAuth client: credentials can be sent to an authorization server selected by an
-untrusted MCP server. The advisory excludes MCP servers.
+- Studio (`apps/studio/src/features/mcp/mcp.server.ts`) registers `docs`,
+  `search` and `execute` on Effect's `McpServer` from `effect/ai`.
+- Icons (`apps/icons/src/lib/mcp.server.ts`) registers its read-only icon
+  tools the same way.
+- Both route each session to a Durable Object (`StudioMcpSession`,
+  `IconsMcpSession`) through `routeMcpSession` in
+  `packages/cloudflare/src/mcp-session.ts`.
 
-Sketchi's two deployed consumers are inbound, authless MCP servers:
+No manifest declares `agents` or a `@modelcontextprotocol/*` package. The
+lockfile still resolves `@modelcontextprotocol/sdk@1.32.2` as an optional peer
+of `@cloudflare/codemode`, which the Code Mode sandbox uses; Sketchi source
+imports nothing from it.
 
-- Icons constructs an SDK v1 `Server`, registers read-only icon tools, and
-  passes it to `createLegacyMcpHandler` from `agents/mcp`.
-- Playground constructs an SDK v1 `Server`, registers `docs`, `search`, and
-  `execute`, and passes it to the same handler.
-- Neither entry point constructs an SDK client, supplies an `authProvider`, or
-  calls `withOAuth`, `auth`, or `fetchToken`.
+That version must stay at 1.31.0 or later. `GHSA-6qxp-vccf-f47h` affects SDK
+versions from 1.12.0 up to, but not including, 1.31.0. The vulnerability is in
+the HTTP OAuth client: credentials can be sent to an authorization server
+selected by an untrusted MCP server. The advisory excludes MCP servers, and
+Sketchi constructs no SDK client.
 
-`createLegacyMcpHandler` keeps the sessionful SDK v1 behavior these servers
-have always had. Agents 0.32 still accepts a v1 server in `createMcpHandler`,
-but deprecates that overload and warns on every request. Moving to the
-stateless `agents/mcp/server` handler needs an SDK v2 server factory, which is
-a separate protocol migration.
-
-`scripts/lib/mcp-sdk-compatibility.test.mjs` checks that the declared MCP
-versions match the Agents peers, that the SDK stays patched, and that neither
-entry point gains OAuth-client reachability. The MCP handler tests and the
-preview protocol probe cover initialize, tool listing, and read-only tool calls
-without an Authorization header.
+No test pins the SDK version. The MCP server tests
+(`apps/studio/src/features/mcp/tests/mcp.server.test.ts`,
+`apps/icons/tests/mcp.test.ts`) list and call tools without credentials, and
+the hand-run `pnpm sanity` initializes a deployed Studio's MCP endpoint and
+calls `execute` without an Authorization header.
 
 Reassess this before adding any outbound MCP client or OAuth flow.
 
-Sources:
-
-- <https://github.com/advisories/GHSA-6qxp-vccf-f47h>
-- <https://github.com/cloudflare/agents/blob/main/packages/agents/package.json>
+Source: <https://github.com/advisories/GHSA-6qxp-vccf-f47h>
