@@ -3,11 +3,13 @@ import {
 	Context,
 	Deferred,
 	Effect,
+	Exit,
 	FiberSet,
 	Layer,
 	ManagedRuntime,
 	pipe,
 	Predicate,
+	Scope,
 } from "effect";
 import "@tanstack/react-start/server-only";
 import { type BuildRuntimeEnvironment } from "@sketchi/diagrams/build";
@@ -44,14 +46,11 @@ export interface PlaygroundRequestBoundary {
 	readonly platform: PlaygroundPlatformBoundaryShape;
 	readonly request: Request;
 }
+/** Work one request leaves running: its response stream and callbacks. */
 class PlaygroundCallbackFibers extends Context.Service<
 	PlaygroundCallbackFibers,
 	FiberSet.FiberSet<unknown, unknown>
 >()("@sketchi/playground/PlaygroundCallbackFibers") {}
-const PlaygroundCallbackFibersLive = Layer.effect(
-	PlaygroundCallbackFibers,
-	FiberSet.make<unknown, unknown>(),
-);
 const PlaygroundTelemetryLive = makeWorkersTelemetryLayer({
 	resource: { serviceName: "sketchi-studio" },
 });
@@ -59,7 +58,6 @@ const PlaygroundCoreLive = Layer.mergeAll(
 	PlaygroundClockLive,
 	PlaygroundIdsLive,
 	PlaygroundAiModelLive,
-	PlaygroundCallbackFibersLive,
 	StudioBuildHostLive,
 	PlaygroundCodeModeUsageLive,
 	PlaygroundGenerationLive,
@@ -225,14 +223,26 @@ function runWithPlaygroundRuntime<A, E>(
 		const streamed = recordStreamedBody(result, result.body);
 		recordStreamEnd(streamed.recorded);
 		return streamed.response;
-	}).pipe(
-		withTelemetryExport({
-			pipeline: boundary.env.TELEMETRY_SPANS,
-			waitUntil: boundary.platform.waitUntilPromise,
-		}),
-		Effect.withSpan("playground.request"),
-	);
-	return runtime.runPromise(program, {
+	});
+	const request = Effect.gen(function* () {
+		const services = yield* Effect.context<never>();
+		const scope = yield* Scope.make();
+		const callbackFibers = yield* FiberSet.make<unknown, unknown>().pipe(Scope.provide(scope));
+		// The request ends once its handler, stream and callbacks have; closing its scope then
+		// sends its spans.
+		const end = FiberSet.awaitEmpty(callbackFibers).pipe(
+			Effect.andThen(Scope.close(scope, Exit.void)),
+		);
+		return yield* program.pipe(
+			withTelemetryExport({ pipeline: boundary.env.TELEMETRY_SPANS, scope }),
+			Effect.withSpan("playground.request"),
+			Effect.provideService(PlaygroundCallbackFibers, callbackFibers),
+			Effect.ensuring(
+				Effect.sync(() => boundary.platform.waitUntilPromise(Effect.runPromiseWith(services)(end))),
+			),
+		);
+	});
+	return runtime.runPromise(request, {
 		signal: boundary.request.signal,
 	});
 }

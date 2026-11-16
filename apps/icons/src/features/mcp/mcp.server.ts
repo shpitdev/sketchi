@@ -7,7 +7,7 @@ import {
 	type TelemetryExportTarget,
 	type TelemetryPipeline,
 } from "@sketchi/observability";
-import { Context, Effect, Layer, Predicate, Scheduler } from "effect";
+import { Context, Effect, Exit, Layer, Predicate, Scheduler, Scope } from "effect";
 import { SecureRandom } from "effect/crypto";
 import { McpProtocol, McpSchema, McpServer } from "effect/ai";
 import { HttpMiddleware, HttpRouter, HttpServer, HttpServerRequest } from "effect/http";
@@ -48,12 +48,10 @@ export const IconMcpRegistrations = McpServer.toolkit(IconToolkit).pipe(
 );
 
 /** One request's native server; its icon source and export come from that request. */
-function makeIconMcpHandler(
-	request: Request,
-	env: IconsMcpEnv,
-	waitUntil: (promise: Promise<unknown>) => void,
-): McpWebHandler {
+function makeIconMcpHandler(request: Request, env: IconsMcpEnv): McpWebHandler {
 	const origin = request.headers.get("origin");
+	// Closed when the handler is disposed, after the response body, so late spans are sent too.
+	const scope = Scope.makeUnsafe();
 	const app = McpServer.layerHttp({
 		name: "sketchi-icons",
 		version: "1.0.0",
@@ -82,7 +80,10 @@ function makeIconMcpHandler(
 			}),
 	});
 	return {
-		dispose: runtime.dispose,
+		dispose: () =>
+			Effect.runPromise(
+				Effect.promise(runtime.dispose).pipe(Effect.ensuring(Scope.close(scope, Exit.void))),
+			),
 		fetch(request, { replay }) {
 			return runtime.handler(
 				request,
@@ -92,7 +93,7 @@ function makeIconMcpHandler(
 				}).pipe(
 					Context.add(IconMcpExport, {
 						pipeline: replay ? undefined : env.TELEMETRY_SPANS,
-						waitUntil,
+						scope,
 					}),
 				),
 			);
@@ -114,10 +115,8 @@ export const handleIconMcpRequest = (
 	request.method === "OPTIONS"
 		? Promise.resolve(corsPreflight())
 		: Effect.runPromise(
-				serveStatelessMcp(
-					request,
-					() => makeIconMcpHandler(request, env, waitUntil),
-					waitUntil,
-				).pipe(Effect.map(withCors)),
+				serveStatelessMcp(request, () => makeIconMcpHandler(request, env), waitUntil).pipe(
+					Effect.map(withCors),
+				),
 				{ signal: request.signal },
 			);

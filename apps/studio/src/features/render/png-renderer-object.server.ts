@@ -7,7 +7,7 @@ import {
 	withTelemetryCorrelation,
 	withTelemetryExport,
 } from "@sketchi/observability";
-import { Effect, Layer, ManagedRuntime, Tracer } from "effect";
+import { Effect, Exit, Layer, ManagedRuntime, Scope, Tracer } from "effect";
 
 import type { IconImagingResult } from "@sketchi/icon-draw";
 
@@ -133,10 +133,11 @@ export class CodeModePngRenderer extends DurableObject<CodeModePngRendererEnv> {
 	 * attempt IDs, and sends them when the call ends.
 	 */
 	#exportSpans(name: string, caller: PngRenderCaller | undefined) {
-		const target = {
-			pipeline: this.env.TELEMETRY_SPANS,
-			waitUntil: (promise: Promise<unknown>) => this.ctx.waitUntil(promise),
-		};
+		const scope = Scope.makeUnsafe();
+		const target = { pipeline: this.env.TELEMETRY_SPANS, scope };
+		const end = Effect.sync(() =>
+			this.ctx.waitUntil(Effect.runPromise(Scope.close(scope, Exit.void))),
+		);
 		return <A, E, R>(effect: Effect.Effect<A, E, R>) =>
 			withTelemetryCorrelation(
 				effect.pipe(
@@ -153,7 +154,7 @@ export class CodeModePngRenderer extends DurableObject<CodeModePngRendererEnv> {
 					...(caller?.rayId ? { rayId: caller.rayId } : {}),
 					...(caller?.runId ? { runId: caller.runId } : {}),
 				},
-			);
+			).pipe(Effect.ensuring(end));
 	}
 
 	#rendererRuntime() {

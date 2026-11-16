@@ -109,11 +109,12 @@ produces PNG artifacts within a scoped lifecycle.
 
 Every finished Effect span is stored, with its full content, as a row in an
 Iceberg table. `packages/observability` supplies the tracer and logger. A
-request's root span (`playground.request`, `evalHarness.request`, or a PNG
-renderer call) adopts a batch, and every span beneath it joins that batch.
-The batch is sent to the `TELEMETRY_SPANS` Pipeline stream through `waitUntil`
-when the root ends. Spans the request left running, such as a streamed response,
-are sent in a later batch once they end. A row holds the trace, span and parent
+request's root span (`playground.request`, `studio.mcp`, `icons.http`,
+`icons.mcp`, or a PNG renderer call) owns every span beneath it, including work
+the request leaves running, such as a streamed response or a callback. The host
+closes the request's scope under `waitUntil` once that work ends; closing it
+sends the request's spans together to the `TELEMETRY_SPANS` Pipeline stream and
+waits for the send. A span outside every request is not stored. A row holds the trace, span and parent
 IDs, name, kind, service, start, end and duration, the outcome with the typed
 error, its message and the full cause, every attribute as JSON, and the span's
 events: its Effect logs, metric updates and span events. Every row of a request
