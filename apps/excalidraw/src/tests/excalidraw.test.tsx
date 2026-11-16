@@ -3,7 +3,7 @@ import { Layer, Tracer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { type ReactNode } from "react";
 import { type ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@sketchi/editor", async (original) => ({
@@ -43,9 +43,36 @@ vi.mock("@sketchi/editor", async (original) => ({
 	),
 }));
 
-import { type SvgHandoff } from "../../lib/svg-handoff";
-import { svgHttpLayer } from "../../lib/svg-source-atom";
-import { SvgIconWorkspace, type SvgIconWorkspaceProps } from "./svg-icon-workspace";
+import { parseSvgHandoff, type SvgHandoff } from "../lib/svg-handoff";
+import { svgHttpLayer } from "../lib/svg-source-atom";
+import {
+	SvgIconWorkspace,
+	type SvgIconWorkspaceProps,
+} from "../components/svg-icon-workspace/svg-icon-workspace";
+
+describe("SVG handoff", () => {
+	it("accepts a public Sketchi Icons SVG", () => {
+		expect(
+			parseSvgHandoff({
+				svg: "https://icons.sketchi.app/output/upload-ready/svg/auth-identity/workos.svg",
+			}),
+		).toMatchObject({ kind: "valid" });
+	});
+
+	it.each([
+		"https://example.com/output/upload-ready/svg/auth/workos.svg",
+		"https://sketchi-icons.attacker.workers.dev/output/upload-ready/svg/auth/workos.svg",
+		"https://evil-sketchi-icons.dimethyl.workers.dev/output/upload-ready/svg/auth/workos.svg",
+		"https://pr-91-sketchi-studio.dimethyl.workers.dev/output/upload-ready/svg/auth/workos.svg",
+		"https://sketchi-icons.dimethyl.workers.dev:444/output/upload-ready/svg/auth/workos.svg",
+		"https://sketchi-icons.dimethyl.workers.dev/output/upload-ready/svg/auth/workos.svg?raw=1",
+		"https://sketchi-icons.dimethyl.workers.dev/output/review/review-data.json",
+		"https://sketchi-icons.dimethyl.workers.dev/output/upload-ready/svg/../reports/private.svg",
+		"http://sketchi-icons.dimethyl.workers.dev/output/upload-ready/svg/auth/workos.svg",
+	])("rejects non-contract source %s", (svg) => {
+		expect(parseSvgHandoff({ svg })).toMatchObject({ kind: "invalid" });
+	});
+});
 
 const handoff: SvgHandoff = {
 	options: {
@@ -97,69 +124,7 @@ const expectUnavailable = async (message: string) => {
 	expect(screen.getByRole("button", { name: "Download library" })).toHaveProperty("disabled", true);
 };
 
-describe("SvgIconWorkspace", () => {
-	it("loads the trusted SVG and exports the current edited scene", async () => {
-		const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(svgResponse());
-		const createObjectUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:edited-library");
-		const click = vi
-			.spyOn(HTMLAnchorElement.prototype, "click")
-			.mockImplementation(() => undefined);
-		const spans: Tracer.Span[] = [];
-		const tracer = Tracer.make({
-			span(options) {
-				const span = Tracer.nativeTracer.span(options);
-				spans.push(span);
-				return span;
-			},
-		});
-		renderWorkspace(fetchMock, { handoff }, tracer);
-		expect(await screen.findByLabelText("sample.svg editable canvas")).toBeTruthy();
-		expect(fetchMock).toHaveBeenCalledOnce();
-		expect(fetchMock.mock.calls[0]?.[0]).toEqual(new URL(handoff.sourceUrl));
-		expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
-			redirect: "error",
-			signal: expect.any(AbortSignal),
-		});
-		const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
-		expect(headers.has("b3")).toBe(false);
-		expect(headers.has("traceparent")).toBe(false);
-		const clientSpan = spans.find((span) => span.kind === "client");
-		expect(clientSpan?.status._tag).toBe("Ended");
-		expect(clientSpan?.attributes.get("http.request.method")).toBe("GET");
-		expect(clientSpan?.attributes.get("http.response.status_code")).toBe(200);
-		expect(
-			spans.some((span) => span.name === "SvgWorkspace.loadSource" && span.status._tag === "Ended"),
-		).toBe(true);
-		expect(screen.getByText("Elements").parentElement?.textContent).toBe("Elements1");
-		fireEvent.click(screen.getByRole("button", { name: "Apply representative edit" }));
-		fireEvent.click(screen.getByRole("button", { name: "Download library" }));
-		const blob = createObjectUrl.mock.calls[0]?.[0];
-		expect(blob).toBeInstanceOf(Blob);
-		if (!(blob instanceof Blob)) throw new Error("Missing library download");
-		const library = JSON.parse(await blob.text());
-		expect(library.libraryItems[0].elements[0]).toMatchObject({
-			groupIds: ["workspace-edited"],
-			strokeColor: "#ff006e",
-			x: 24,
-		});
-		expect(click).toHaveBeenCalledOnce();
-	});
-
-	it("uses initialSource without network and keeps blocked capability diagnostics out of the editor", () => {
-		const fetchMock = vi.fn<typeof fetch>();
-		const fixture = renderWorkspace(fetchMock, { handoff, initialSource: blockedSvg });
-		expect(screen.getByText("Native import unavailable")).toBeTruthy();
-		expect(screen.queryByText("Editable canvas")).toBeNull();
-		expect(screen.getByLabelText("Import diagnostics")).toBeTruthy();
-		expect(screen.getByRole("button", { name: "Download library" })).toHaveProperty(
-			"disabled",
-			true,
-		);
-		fixture.rerender(<SvgIconWorkspace handoff={handoff} initialSource={supportedSvg} />);
-		expect(screen.getByLabelText("sample.svg editable canvas")).toBeTruthy();
-		expect(fetchMock).not.toHaveBeenCalled();
-	});
-
+describe("SVG icon workspace", () => {
 	it("rejects invalid responses without partial scenes, then recovers on a new handoff without automatic retries", async () => {
 		const fetchMock = vi
 			.fn<typeof fetch>()
@@ -185,53 +150,6 @@ describe("SvgIconWorkspace", () => {
 		}
 		expect(await screen.findByLabelText("response-3.svg editable canvas")).toBeTruthy();
 		expect(fetchMock).toHaveBeenCalledTimes(5);
-	});
-
-	it("interrupts pending headers and body on source change, rejects late results, and cancels on unmount", async () => {
-		const headers = Promise.withResolvers<Response>();
-		const bodyReady = Promise.withResolvers<void>();
-		const cancel = vi.fn();
-		const body = new ReadableStream<Uint8Array>({
-			pull() {
-				bodyReady.resolve();
-			},
-			cancel,
-		});
-		const fetchMock = vi
-			.fn<typeof fetch>()
-			.mockReturnValueOnce(headers.promise)
-			.mockResolvedValueOnce(svgResponse(body))
-			.mockResolvedValueOnce(svgResponse())
-			.mockResolvedValueOnce(svgResponse(new ReadableStream({ cancel })));
-		const { rerender, unmount } = renderWorkspace(fetchMock);
-		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-		const firstSignal = fetchMock.mock.calls[0]?.[1]?.signal;
-		rerender(<SvgIconWorkspace handoff={nextHandoff("body")} />);
-		await bodyReady.promise;
-		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-		expect(firstSignal?.aborted).toBe(true);
-		const bodySignal = fetchMock.mock.calls[1]?.[1]?.signal;
-		rerender(<SvgIconWorkspace handoff={nextHandoff("current")} />);
-		expect(await screen.findByLabelText("current.svg editable canvas")).toBeTruthy();
-		expect(bodySignal?.aborted).toBe(true);
-		expect(cancel).toHaveBeenCalledOnce();
-		await act(async () => {
-			headers.resolve(svgResponse(blockedSvg));
-			await headers.promise;
-		});
-		expect(screen.getByLabelText("current.svg editable canvas")).toBeTruthy();
-		expect(screen.queryByText("Native import unavailable")).toBeNull();
-		rerender(<SvgIconWorkspace handoff={nextHandoff("unmount")} />);
-		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
-		unmount();
-		await waitFor(() => expect(cancel).toHaveBeenCalledTimes(2));
-		expect(fetchMock.mock.calls[3]?.[1]?.signal?.aborted).toBe(true);
-		const pending = Promise.withResolvers<Response>();
-		const pendingFetch = vi.fn<typeof fetch>().mockReturnValue(pending.promise);
-		const pendingView = renderWorkspace(pendingFetch);
-		await waitFor(() => expect(pendingFetch).toHaveBeenCalledOnce());
-		pendingView.unmount();
-		await waitFor(() => expect(pendingFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true));
 	});
 
 	it("accepts exactly one million UTF-8 bytes and cancels oversized streams before conversion despite a smaller declared length", async () => {

@@ -38,7 +38,7 @@ export default defineConfig({
 		name: "excalidraw-browser",
 		watch: false,
 		attachmentsDir: source("../../.memory/vitest-attachments/excalidraw"),
-		include: ["apps/excalidraw/src/**/*.browser.test.tsx"],
+		include: ["apps/excalidraw/src/tests/**/*.browser.test.tsx"],
 		browser: {
 			enabled: true,
 			headless: true,
