@@ -39,7 +39,7 @@ from `scripts/lib/worker-apps.mjs`.
 | Scenario evaluation | `packages/diagram/scenarios`             | maintained scenarios, pure grading, and internal Effect tooling                  |
 | Icon catalog        | `packages/icons/catalog`                 | icon manifest, ranked search, SVG sources, and node-logo eligibility             |
 | Icon drawing        | `packages/icons/draw`                    | a logo in, a judged hand-drawn recipe out: author rounds, renders, and the judge |
-| Studio persistence  | `packages/studio/projects`               | typed ownership and scoped R2 persistence services                               |
+| Studio persistence  | `apps/studio/src/features/projects`      | typed ownership and scoped R2 persistence services                               |
 | Telemetry           | `packages/observability`                 | span rows with full content, batched per request to a Pipelines stream           |
 | UI                  | `packages/editor` and app components | React rendering and local view state                                             |
 | UI primitives       | `packages/ui`                            | shared shadcn primitives and tokens for the Tailwind apps                        |

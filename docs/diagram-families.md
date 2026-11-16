@@ -1,14 +1,14 @@
 # Diagram families
 
 Sketchi supports a fixed set of canonical diagram families: flowchart, mindmap,
-sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, and quadrant. `DIAGRAM_TYPES` in `packages/diagrams/src/types.ts` is the
+sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, and quadrant. `DIAGRAM_TYPES` in `packages/diagrams/src/family.ts` is the
 registry of advertised families. Each supported family has a complete document-to-export
 path. Swimlanes and architecture diagrams are
 flowchart features. A prompt for anything else generates the closest family, and
 a request whose `type` names no family is invalid input.
 
 Family work follows the [product structure](plans/product-structure.md).
-Mindmap is the first complete family owner under `packages/diagrams/src/mindmap`.
+Mindmap is the first complete family owner under `packages/diagrams/src/families/mindmap`.
 The remaining boundaries below describe the existing families. The former generic
 node/edge scaffold is retired; it does not represent the family-owned document,
 layout and build structure.
@@ -26,7 +26,7 @@ document builds without requiring particular source, story or test filenames.
 | Code Mode build | A Code Mode authoring spec and build operation in `packages/diagrams/src/build`, registered in `CANONICAL_DOCUMENT_SPECS`, `buildCanonicalDocument`, and `canonicalDocumentFromDiagram` (`documents.ts`), plus MCP docs in `apps/studio/src/features/mcp/mcp-docs/catalog.ts`. | compile, offline-build pipeline |
 | CLI document dispatch | `sketchi create` and the offline builder read the agent registry. Add a changeset for `@sketchi/cli`. | offline-build pipeline |
 | CLI generate type | `generate --type` reads the registry, and the wizard choice comes from `GENERATION_TYPE_CHOICES` in `apps/cli/src/generation-types.ts`. | compile, CLI behavior tests |
-| generate API request | `POST /api/v1/generate` accepts every registered family (`apps/studio/src/server/generation/request.ts`). Unsupported kinds come from `UnsupportedDiagramIntentKindSchema`. | request schema |
+| generate API request | `POST /api/v1/generate` accepts every registered family (`apps/studio/src/server/generation/api.server.ts`). Unsupported kinds come from `UnsupportedDiagramIntentKindSchema`. | request schema |
 | maintained scenarios | `packages/diagram/scenarios`: scenarios with checks scored on the model's own diagram, registered in `diagramScenarios` or the reliability scenarios. | scenario regressions and Frontierclimb |
 | Storybook story | `tools/storybook/families/<name>.stories.tsx`. | Storybook build and review |
 
@@ -63,7 +63,7 @@ rest; see `docs/quadrant-charts.md`. Mindmaps radiate from their central topic; 
 
 Surfaces that offer a family to people also need updating: the playground
 generate API (`apps/studio/src/server/generation/api.server.ts`), Studio
-chat build tools (`apps/studio/src/server/chat/`), and `llms.txt`. Add
+chat build tools (`apps/studio/src/features/chat/`), and `llms.txt`. Add
 optional `icon` support through the shared `DiagramIconRef` when a family's
 elements represent named technologies.
 

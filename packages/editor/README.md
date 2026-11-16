@@ -1,4 +1,4 @@
-# diagram-ui
+# editor
 
 Reusable React components and Storybook states for Sketchi diagram review surfaces.
 
@@ -20,11 +20,11 @@ flowchart LR
 ## Commands
 
 ```sh
-pnpm nx test diagram-ui
-pnpm nx typecheck diagram-ui
-pnpm nx build diagram-ui
-pnpm nx storybook diagram-ui
-pnpm nx build-storybook diagram-ui
+pnpm nx test editor
+pnpm nx typecheck editor
+pnpm nx build editor
+pnpm nx storybook editor
+pnpm nx build-storybook editor
 ```
 
 ## Usage
@@ -34,4 +34,4 @@ canvas. Keep reusable state and component
 coverage here; app-specific routing and service calls stay inside `apps/*`.
 
 Storybook, Chromatic and the Storybook MCP endpoint are described in
-[docs/storybook-chromatic.md](../../../docs/storybook-chromatic.md).
+[docs/storybook-chromatic.md](../../docs/storybook-chromatic.md).

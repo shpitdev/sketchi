@@ -422,8 +422,8 @@ response envelope when pre-enforcement model-quality evidence is needed.
 Each result with a delivered Excalidraw scene carries `metrics`: how the scene
 holds up when a person drags its shapes in the editor. The scene runs through
 Excalidraw 0.18.1's own restore, drag and binding code, with the canvas's
-release step (`createRouteRelease`, diagram-excalidraw) after every pointer
-move. `edit-session.ts` is that session; diagram-ui's `arrow-edits.test.tsx`
+release step (`createRouteRelease`, drawing/excalidraw) after every pointer
+move. `edit-session.ts` is that session; editor's `arrow-edits.test.tsx`
 drags every maintained scenario through it too. `excalidraw-editor.ts` loads
 Excalidraw's editor module into plain Node with a linkedom DOM. The first touch
 re-places every bound arrow before anything moves. Then each shape holding a

@@ -4,14 +4,14 @@
 
 | Need                    | Command or URL                                                 |
 | ----------------------- | -------------------------------------------------------------- |
-| Run local Storybook     | `pnpm nx storybook diagram-ui -- --ci --host 127.0.0.1` |
-| Build Storybook         | `pnpm nx build-storybook diagram-ui`                    |
-| Publish/check Chromatic | `pnpm nx chromatic diagram-ui`                          |
+| Run local Storybook     | `pnpm nx storybook editor -- --ci --host 127.0.0.1` |
+| Build Storybook         | `pnpm nx build-storybook editor`                    |
+| Publish/check Chromatic | `pnpm nx chromatic editor`                          |
 | Local MCP endpoint      | `http://127.0.0.1:6006/mcp`                                    |
 
 ```mermaid
 flowchart LR
-  UI["diagram-ui"] --> Storybook["Storybook"]
+  UI["editor"] --> Storybook["Storybook"]
   Storybook --> MCP["/mcp endpoint"]
   Storybook --> Chromatic["Chromatic publish"]
   CI["pnpm ci:local"] --> Build["Canonical Nx gates"]
@@ -20,12 +20,12 @@ flowchart LR
 
 ## Targets
 
-`diagram-ui` owns the reusable Studio component stories. The Storybook
+`editor` owns the reusable Studio component stories. The Storybook
 targets are Nx targets:
 
-- `pnpm nx storybook diagram-ui`
-- `pnpm nx build-storybook diagram-ui`
-- `pnpm nx chromatic diagram-ui`
+- `pnpm nx storybook editor`
+- `pnpm nx build-storybook editor`
+- `pnpm nx chromatic editor`
 
 The Storybook serve/build targets use `@nx/storybook` executors. Chromatic does
 not ship as an Nx executor in this workspace, so `chromatic` is a small
@@ -55,7 +55,7 @@ npx mcp-add \
 Then start Storybook before asking an agent to inspect component docs:
 
 ```sh
-pnpm nx storybook diagram-ui -- --ci --host 127.0.0.1
+pnpm nx storybook editor -- --ci --host 127.0.0.1
 ```
 
 Useful first MCP prompt:
@@ -89,7 +89,7 @@ the token from Infisical rather than pasting it into a shell history:
 ```sh
 infisical run --env=staging --path=/github -- \
   pnpm exec chromatic \
-    --storybook-build-dir storybook-static/diagram-ui \
+    --storybook-build-dir storybook-static/editor \
     --storybook-config-dir packages/editor/.storybook \
     --storybook-base-dir packages/editor \
     --patch-build=chore/chromatic-storybook-contrast...main
