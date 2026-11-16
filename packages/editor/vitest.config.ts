@@ -9,7 +9,7 @@ export default defineConfig({
 		coverage: {
 			reportsDirectory: new URL("../../coverage/packages/editor", import.meta.url).pathname,
 		},
-		include: ["packages/editor/src/**/*.test.tsx"],
+		include: ["packages/editor/src/tests/**/*.test.tsx"],
 		server: { deps: { inline: [/@excalidraw\/excalidraw/] } },
 		// Hang guard, not a speed budget: the full scenario suite renders every
 		// scenario in jsdom and runs several times slower on loaded CI runners.
