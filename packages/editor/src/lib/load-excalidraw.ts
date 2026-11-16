@@ -8,7 +8,7 @@ declare global {
  * Excalidraw resolves its font files against this path and only falls back to
  * the esm.sh CDN when they fail to load. Every surface that renders Excalidraw
  * serves them from its own origin at `/fonts/<Family>/<file>` through the
- * `excalidrawFonts` Vite plugin (scripts/lib/excalidraw-fonts.mjs).
+ * `excalidrawFonts` Vite plugin (tools/ops/src/vite/excalidraw-fonts.ts).
  */
 export const EXCALIDRAW_ASSET_PATH = "/";
 

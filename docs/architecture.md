@@ -25,7 +25,8 @@ flowchart LR
 The four Worker projects are `web`, `playground` (`apps/studio`), `excalidraw` (`apps/editor`), and `icons`. `playground` deploys as the durable `sketchi-studio` Worker and
 owns chat, HTTP build/artifact APIs, MCP, Browser Rendering, and Studio
 persistence. Preview identities and production routes come only
-from `scripts/lib/worker-apps.mjs`.
+from `tools/ops/src/workers.ts`. Operator commands (`pnpm ops`, `pnpm ci:local`,
+`pnpm db`, `pnpm sanity`) are typed Effect in `tools/ops`.
 
 ## Package ownership
 
@@ -175,7 +176,7 @@ to 128 MB files and expire snapshots older than 7 days, keeping at least 5.
 Pipelines ingestion is free. Delivery to Iceberg costs $0.06/GB after 50 GB a
 month, and R2 storage is billed as usual.
 
-`pnpm db` opens DuckDB with `scripts/telemetry/duckdb-init.sql`. It attaches the
+`pnpm db` opens DuckDB with `tools/ops/src/telemetry/duckdb-init.sql`. It attaches the
 spans catalog with a read-only `R2_DATA_READ_TOKEN`, which it takes from
 Infisical when the variable is unset. `pnpm db --preview` reads the preview
 spans catalog, and DuckDB arguments pass

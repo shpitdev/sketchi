@@ -199,9 +199,9 @@
 						"allow": [
 							// Storybook composes the Studio-owned workspace and its stylesheet.
 							"^@sketchi/playground/styles\\.css$",
-							"^\\.\\./\\.\\./scripts/lib/client-server-boundary\\.mjs$",
-							"^\\.\\./\\.\\./scripts/lib/worker-apps\\.mjs$",
-							"^(\\.\\./){2,4}scripts/lib/excalidraw-fonts\\.mjs$",
+							"^\\.\\./\\.\\./tools/ops/src/vite/client-server-boundary$",
+							"^\\.\\./\\.\\./tools/ops/src/workers$",
+							"^(\\.\\./){2,4}tools/ops/src/vite/excalidraw-fonts$",
 							"^\\.\\./\\.\\./tools/local-dev-ports$",
 							"^\\.\\./\\.\\./tools/testing/browserbase$"
 						],

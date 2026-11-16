@@ -14,7 +14,7 @@
 			"inputs": [
 				"default",
 				"^default",
-				"{workspaceRoot}/scripts/lib/excalidraw-fonts.mjs",
+				"{workspaceRoot}/tools/ops/src/vite/excalidraw-fonts.ts",
 				"{workspaceRoot}/tools/storybook/families/**/*"
 			]
 		},

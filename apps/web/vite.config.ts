@@ -5,8 +5,8 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 import { localInspectorPort, localViteCacheDir } from "../../tools/local-dev-ports";
-import { excalidrawFonts } from "../../scripts/lib/excalidraw-fonts.mjs";
-import { workerProjectConfig } from "../../scripts/lib/worker-apps.mjs";
+import { excalidrawFonts } from "../../tools/ops/src/vite/excalidraw-fonts";
+import { workerProjectConfig } from "../../tools/ops/src/workers";
 
 const workerProject = workerProjectConfig("web");
 

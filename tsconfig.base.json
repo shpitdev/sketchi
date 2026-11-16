@@ -94,6 +94,33 @@
         },
         "overrides": [
           {
+            "include": ["tools/ops/src/**/*.ts"],
+            "options": {
+              "diagnosticSeverity": {
+                "asyncFunction": "error",
+                "cryptoRandomUUID": "error",
+                "cryptoRandomUUIDInEffect": "error",
+                "extendsNativeError": "error",
+                "globalConsole": "error",
+                "globalConsoleInEffect": "error",
+                "globalDate": "error",
+                "globalDateInEffect": "error",
+                "globalFetch": "error",
+                "globalFetchInEffect": "error",
+                "globalRandom": "error",
+                "globalRandomInEffect": "error",
+                "globalTimers": "error",
+                "globalTimersInEffect": "error",
+                "newPromise": "error",
+                "processEnv": "error",
+                "processEnvInEffect": "error",
+                "runEffectInsideEffect": "error",
+                "schemaSync": "error",
+                "schemaSyncInEffect": "error"
+              }
+            }
+          },
+          {
             "include": ["packages/diagrams/src/generate/jev-workers-ai.ts"],
             "options": {
               "diagnosticSeverity": {
