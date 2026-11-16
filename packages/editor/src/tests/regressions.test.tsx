@@ -87,4 +87,3 @@ it("keeps a shared native elbow departure valid through a clear grouped move and
 		session.close(scene);
 	}
 });
-

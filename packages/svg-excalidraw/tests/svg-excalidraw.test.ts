@@ -64,8 +64,14 @@ describe("SVG import fails closed", () => {
 			"a thin contour Clipper would drop",
 			"M0 0L1000000000 999999999L1000100000 1000099999Z M-20 0L-10 10L-20 10L-10 0Z",
 		],
-		["a fill missing from one partial element", "M0 0L40000000 39999999L40100000 40099999L0 0L50000000 0L60000000 0L60000000 10000000L50000000 10000000L50000000 0L0 0Z"],
-		["nonzero topology past safe integers", "M0 0L2000000000000 2000000000000L0 2000000000000L2000000000000 0Z"],
+		[
+			"a fill missing from one partial element",
+			"M0 0L40000000 39999999L40100000 40099999L0 0L50000000 0L60000000 0L60000000 10000000L50000000 10000000L50000000 0L0 0Z",
+		],
+		[
+			"nonzero topology past safe integers",
+			"M0 0L2000000000000 2000000000000L0 2000000000000L2000000000000 0Z",
+		],
 	])("returns no partial output when %s", (_case, path) => {
 		const result = convertSvgToExcalidraw(mustParse(`<svg><path fill="#000" d="${path}"/></svg>`), {
 			roughness: 0,

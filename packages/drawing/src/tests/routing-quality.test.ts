@@ -9,7 +9,7 @@ import {
 	sharedSegments,
 	touchingLines,
 	type RoutingQualityArrow,
-} from "./routing-quality";
+} from "../routing-quality";
 
 const arrow = (id: string, ...points: [number, number][]): RoutingQualityArrow => ({
 	id,
