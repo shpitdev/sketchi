@@ -8,10 +8,10 @@ import { IconRecipeSchema } from "./recipe-schema.js";
  * PNG, or another render target without changing the authored scene.
  */
 
-import { cubicConnectorPoints } from "./curves.js";
+import { cubicConnectorPoints } from "./geometry/curves.js";
 import { isDiagramIconSlug, isDrawnIconSlug } from "./icon.js";
 import { iconRecipeByteLength, iconRecipeIssues } from "./icon-recipe.js";
-import { boundLabelWidth, estimateTextWidth } from "./text-metrics.js";
+import { boundLabelWidth, estimateTextWidth } from "./geometry/text-metrics.js";
 
 export const CANVAS_SPEC_VERSION = 1 as const;
 
