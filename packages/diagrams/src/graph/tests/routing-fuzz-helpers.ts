@@ -1,4 +1,4 @@
-import type { GraphEdge, GraphNode } from "@sketchi/diagrams/graph/input";
+import type { GraphEdge, GraphNode } from "../input";
 import {
 	candidateRouteQuality,
 	canvasOutlineContains,

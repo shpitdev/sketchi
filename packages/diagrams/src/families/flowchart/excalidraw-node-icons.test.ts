@@ -1,4 +1,4 @@
-import { deployWebhookLogoSequence } from "@sketchi/diagrams/families/sequence/fixtures";
+import { deployWebhookLogoSequence } from "../sequence/fixtures";
 
 import { describe, expect, it } from "vitest";
 
@@ -9,10 +9,10 @@ import {
 	embedCanvasIcons,
 	type CanvasShapeElement,
 } from "@sketchi/drawing";
-import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/fixtures";
+import { deployPipelineLogoFlowchart } from "./fixtures";
 
-import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
-import { renderSequenceDiagram } from "@sketchi/diagrams/families/sequence/render";
+import { renderFlowchartDiagram } from "./render";
+import { renderSequenceDiagram } from "../sequence/render";
 
 import {
 	convertSceneToExcalidraw,

@@ -1,6 +1,6 @@
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
-import { labelFixtures } from "@sketchi/diagrams/families/flowchart/label-fixtures";
-import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
+import { parseFlowchartDiagram } from "../../families/flowchart/document";
+import { labelFixtures } from "../../families/flowchart/label-fixtures";
+import { renderFlowchartDiagram } from "../../families/flowchart/render";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";

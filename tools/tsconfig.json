@@ -15,12 +15,5 @@
     },
     "composite": false
   },
-  "include": [
-    "*.ts",
-    "*.mts",
-    "oxlint/*.ts",
-    "testing/browserbase.ts",
-    "drawing-tests/**/*.ts",
-    "storybook/**/*.tsx"
-  ]
+  "include": ["*.ts", "*.mts", "oxlint/*.ts", "testing/browserbase.ts", "storybook/**/*.tsx"]
 }

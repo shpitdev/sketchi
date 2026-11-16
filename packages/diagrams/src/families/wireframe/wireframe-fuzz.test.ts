@@ -8,12 +8,9 @@ import {
 	counts,
 	WIREFRAME_MAX_ELEMENTS,
 	type WireframeDiagram,
-} from "@sketchi/diagrams/families/wireframe/document";
-import { renderWireframeDiagram } from "@sketchi/diagrams/families/wireframe/render";
-import {
-	wireframeBoxIssues,
-	wireframeLayoutIssues,
-} from "@sketchi/diagrams/families/wireframe/readout";
+} from "./document";
+import { renderWireframeDiagram } from "./render";
+import { wireframeBoxIssues, wireframeLayoutIssues } from "./readout";
 
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 

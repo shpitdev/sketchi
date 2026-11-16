@@ -1,4 +1,4 @@
-import { renderGraphDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderGraphDiagram } from "../scene";
 import { getCanvasValidationIssues, groupRegionIssues } from "@sketchi/drawing";
 import { describe, expect, it } from "vitest";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";

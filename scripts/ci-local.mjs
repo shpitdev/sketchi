@@ -84,7 +84,11 @@ export async function runTests({ runAll, runTask }) {
 	const outputs = nxTaskOutputs(first.output);
 	const onlyTimeouts =
 		failed.length > 0 &&
-		failed.every((task) => task.endsWith(":test") && onlyVitestTimeouts(outputs.get(task) ?? ""));
+		failed.every(
+			(task) =>
+				(task.endsWith(":test") || task.startsWith("diagrams:test-")) &&
+				onlyVitestTimeouts(outputs.get(task) ?? ""),
+		);
 	if (!onlyTimeouts) return { ok: false, reruns: [], logs: [first.log] };
 	const reruns = [];
 	for (const task of failed) {
@@ -402,7 +406,14 @@ async function main(argv) {
 			runAll: async () => {
 				const first = await run(
 					"pnpm",
-					["nx", ...nxScope, "-t", "test", "--parallel=4", "--outputStyle=static"],
+					[
+						"nx",
+						...nxScope,
+						"-t",
+						"test,test-chart,test-class,test-er,test-flowchart,test-gantt,test-journey,test-mindmap,test-org-chart,test-quadrant,test-sankey,test-sequence,test-state-machine,test-timeline,test-venn,test-wireframe,test-graph",
+						"--parallel=4",
+						"--outputStyle=static",
+					],
 					logFile("test"),
 				);
 				return { ...first, output: readFileSync(first.log, "utf8") };

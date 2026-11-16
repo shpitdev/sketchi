@@ -80,6 +80,9 @@ behavior and domain/font integration tests, the Nx-affected native `typecheck`,
 - Logs are in `.memory/ci-local/`. `--all` runs every project instead of the
   affected graph. At most two gates run at once per machine (`CI_LOCAL_SLOTS`).
 
+`diagrams:test` owns shared build/generation tests. `diagrams:test-<family>` and
+`diagrams:test-graph` own family and graph tests; `pnpm test` and the local gate
+select all these native targets, with Nx 24 input-based affected selection.
 `drawing:test` retains the cross-family text-fit cases and excludes the sampled
 routing suite. `drawing:routing-sample` runs once when a unit changes graph,
 Flowchart, the eagerly loaded state-machine parser, drawing or shared runtime/config inputs. Selection uses the gate's

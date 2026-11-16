@@ -1,6 +1,6 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { classFixture } from "@sketchi/diagrams/families/class/document";
-import { renderDiagram } from "@sketchi/diagrams/family";
+import { classFixture } from "./document";
+import { renderDiagram } from "../../family";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 

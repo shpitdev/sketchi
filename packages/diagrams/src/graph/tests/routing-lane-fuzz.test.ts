@@ -1,10 +1,7 @@
 import type { CanvasSpec } from "@sketchi/drawing";
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
-import {
-	laneFixtures,
-	laneStressFixtures,
-} from "@sketchi/diagrams/families/flowchart/lane-fixtures";
-import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
+import { parseFlowchartDiagram } from "../../families/flowchart/document";
+import { laneFixtures, laneStressFixtures } from "../../families/flowchart/lane-fixtures";
+import { renderFlowchartDiagram } from "../../families/flowchart/render";
 import { getCanvasValidationIssues, laneRegionIssues } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";

@@ -38,31 +38,289 @@
 		"mindmap-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "MINDMAP_FUZZ_SEEDS=2000 vitest run --config packages/diagrams/vitest.config.ts packages/diagrams/src/families/mindmap/mindmap-fuzz.test.ts"
+				"command": "MINDMAP_FUZZ_SEEDS=2000 vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/mindmap/mindmap-fuzz.test.ts"
 			}
 		},
 		"gantt-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "GANTT_FUZZ_SEEDS=300 vitest run --config packages/diagrams/vitest.config.ts packages/diagrams/src/families/gantt/render.test.ts -t \"seeded fuzz\""
+				"command": "GANTT_FUZZ_SEEDS=300 vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/gantt/render.test.ts -t \"seeded fuzz\""
 			}
 		},
 		"chart-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "CHART_FUZZ_SEEDS=300 vitest run --config packages/diagrams/vitest.config.ts packages/diagrams/src/families/chart/render.test.ts -t \"seeded fuzz\""
+				"command": "CHART_FUZZ_SEEDS=300 vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/chart/render.test.ts -t \"seeded fuzz\""
 			}
 		},
 		"venn-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "VENN_FUZZ=full vitest run --config packages/diagrams/vitest.config.ts packages/diagrams/src/families/venn/venn-fuzz.test.ts"
+				"command": "VENN_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/venn/venn-fuzz.test.ts"
+			},
+			"inputs": ["default", "^production", "testEnvironment"]
+		},
+		"test-chart": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/chart/"
 			},
 			"inputs": [
-				"default",
-				"{workspaceRoot}/tools/drawing-tests/**/*",
-				"{workspaceRoot}/packages/diagrams/src/**/*"
-			]
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/chart/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-class": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/class/"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/class/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-er": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/er/"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/er/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-flowchart": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/flowchart/"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/flowchart/**/*",
+				"{projectRoot}/src/graph/**/*",
+				"{projectRoot}/src/families/sequence/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-gantt": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/gantt/"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/gantt/**/*",
+				"{projectRoot}/src/graph/**/*",
+				"{projectRoot}/src/families/timeline/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-journey": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/journey/"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/journey/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-mindmap": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/mindmap/"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/mindmap/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-org-chart": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/org-chart/"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/org-chart/**/*",
+				"{projectRoot}/src/graph/**/*",
+				"{projectRoot}/src/families/gantt/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-quadrant": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/quadrant/"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/quadrant/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-sankey": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/sankey/"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/sankey/**/*",
+				"{projectRoot}/src/graph/**/*",
+				"{projectRoot}/src/families/chart/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-sequence": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/sequence/"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/sequence/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-state-machine": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/state-machine/"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/state-machine/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-timeline": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/timeline/"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/timeline/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-venn": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/venn/"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/venn/**/*",
+				"{projectRoot}/src/graph/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-wireframe": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/wireframe/"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/families/wireframe/**/*",
+				"{projectRoot}/src/graph/**/*",
+				"{projectRoot}/src/families/org-chart/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
+		},
+		"test-graph": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config packages/diagrams/vitest.graph.config.ts"
+			},
+			"inputs": [
+				"diagramTestShared",
+				"testEnvironment",
+				"^production",
+				"{projectRoot}/src/graph/**/*",
+				"{projectRoot}/src/families/flowchart/**/*",
+				"{projectRoot}/src/families/state-machine/**/*"
+			],
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
 		}
 	}
 }

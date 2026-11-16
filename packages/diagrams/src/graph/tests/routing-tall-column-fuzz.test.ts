@@ -1,5 +1,5 @@
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
-import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
+import { parseFlowchartDiagram } from "../../families/flowchart/document";
+import { renderFlowchartDiagram } from "../../families/flowchart/render";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";

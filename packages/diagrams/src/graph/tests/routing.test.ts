@@ -1,21 +1,21 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
+import { parseFlowchartDiagram } from "../../families/flowchart/document";
 import {
 	flowchartFixture,
 	pharmaBatchDispositionFlowchart,
-} from "@sketchi/diagrams/families/flowchart/fixtures";
-import { type GraphInput } from "@sketchi/diagrams/graph/input";
-import { renderGraphDiagram } from "@sketchi/diagrams/graph/scene";
+} from "../../families/flowchart/fixtures";
+import { type GraphInput } from "../input";
+import { renderGraphDiagram } from "../scene";
 import {
 	SKETCHI_DIAGRAM_STYLE,
 	segmentsFromPoints,
 	segmentsOverlapInterior,
 	segmentCrossesBoundsInterior,
 } from "@sketchi/drawing";
-import { routingFixtures } from "@sketchi/diagrams/families/flowchart/routing-fixtures";
-import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
+import { routingFixtures } from "../../families/flowchart/routing-fixtures";
+import { renderFlowchartDiagram } from "../../families/flowchart/render";
 import {
 	convertSceneToExcalidraw,
 	createExcalidrawFile,

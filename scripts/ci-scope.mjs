@@ -11,14 +11,14 @@ const WORKSPACE_FILE =
 function routingInput(file) {
 	if (file.startsWith("packages/diagrams/")) {
 		return (
-			!file.startsWith("packages/diagrams/src/families/") ||
+			(file !== "packages/diagrams/src/graph/tests/text-fit-fuzz.test.ts" &&
+				!file.startsWith("packages/diagrams/src/families/")) ||
 			file.startsWith("packages/diagrams/src/families/flowchart/")
 		);
 	}
 	return (
 		file.startsWith("packages/drawing/") ||
 		file.startsWith("packages/editor/public/fonts/") ||
-		/^tools\/drawing-tests\/(?:routing[^/]*|text-fit-helpers)\.ts$/.test(file) ||
 		/^scripts\/ci-(?:local|scope)\.mjs$/.test(file) ||
 		/^(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|vitest\.config\.ts|tsconfig(?:\.base)?\.json|mise\.toml|\.npmrc)$/.test(
 			file,

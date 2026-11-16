@@ -67,6 +67,5 @@ chat build tools (`apps/playground/src/server/chat/`), and `llms.txt`. Add
 optional `icon` support through the shared `DiagramIconRef` when a family's
 elements represent named technologies.
 
-Verify with `pnpm nx affected -t typecheck,test --base=origin/main`,
-`pnpm run test:tools`, `pnpm run check`, and
-`pnpm nx build-storybook editor`.
+Verify with `pnpm ci:local --no-signoff` (includes the affected family and shared
+test targets, tools, typechecks and editor Storybook).

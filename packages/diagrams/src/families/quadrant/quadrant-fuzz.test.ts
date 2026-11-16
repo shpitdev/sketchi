@@ -2,13 +2,9 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { getCanvasValidationIssues } from "@sketchi/drawing";
-import {
-	parseQuadrantDiagram,
-	QUADRANT_MAX_POINTS,
-	type QuadrantDiagram,
-} from "@sketchi/diagrams/families/quadrant/document";
-import { quadrantLayoutIssues } from "@sketchi/diagrams/families/quadrant/readout";
-import { renderQuadrantDiagram } from "@sketchi/diagrams/families/quadrant/render";
+import { parseQuadrantDiagram, QUADRANT_MAX_POINTS, type QuadrantDiagram } from "./document";
+import { quadrantLayoutIssues } from "./readout";
+import { renderQuadrantDiagram } from "./render";
 
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 

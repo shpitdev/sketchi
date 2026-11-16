@@ -89,16 +89,18 @@ function fakeTests(first, reruns = {}) {
 }
 
 test("a test task that only timed out is rerun alone and passes", async () => {
-	const fake = fakeTests({
-		code: 1,
-		output: nxLog({ "a:test": timedOut("a.test.ts"), "b:test": "ok" }, ["a:test"]),
-	});
-	assert.deepEqual(await runTests(fake), {
-		ok: true,
-		reruns: [{ task: "a:test", passed: true }],
-		logs: [],
-	});
-	assert.deepEqual(fake.calls, ["all", "a:test"]);
+	for (const task of ["a:test", "diagrams:test-quadrant"]) {
+		const fake = fakeTests({
+			code: 1,
+			output: nxLog({ [task]: timedOut("a.test.ts"), "b:test": "ok" }, [task]),
+		});
+		assert.deepEqual(await runTests(fake), {
+			ok: true,
+			reruns: [{ task, passed: true }],
+			logs: [],
+		});
+		assert.deepEqual(fake.calls, ["all", task]);
+	}
 });
 
 test("a test task that times out again when rerun alone fails the gate", async () => {
@@ -396,7 +398,11 @@ test("an edited state document retains default tests without selecting sampled r
 	assert.match(result.output, /sampled routing: not affected/);
 	for (const target of ["test", "typecheck,build"]) {
 		assert.ok(
-			result.commands.some(({ args }) => args.includes("affected") && args.includes(target)),
+			result.commands.some(
+				({ args }) =>
+					args.includes("affected") &&
+					args.some((arg) => arg === target || arg.startsWith(`${target},`)),
+			),
 			target,
 		);
 	}
@@ -410,7 +416,11 @@ test("a plain-family unit gate retains default tests without running sampled rou
 	assert.match(result.output, /sampled routing: not affected/);
 	for (const target of ["test", "typecheck,build"]) {
 		assert.ok(
-			result.commands.some(({ args }) => args.includes("affected") && args.includes(target)),
+			result.commands.some(
+				({ args }) =>
+					args.includes("affected") &&
+					args.some((arg) => arg === target || arg.startsWith(`${target},`)),
+			),
 			target,
 		);
 	}
@@ -433,7 +443,10 @@ test("origin/main, an equivalent explicit base, --all and signoff always run rou
 		);
 		if (args.includes("--all")) {
 			assert.ok(
-				result.commands.some(({ args }) => args.includes("run-many") && args.includes("test")),
+				result.commands.some(
+					({ args }) =>
+						args.includes("run-many") && args.some((arg) => arg.split(",").includes("test")),
+				),
 			);
 		}
 	}
