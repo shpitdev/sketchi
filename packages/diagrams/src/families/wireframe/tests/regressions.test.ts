@@ -41,7 +41,9 @@ it("keeps repeated tab and nav items' element ids unique, so the export stays va
 		const ids = (formats.get("scene") as CanvasSpec).elements.map((element) => element.id);
 		expect(new Set(ids).size).toBe(ids.length);
 		expect(
-			validateExcalidrawScene(formats.get("excalidraw") as Parameters<typeof validateExcalidrawScene>[0]),
+			validateExcalidrawScene(
+				formats.get("excalidraw") as Parameters<typeof validateExcalidrawScene>[0],
+			),
 		).toEqual({ ok: true, issues: [] });
 	}
 });
@@ -49,7 +51,10 @@ it("keeps repeated tab and nav items' element ids unique, so the export stays va
 it.each(["constructor", "__proto__", "toString", "hasOwnProperty"])(
 	"refuses the inherited name %s as a type or device as invalid input, never crashing",
 	async (name) => {
-		const typed = await build({ title: "Bad", screens: [{ name: "Bad", children: [{ type: name }] }] });
+		const typed = await build({
+			title: "Bad",
+			screens: [{ name: "Bad", children: [{ type: name }] }],
+		});
 		expect(typed).toMatchObject({ ok: false, status: "invalid_input" });
 		const device = await build({
 			title: "Bad",

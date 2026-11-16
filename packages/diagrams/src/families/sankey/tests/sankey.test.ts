@@ -22,6 +22,7 @@ import {
 } from "../document.js";
 import { sankeyStressFixtures } from "../fixtures.js";
 import { layoutSankeyDiagram } from "../layout.js";
+import { readSankeyScene, type SankeyLayoutIssue, sankeyLayoutIssues } from "../readout.js";
 import { renderSankeyDiagram } from "../render.js";
 
 const storage = makeMemoryArtifactStorage();
@@ -100,7 +101,10 @@ describe("Sankey diagrams", () => {
 	});
 
 	it("refuse a layout whose labels cannot all sit clear, storing nothing", async () => {
-		const teams = Array.from({ length: 8 }, (_, index) => ({ id: `t${index}`, label: `Team ${index}` }));
+		const teams = Array.from({ length: 8 }, (_, index) => ({
+			id: `t${index}`,
+			label: `Team ${index}`,
+		}));
 		const services = Array.from({ length: 8 }, (_, index) => ({
 			id: `s${index}`,
 			label: `Service ${index}`,
@@ -171,5 +175,93 @@ describe("Sankey validator", () => {
 	it.each(Object.entries(bad))("raises %s for a minimal bad diagram", (code, change) => {
 		const issues = getSankeyValidationIssues({ ...sankeyFixture, ...change });
 		expect(issues.map((issue) => issue.code)).toContain(code);
+	});
+});
+
+type Mutable = Record<string, unknown> & { x: number; y: number; width: number; height: number };
+const at = (scene: CanvasSpec, id: string) => {
+	const element = scene.elements.find((candidate) => candidate.id === id);
+	if (!element) throw new Error(`No element ${id}.`);
+	return element as unknown as Mutable;
+};
+/** A point just inside a band, beside its source bar. */
+const insideBand = (scene: CanvasSpec, source: string, target: string) => {
+	const band = readSankeyScene(scene).bands.find(
+		(entry) => entry.source === source && entry.target === target,
+	)!;
+	return { x: band.sourceEnd.x + 2, y: (band.sourceEnd.top + band.sourceEnd.bottom) / 2 };
+};
+const centreOf = (scene: CanvasSpec, id: string) => {
+	const node = at(scene, id);
+	return { x: node.x + node.width / 2, y: node.y + node.height / 2 };
+};
+
+/** One deliberately broken drawing per issue the fuzz oracle reads. */
+const broken: Record<SankeyLayoutIssue["code"], (scene: CanvasSpec) => void> = {
+	"band-off-node": (scene) => {
+		at(scene, "node:sankey:link:engineering:compute").y += 500;
+	},
+	"side-unbalanced": (scene) => {
+		at(scene, "node:sankey:node:engineering").height += 40;
+	},
+	"band-leaves-gap": (scene) => {
+		at(scene, "node:sankey:link:engineering:compute").x -= 30;
+	},
+	"band-over-node": (scene) => {
+		const point = insideBand(scene, "data", "storage");
+		Object.assign(at(scene, "node:sankey:node:networking"), {
+			x: point.x - 1,
+			y: point.y - 2,
+			width: 4,
+			height: 4,
+		});
+	},
+	"labels-overlap": (scene) => {
+		const other = at(scene, "text:sankey:node:storage");
+		Object.assign(at(scene, "text:sankey:node:compute"), { x: other.x, y: other.y });
+	},
+	"label-over-node": (scene) => {
+		Object.assign(
+			at(scene, "text:sankey:node:compute"),
+			centreOf(scene, "node:sankey:node:engineering"),
+		);
+	},
+	"label-over-band": (scene) => {
+		Object.assign(at(scene, "text:sankey:node:compute"), insideBand(scene, "data", "storage"));
+	},
+	"leader-over-label": (scene) => {
+		const { y } = centreOf(scene, "node:sankey:node:engineering");
+		scene.elements.push({
+			type: "line",
+			id: "leader:sankey:link:engineering:compute",
+			points: [
+				{ x: 0, y },
+				{ x: scene.width, y },
+			],
+		});
+	},
+	"label-on-band": (scene) => {
+		(scene as { elements: CanvasSpec["elements"] }).elements = scene.elements.filter(
+			(element) => element.id !== "node:sankey:knockout:engineering",
+		);
+		Object.assign(
+			at(scene, "text:sankey:node:engineering"),
+			insideBand(scene, "engineering", "compute"),
+		);
+	},
+	"text-overflow": (scene) => {
+		at(scene, "text:sankey:node:compute").maxWidth = 1;
+	},
+};
+
+describe("Sankey layout readout", () => {
+	it("reads the fixture as clean", () => {
+		expect(sankeyLayoutIssues(renderSankeyDiagram(sankeyFixture))).toEqual([]);
+	});
+
+	it.each(Object.entries(broken))("reports %s on a drawing broken that way", (code, breakIt) => {
+		const scene = structuredClone(renderSankeyDiagram(sankeyFixture));
+		breakIt(scene);
+		expect(sankeyLayoutIssues(scene).map((issue) => issue.code)).toContain(code);
 	});
 });

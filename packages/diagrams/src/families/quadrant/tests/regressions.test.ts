@@ -6,7 +6,10 @@ import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
 } from "../../../build/code-mode/artifacts.js";
-import { buildQuadrantChart, CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import {
+	buildQuadrantChart,
+	CodeModeRuntimeEnvironment,
+} from "../../../build/code-mode/runtime.js";
 import { buildResponse } from "../../../build/operation.js";
 import { quadrantFixture } from "../document.js";
 

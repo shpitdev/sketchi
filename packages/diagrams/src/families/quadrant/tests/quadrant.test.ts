@@ -1,3 +1,4 @@
+import { type CanvasLineElement, type CanvasSpec } from "@sketchi/drawing";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Effect, Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -19,9 +20,13 @@ import {
 	quadrantFixture,
 	QuadrantValidationIssueCodeSchema,
 } from "../document.js";
+import { type QuadrantLayoutIssue, quadrantLayoutIssues, readQuadrantScene } from "../readout.js";
+import { renderQuadrantDiagram } from "../render.js";
 
 const storage = makeMemoryArtifactStorage();
-const environment = { createId: (prefix: string) => `${prefix}_${Math.random().toString(36).slice(2)}` };
+const environment = {
+	createId: (prefix: string) => `${prefix}_${Math.random().toString(36).slice(2)}`,
+};
 function run<A, E extends BuildRejection<unknown>>(
 	effect: Effect.Effect<A, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
 ) {
@@ -132,5 +137,96 @@ describe("quadrant validator", () => {
 	it.each(Object.entries(bad))("raises %s for a minimal bad chart", (code, change) => {
 		const issues = getQuadrantValidationIssues({ ...quadrantFixture, ...change });
 		expect(issues.map((issue) => issue.code)).toContain(code);
+	});
+});
+
+type Loose = Record<string, unknown> & { x: number; y: number; width: number; height: number };
+const at = (scene: CanvasSpec, id: string) => {
+	const element = scene.elements.find((candidate) => candidate.id === id);
+	if (!element) throw new Error(`No element ${id}.`);
+	return element as unknown as Loose;
+};
+const without = (scene: CanvasSpec, drop: (id: string) => boolean) => {
+	(scene as { elements: CanvasSpec["elements"] }).elements = scene.elements.filter(
+		(element) => !drop(element.id),
+	);
+};
+const dot = (scene: CanvasSpec, index: number) => {
+	const node = at(scene, `node:quadrant:point:${index}`);
+	return { x: node.x + node.width / 2, y: node.y + node.height / 2 };
+};
+const leader = (
+	id: string,
+	from: { x: number; y: number },
+	to: { x: number; y: number },
+): CanvasLineElement => ({ type: "line", id, points: [from, to] });
+
+/** One deliberately broken drawing per issue the fuzz oracle reads. */
+const broken: Record<QuadrantLayoutIssue["code"], (scene: CanvasSpec) => void> = {
+	"missing-plot": (scene) => without(scene, (id) => id.startsWith("node:quadrant:region:")),
+	"missing-point": (scene) => without(scene, (id) => id === "quadrant:label:0"),
+	"dot-position": (scene) => {
+		at(scene, "node:quadrant:point:0").x += 10;
+	},
+	"label-outside-plot": (scene) => {
+		at(scene, "quadrant:label:0").x = -1000;
+	},
+	"text-overlap": (scene) => {
+		const other = at(scene, "quadrant:label:1");
+		Object.assign(at(scene, "quadrant:label:0"), { x: other.x, y: other.y });
+	},
+	"label-over-dot": (scene) => {
+		Object.assign(at(scene, "quadrant:label:0"), dot(scene, 1));
+	},
+	"detached-label": (scene) => {
+		without(scene, (id) => id === "quadrant:leader:0");
+		const { x, y } = dot(scene, 1);
+		Object.assign(at(scene, "quadrant:label:0"), { x, y: y + 16 });
+	},
+	"misread-label": (scene) => {
+		without(scene, (id) => id === "quadrant:leader:0");
+		const { x, y } = dot(scene, 1);
+		Object.assign(at(scene, "quadrant:label:0"), { x: x + 60, y });
+	},
+	"name-over-dot": (scene) => {
+		Object.assign(at(scene, "quadrant:name:topLeft"), dot(scene, 0));
+	},
+	"name-outside-quadrant": (scene) => {
+		at(scene, "quadrant:name:topLeft").x = -1000;
+	},
+	"leader-crossing": (scene) => {
+		const { y } = at(scene, "quadrant:label:1");
+		scene.elements.push(leader("quadrant:leader:0", { x: 0, y }, { x: scene.width, y }));
+	},
+	"leader-over-dot": (scene) => {
+		scene.elements.push(leader("quadrant:leader:0", dot(scene, 0), dot(scene, 1)));
+	},
+	"rule-crosses-text": (scene) => {
+		const { plot } = readQuadrantScene(scene);
+		Object.assign(at(scene, "quadrant:label:0"), {
+			x: (plot!.left + plot!.right) / 2,
+			y: (plot!.top + plot!.bottom) / 2,
+		});
+	},
+	"broken-divider": (scene) => without(scene, (id) => id === "quadrant:midline:vertical"),
+	"broken-word": (scene) => {
+		at(scene, "quadrant:label:0").text = "Da rk";
+	},
+	"wide-aspect": (scene) => {
+		scene.width = scene.height * 3;
+	},
+};
+
+describe("quadrant layout readout", () => {
+	const clean = renderQuadrantDiagram(quadrantFixture).pipe(Result.getOrThrow);
+
+	it("reads the fixture as clean", () => {
+		expect(quadrantLayoutIssues(clean, quadrantFixture)).toEqual([]);
+	});
+
+	it.each(Object.entries(broken))("reports %s on a drawing broken that way", (code, breakIt) => {
+		const scene = structuredClone(clean);
+		breakIt(scene);
+		expect(quadrantLayoutIssues(scene, quadrantFixture).map((issue) => issue.code)).toContain(code);
 	});
 });
