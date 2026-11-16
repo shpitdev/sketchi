@@ -2,7 +2,8 @@ import { CanvasSpec } from "@sketchi/drawing";
 import "@tanstack/react-start/server-only";
 
 import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
-import { CodeModeRuntimeEnvironment, getArtifact } from "@sketchi/diagrams/build/code-mode/runtime";
+import { CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
+import { getArtifact } from "@sketchi/diagrams/canvas/artifact";
 
 import {
 	makeStudioObjectStoreLayer,

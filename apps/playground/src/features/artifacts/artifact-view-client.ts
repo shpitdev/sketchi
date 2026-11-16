@@ -3,7 +3,7 @@ import { Effect, Schema, Result } from "effect";
 import { HttpClient } from "effect/http";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { projectsRuntime, StudioRequestError } from "../projects/client";
-import { type GetArtifactResult } from "@sketchi/diagrams/build/code-mode/contract";
+import { type GetArtifactResult } from "@sketchi/diagrams/canvas/artifact-contract";
 import { type ArtifactProvenance } from "@sketchi/drawing/artifacts";
 
 export type ArtifactViewState = AsyncResult.AsyncResult<ArtifactReview, unknown>;

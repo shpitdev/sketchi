@@ -6,7 +6,8 @@ import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
 } from "../../../build/code-mode/artifacts.js";
-import { buildSankey, CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { buildSankey } from "../../../build/code-mode/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
 import { buildResponse } from "../../../build/operation.js";
 
 it("builds and exports nodes whose ids and labels name Object members", async () => {

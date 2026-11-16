@@ -1,4 +1,4 @@
-import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagrams/build/code-mode/contract";
+import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagrams/canvas/patch-contract";
 import {
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_ISSUES,

@@ -1,17 +1,25 @@
 import {
-	ApplyDiagramPatchRequest,
-	ApplyDiagramPatchResultSchema,
-	CreateCanvasRequest,
-	CreateCanvasResultSchema,
-	DiagramSelector,
 	EditFlowchartRequest,
 	EditFlowchartResultSchema,
-	GetArtifactRequest,
-	GetArtifactResultSchema,
+} from "@sketchi/diagrams/build/code-mode/edit-flowchart-contract";
+import { toCodeModeJsonSchema } from "@sketchi/diagrams/build/code-mode/schema";
+import {
 	SearchIconsRequest,
 	SearchIconsResultSchema,
-	toCodeModeJsonSchema,
-} from "@sketchi/diagrams/build/code-mode/contract";
+} from "@sketchi/diagrams/build/code-mode/search-icons-contract";
+import {
+	GetArtifactRequest,
+	GetArtifactResultSchema,
+} from "@sketchi/diagrams/canvas/artifact-contract";
+import {
+	CreateCanvasRequest,
+	CreateCanvasResultSchema,
+} from "@sketchi/diagrams/canvas/create-contract";
+import {
+	ApplyDiagramPatchRequest,
+	ApplyDiagramPatchResultSchema,
+	DiagramSelector,
+} from "@sketchi/diagrams/canvas/patch-contract";
 import { flowchartBuild } from "@sketchi/diagrams/families/flowchart/build";
 import {
 	BuildOptions,

@@ -7,11 +7,9 @@ import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
 } from "../../../build/code-mode/artifacts.js";
-import {
-	applyDiagramPatch,
-	buildWireframe,
-	CodeModeRuntimeEnvironment,
-} from "../../../build/code-mode/runtime.js";
+import { buildWireframe } from "../../../build/code-mode/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { applyDiagramPatch } from "../../../canvas/patch.js";
 import { buildResponse, type BuildRejection } from "../../../build/operation.js";
 import {
 	getWireframeValidationIssues,

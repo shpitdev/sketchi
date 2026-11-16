@@ -22,14 +22,13 @@ import {
 	type CodeModeCommunityIcon,
 	type CodeModeIconCatalog,
 } from "../icons";
+import { getArtifact } from "../../../canvas/artifact";
+import { createCanvas } from "../../../canvas/create";
+import { buildFlowchart, buildSequenceDiagram } from "../builds";
+import { editFlowchart } from "../edit-flowchart";
 import {
-	buildFlowchart,
-	buildSequenceDiagram,
 	type CodeModeArtifactRenderer,
 	CodeModeRuntimeEnvironment,
-	createCanvas,
-	editFlowchart,
-	getArtifact,
 	makeCodeModeRuntimeEnvironmentLayer,
 } from "../runtime";
 

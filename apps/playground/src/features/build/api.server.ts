@@ -10,10 +10,14 @@ import {
 	CodeModeArtifactStorage,
 	type StoredArtifactFormat,
 } from "@sketchi/diagrams/build/code-mode/artifacts";
-import {
-	type CreateCanvasResult,
-	type EditFlowchartResult,
-} from "@sketchi/diagrams/build/code-mode/contract";
+import { bindBuild } from "@sketchi/diagrams/build/code-mode/builds";
+import { editFlowchart } from "@sketchi/diagrams/build/code-mode/edit-flowchart";
+import { type EditFlowchartResult } from "@sketchi/diagrams/build/code-mode/edit-flowchart-contract";
+import { type CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
+import { getArtifact } from "@sketchi/diagrams/canvas/artifact";
+import { createCanvas } from "@sketchi/diagrams/canvas/create";
+import { type CreateCanvasResult } from "@sketchi/diagrams/canvas/create-contract";
+import { applyDiagramPatch } from "@sketchi/diagrams/canvas/patch";
 import { CANVAS_LIMITS } from "@sketchi/drawing";
 import { type ArtifactFormat } from "@sketchi/drawing/artifacts";
 import { createExcalidrawFile, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
@@ -22,7 +26,6 @@ import { PlaygroundClock } from "../../server/runtime/context.server";
 import { resultHttpStatus } from "../../server/runtime/http-status.server";
 import { readBoundedJson } from "../../server/runtime/request-body.server";
 import { buildResponse } from "@sketchi/diagrams/build/operation";
-import * as Build from "@sketchi/diagrams/build/code-mode/runtime";
 import { codeModeUsageResponseHeaders, PlaygroundCodeModeUsage } from "./usage-events.server";
 export const MAX_CODE_MODE_BUILD_REQUEST_BYTES = 256 * 1024;
 /**
@@ -161,11 +164,7 @@ function makeBuildHandler({
 	readonly label: string;
 	readonly run: (
 		input: unknown,
-	) => Effect.Effect<
-		BuildResult,
-		never,
-		CodeModeArtifactStorage | Build.CodeModeRuntimeEnvironment
-	>;
+	) => Effect.Effect<BuildResult, never, CodeModeArtifactStorage | CodeModeRuntimeEnvironment>;
 }) {
 	return Effect.fn(`playground.http.${operation}`)(function* (request: Request) {
 		const clock = yield* PlaygroundClock;
@@ -211,7 +210,7 @@ export function handleFamilyBuildRequest(
 	return makeBuildHandler({
 		operation: family.operation,
 		label: family.label,
-		run: (input) => buildResponse(operation.build(Build)(input)),
+		run: (input) => buildResponse(operation.build({ bindBuild })(input)),
 	})(request);
 }
 export function familyForBuildPath(pathname: string) {
@@ -220,12 +219,12 @@ export function familyForBuildPath(pathname: string) {
 export const handleEditFlowchartRequest = makeBuildHandler({
 	operation: "editFlowchart",
 	label: "Flowchart",
-	run: (input) => buildResponse(Build.editFlowchart(input)),
+	run: (input) => buildResponse(editFlowchart(input)),
 });
 export const handleCreateCanvasRequest = makeBuildHandler({
 	operation: "createCanvas",
 	label: "Canvas",
-	run: (input) => buildResponse(Build.createCanvas(input)),
+	run: (input) => buildResponse(createCanvas(input)),
 	maxRequestBytes: MAX_CANVAS_REQUEST_BYTES,
 });
 export const handleGetArtifactRequest = Effect.fn("playground.http.getArtifact")(function* (
@@ -240,7 +239,7 @@ export const handleGetArtifactRequest = Effect.fn("playground.http.getArtifact")
 		...(format === undefined ? {} : { format }),
 		...(inline === undefined ? {} : { inline }),
 	};
-	const result = yield* buildResponse(Build.getArtifact(input));
+	const result = yield* buildResponse(getArtifact(input));
 	if (!result.ok || !raw) {
 		return jsonResponse(result, resultHttpStatus(result));
 	}
@@ -351,14 +350,11 @@ export const handlePatchArtifactRequest = Effect.fn("playground.http.patchArtifa
 				source: { artifactId },
 				operations: [],
 			};
-	const result = yield* withTelemetryCorrelation(
-		buildResponse(Build.applyDiagramPatch(routeInput)),
-		{
-			artifactId,
-			attemptId: usageContext.attemptId,
-			runId: usageContext.runId,
-		},
-	);
+	const result = yield* withTelemetryCorrelation(buildResponse(applyDiagramPatch(routeInput)), {
+		artifactId,
+		attemptId: usageContext.attemptId,
+		runId: usageContext.runId,
+	});
 	const status = resultHttpStatus(result);
 	const finishedAt = yield* clock.nowMillis;
 	yield* usage.capture({

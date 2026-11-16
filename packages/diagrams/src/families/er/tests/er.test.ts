@@ -17,7 +17,8 @@ import {
 import { erBuild } from "../build.js";
 import { buildResponse } from "../../../build/operation.js";
 import { canonicalDocumentFromDiagram } from "../../../build/code-mode/documents.js";
-import { buildErDiagram, CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { buildErDiagram } from "../../../build/code-mode/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
 
 const storage = makeMemoryArtifactStorage();
 function run<A>(

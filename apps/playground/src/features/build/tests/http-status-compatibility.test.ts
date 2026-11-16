@@ -34,16 +34,12 @@ const runtimeResults = vi.hoisted(() => {
 	};
 });
 
-vi.mock("@sketchi/diagrams/build/code-mode/runtime", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("@sketchi/diagrams/build/code-mode/runtime")>();
-	return {
-		...actual,
-		buildFlowchart: () => Effect.succeed(runtimeResults.getBuildFlowchart()),
-		buildMindmap: () => Effect.succeed(runtimeResults.getBuildMindmap()),
-		getArtifact: () => Effect.succeed(runtimeResults.getGetArtifact()),
-		applyDiagramPatch: () => Effect.succeed(runtimeResults.getApplyDiagramPatch()),
-	};
-});
+vi.mock("@sketchi/diagrams/canvas/artifact", () => ({
+	getArtifact: () => Effect.succeed(runtimeResults.getGetArtifact()),
+}));
+vi.mock("@sketchi/diagrams/canvas/patch", () => ({
+	applyDiagramPatch: () => Effect.succeed(runtimeResults.getApplyDiagramPatch()),
+}));
 
 import { type StudioEnv } from "../../../server/bindings/studio-env.server";
 import { runPlaygroundEffect } from "../../../server/runtime/runtime.server";

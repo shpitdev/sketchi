@@ -2,11 +2,9 @@ import { buildResponse, type BuildRejection } from "../../../build/operation.js"
 import { describe, expect, it } from "vitest";
 import { Effect, Result } from "effect";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import {
-	applyDiagramPatch,
-	buildChart,
-	CodeModeRuntimeEnvironment,
-} from "../../../build/code-mode/runtime.js";
+import { buildChart } from "../../../build/code-mode/builds.js";
+import { CodeModeRuntimeEnvironment } from "../../../build/code-mode/runtime.js";
+import { applyDiagramPatch } from "../../../canvas/patch.js";
 import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
