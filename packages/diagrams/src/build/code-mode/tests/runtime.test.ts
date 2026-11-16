@@ -253,6 +253,31 @@ function element(scene: InlineScene, id: string): Record<string, unknown> {
 	return found;
 }
 
+function approveToDone(scene: InlineScene) {
+	const arrow = scene.elements.find(
+		(candidate) =>
+			candidate.type === "arrow" &&
+			candidate.sourceNodeId === "approve" &&
+			candidate.targetNodeId === "done",
+	);
+	if (arrow?.type !== "arrow") throw new Error("Expected an approve → done arrow.");
+	return arrow;
+}
+
+/** Whether a point lies on the border of a node's box. */
+function onEdge(point: { x: number; y: number }, node: Record<string, unknown>) {
+	const [x, y, width, height] = [node["x"], node["y"], node["width"], node["height"]].map(
+		Number,
+	) as [number, number, number, number];
+	const within = (value: number, from: number, to: number) => value >= from - 1 && value <= to + 1;
+	const near = (value: number, edge: number) => Math.abs(value - edge) <= 1;
+	return (
+		within(point.x, x, x + width) &&
+		within(point.y, y, y + height) &&
+		(near(point.x, x) || near(point.x, x + width) || near(point.y, y) || near(point.y, y + height))
+	);
+}
+
 /** One row per patch operation: the operations to send and what the patched scene must show. */
 const patchCases: Record<
 	(typeof DIAGRAM_PATCH_OPERATION_NAMES)[number],
@@ -290,11 +315,28 @@ const patchCases: Record<
 		check: (patched) => expect(element(patched, "node:done")["label"]).toBe("Shipped"),
 	},
 	rerouteEdges: {
-		operations: () => [{ op: "rerouteEdges" }],
-		check: (patched, source) =>
-			expect(patched.elements.filter((e) => e.type === "arrow")).toHaveLength(
-				source.elements.filter((e) => e.type === "arrow").length,
-			),
+		// Bend the approve → done arrow off its nodes, then reroute: it must leave and reach their edges.
+		operations: (scene) => [
+			{
+				op: "replace",
+				id: approveToDone(scene).id,
+				element: {
+					...approveToDone(scene),
+					points: [
+						{ x: 0, y: 0 },
+						{ x: 5, y: 5 },
+					],
+				} as never,
+			},
+			{ op: "rerouteEdges" },
+		],
+		check: (patched) => {
+			const arrow = approveToDone(patched);
+			const start = arrow.points[0];
+			const end = arrow.points.at(-1);
+			expect(start && onEdge(start, element(patched, "node:approve"))).toBe(true);
+			expect(end && onEdge(end, element(patched, "node:done"))).toBe(true);
+		},
 	},
 	insert: {
 		operations: () => [{ op: "insert", elements: [geometryNode("extra", 400, 400)] }],
@@ -378,6 +420,7 @@ describe("artifact storage", () => {
 		const png = await runtime.getArtifact({
 			artifactId: built.artifact.artifactId,
 			format: "png",
+			inline: true,
 		});
 		expectGetOk(png);
 		expect(png).toMatchObject({ format: "png", mimeType: "image/png", sizeBytes: 4 });
