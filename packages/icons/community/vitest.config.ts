@@ -6,6 +6,6 @@ export default defineConfig({
 		coverage: {
 			reportsDirectory: "../../../coverage/packages/icons/community",
 		},
-		include: ["packages/icons/community/src/**/*.test.ts"],
+		include: ["packages/icons/community/tests/**/*.test.ts"],
 	},
 });
