@@ -1,5 +1,5 @@
 import { Order as Ord, Array as Arr, Effect, Schema, Context } from "effect";
-import { Tool, Toolkit, Prompt, AiError } from "effect/ai";
+import { Tool, Toolkit, Prompt } from "effect/ai";
 import { families, type FamilyOperation, type DiagramFamily } from "@sketchi/diagrams/family";
 import { type OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";
 import "@tanstack/react-start/server-only";
@@ -17,7 +17,7 @@ import {
 	type StudioBuildTurn,
 } from "./studio-build-tool.server";
 function buildTool<Input, Output>(
-	family: {
+	family: Pick<FamilyOperation<Output>, "build"> & {
 		readonly studioInput: Schema.Codec<Input, unknown>;
 		readonly contracts: { readonly output: Schema.Codec<Output, unknown> };
 		readonly docs: { readonly toolDescription: string; readonly toolName: string };
@@ -43,14 +43,12 @@ function buildTool<Input, Output>(
 		const handlers = yield* toolkit.toHandlers({
 			[tool.name]: (input: unknown) =>
 				Schema.decodeUnknownEffect(family.studioInput)(input).pipe(
-					Effect.mapError(
-						(cause) =>
-							new AiError.ToolParameterValidationError({
-								toolName: tool.name,
-								description: cause.message,
-							}),
-					),
-					Effect.flatMap(executor.execute),
+					Effect.matchEffect({
+						// Invalid input never reaches Studio's typed grounding functions. The
+						// canonical operation returns the same paths and repair hints as HTTP/MCP.
+						onFailure: () => buildResponse(family.build(Build)(input)),
+						onSuccess: executor.execute,
+					}),
 					Effect.provide(context),
 				),
 		});

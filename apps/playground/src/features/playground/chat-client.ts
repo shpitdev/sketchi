@@ -65,7 +65,7 @@ export function applyChatEvent(
 				),
 			};
 		case "TOOL_CALL_START":
-			return update(event.parentMessageId ?? `tools-${runId}`, (message) => ({
+			return update(event.parentMessageId ?? `tools-${runId}-${event.toolCallId}`, (message) => ({
 				...message,
 				toolCalls: [
 					...(message.toolCalls ?? []),
@@ -177,16 +177,16 @@ export function makeStudioChat(httpLayer = FetchHttpClient.layer) {
 				Stream.decodeText(),
 				Stream.pipeThroughChannel(Sse.decodeDataSchema(AgUiSchema.Event)),
 				Stream.runForEach(({ data: event }) =>
-					Effect.sync(() => {
+					Effect.gen(function* () {
 						if (ended)
-							throw new StudioChatError({
+							return yield* new StudioChatError({
 								message: "Sketchi sent an invalid response. Try again.",
 							});
 						if (
 							(event.type === "RUN_STARTED" || event.type === "RUN_FINISHED") &&
 							event.runId !== runId
 						)
-							throw new StudioChatError({
+							return yield* new StudioChatError({
 								message: "Sketchi sent an invalid response. Try again.",
 							});
 						if (event.type === "RUN_FINISHED" || event.type === "RUN_ERROR") ended = true;

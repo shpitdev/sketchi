@@ -1,6 +1,9 @@
+import { applyChatEvent, emptyChat } from "../../features/playground/chat-client";
+import { chatMessageViews } from "../../features/playground/chat-message";
+import { deriveBuildState } from "../../features/playground/build-result";
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Stream, Schema } from "effect";
-import { Chat, LanguageModel, Response, Tool, Toolkit } from "effect/ai";
+import { AgUi, IdGenerator, Chat, LanguageModel, Response, Tool, Toolkit } from "effect/ai";
 import { studioReplyStream, STUDIO_RAN_OUT_REPLY } from "./studio-reply.server";
 import type { StudioTurnOutcome } from "./studio-build-tool.server";
 
@@ -171,3 +174,54 @@ describe("Studio reply policy", () => {
 		}),
 	);
 });
+
+it.effect("keeps a repair tool after released text active in chronological assistant order", () =>
+	Effect.gen(function* () {
+		const spec = { title: "Review", nodes: { a: "Open", b: "Close" }, edges: [["a", "b"]] };
+		const source = Stream.fromIterable([
+			...text("I will draw this."),
+			Response.makePart("tool-call", {
+				id: "build-1",
+				name: "build_flowchart",
+				providerExecuted: false,
+				params: { spec },
+			}),
+			Response.makePart("tool-result", {
+				id: "build-1",
+				name: "build_flowchart",
+				providerExecuted: false,
+				isFailure: false,
+				preliminary: false,
+				result: { ok: false },
+				encodedResult: { ok: false },
+			}),
+			finish("tool-calls"),
+			Response.makePart("tool-params-start", {
+				id: "build-2",
+				name: "build_flowchart",
+				providerExecuted: false,
+			}),
+			Response.makePart("tool-params-delta", { id: "build-2", delta: JSON.stringify({ spec }) }),
+		]);
+		const events = yield* studioReplyStream({
+			run: () => source,
+			outcome: Effect.succeed(noBuild),
+		}).pipe(
+			AgUi.fromStreamParts,
+			Stream.provideService(IdGenerator.IdGenerator, {
+				generateId: () => Effect.succeed("result"),
+			}),
+			Stream.runCollect,
+		);
+		const state = events.reduce((state, event) => applyChatEvent(state, event, "run"), emptyChat);
+		const views = chatMessageViews(state.messages, state.completed);
+		const build = deriveBuildState(views, true);
+		expect(views.map((view) => view.parts[0]?.type)).toEqual([
+			"tool-build_flowchart",
+			"text",
+			"tool-build_flowchart",
+		]);
+		expect(build.activePart?.toolCallId).toBe("build-2");
+		expect(build.ghostLabels).toEqual(["Open", "Close"]);
+	}),
+);

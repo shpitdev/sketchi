@@ -7,9 +7,10 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 const chat = vi.hoisted(() => ({
 	messages: [] as ChatMessage[],
 	status: "ready" as ChatStatus,
-	error: undefined as Error | undefined,
+	error: undefined as string | undefined,
 	sendMessage: vi.fn(),
 	stop: vi.fn(),
+	retry: vi.fn(),
 }));
 vi.mock("./chat-client", () => ({ useStudioChat: () => chat }));
 vi.mock("@excalidraw/excalidraw", () => ({
@@ -138,11 +139,13 @@ describe("streaming workspace", () => {
 		expect(chat.stop).toHaveBeenCalledOnce();
 
 		chat.status = "error";
-		chat.error = new Error("Network request failed");
+		chat.error = "Network request failed. Try again.";
 		rerender(<Studio />);
 		expect(screen.getByRole("alert")).toBe(alert);
-		expect(alert.textContent).toContain("couldn’t finish");
+		expect(alert.textContent).toContain(chat.error);
 		expect(alert.getBoundingClientRect().height).toBeGreaterThan(1);
+		fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+		expect(chat.retry).toHaveBeenCalledOnce();
 		fireEvent.click(screen.getByRole("button", { name: "Reply in conversation" }));
 		await frame();
 		expect(document.activeElement).toBe(screen.getByRole("textbox"));
