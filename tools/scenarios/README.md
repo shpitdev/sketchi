@@ -375,9 +375,9 @@ keeps Nx task output out of stdout:
 
 ```sh
 pnpm nx build diagram-scenarios
-node packages/diagram/scenarios/dist/cli.js --list
-node packages/diagram/scenarios/dist/cli.js --scenario incident-escalation --input flowchart-execute.json
-node packages/diagram/scenarios/dist/cli.js --scenario checkout-payment-sequence --input sequence-execute.json
+node tools/scenarios/dist/cli.js --list
+node tools/scenarios/dist/cli.js --scenario incident-escalation --input flowchart-execute.json
+node tools/scenarios/dist/cli.js --scenario checkout-payment-sequence --input sequence-execute.json
 ```
 
 `--list` prints a JSON array with `id`, `diagramType`, `title`, `description`,

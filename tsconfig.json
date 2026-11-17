@@ -9,7 +9,7 @@
       "path": "./packages/drawing"
     },
     {
-      "path": "./packages/diagram/scenarios"
+      "path": "./tools/scenarios"
     },
     {
       "path": "./packages/observability"

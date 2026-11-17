@@ -46,10 +46,8 @@ const config: StorybookConfig = {
 			).pathname,
 			"@sketchi/drawing": new URL("../../../../packages/drawing/src/index.ts", import.meta.url)
 				.pathname,
-			"@sketchi/diagram-scenarios": new URL(
-				"../../../../packages/diagram/scenarios/src/index.ts",
-				import.meta.url,
-			).pathname,
+			"@sketchi/diagram-scenarios": new URL("../../../scenarios/src/index.ts", import.meta.url)
+				.pathname,
 			"@sketchi/editor/styles.css": new URL(
 				"../../../../packages/editor/src/styles.css",
 				import.meta.url,

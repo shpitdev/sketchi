@@ -34,7 +34,7 @@
       "path": "../../packages/icons/community/tsconfig.lib.json"
     },
     {
-      "path": "../../packages/diagram/scenarios/tsconfig.lib.json"
+      "path": "../../tools/scenarios/tsconfig.lib.json"
     }
   ]
 }

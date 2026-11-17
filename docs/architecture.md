@@ -37,7 +37,7 @@ from `tools/ops/src/workers.ts`. Operator commands (`pnpm ops`, `pnpm ci:local`,
 | Excalidraw          | `packages/drawing`            | deterministic conversion and real-scene validation                               |
 | Model generation    | `packages/diagrams/src/generate`            | typed provider service, retry, timeout, decode, and candidate summaries          |
 | Product build       | `packages/diagrams/src/build`                 | canonical normalize, validate, quality, render, export, and artifact transaction |
-| Scenario evaluation | `packages/diagram/scenarios`             | maintained scenarios, pure grading, and internal Effect tooling                  |
+| Scenario evaluation | `tools/scenarios`                        | maintained scenarios, pure grading, and internal Effect tooling                  |
 | Icon catalog        | `packages/icons/catalog`                 | icon manifest, ranked search, SVG sources, and node-logo eligibility             |
 | Icon drawing        | `packages/icons/draw`                    | a logo in, a judged hand-drawn recipe out: author rounds, renders, and the judge |
 | Studio persistence  | `apps/studio/src/features/projects`      | typed ownership and scoped R2 persistence services                               |

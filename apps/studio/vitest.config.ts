@@ -64,8 +64,7 @@ export default defineConfig({
 			},
 			{
 				find: "@sketchi/diagram-scenarios",
-				replacement: new URL("../../packages/diagram/scenarios/src/index.ts", import.meta.url)
-					.pathname,
+				replacement: new URL("../../tools/scenarios/src/index.ts", import.meta.url).pathname,
 			},
 			{
 				find: "@sketchi/editor/styles.css",

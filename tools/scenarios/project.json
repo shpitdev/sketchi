@@ -1,0 +1,58 @@
+{
+	"name": "diagram-scenarios",
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"sourceRoot": "tools/scenarios/src",
+	"projectType": "library",
+	"tags": ["scope:package", "type:eval"],
+	"targets": {
+		"build": {
+			"executor": "nx:run-commands",
+			"outputs": ["{projectRoot}/dist"],
+			"options": {
+				"commands": [
+					"effect-tsgo tsc@7.0.2 -p tools/scenarios/tsconfig.lib.json",
+					"vite build --config tools/scenarios/vite.config.ts"
+				],
+				"parallel": false
+			}
+		},
+		"scenario": {
+			"executor": "nx:run-commands",
+			"dependsOn": ["build"],
+			"options": {
+				"command": "node tools/scenarios/dist/cli.js"
+			}
+		},
+		"test": {
+			"executor": "nx:run-commands",
+			"outputs": ["{workspaceRoot}/coverage/tools/scenarios"],
+			"options": {
+				"command": "vitest run --config tools/scenarios/vitest.config.mts"
+			}
+		},
+		"typecheck": {
+			"executor": "nx:run-commands",
+			"options": {
+				"commands": [
+					"effect-tsgo tsc@7.0.2 -p tools/scenarios/tsconfig.spec.json --noEmit",
+					"effect-tsgo tsc@7.0.2 -p tools/scenarios/tsconfig.lib.json --noEmit"
+				],
+				"parallel": false
+			}
+		},
+		"check-scenario": {
+			"executor": "nx:run-commands",
+			"cache": true,
+			"inputs": ["production", "^production"],
+			"outputs": [],
+			"dependsOn": ["build"],
+			"options": {
+				"commands": [
+					"node tools/scenarios/dist/cli.js --list",
+					"node tools/scenarios/dist/cli.js --scenario sketchi-onboarding-decision-flow --fixture"
+				],
+				"parallel": false
+			}
+		}
+	}
+}
