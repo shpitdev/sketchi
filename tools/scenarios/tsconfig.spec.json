@@ -4,7 +4,7 @@
     "types": ["vitest/globals", "node"],
     "composite": false,
     "noEmit": true,
-    "rootDir": "../../..",
+    "rootDir": "../..",
     "tsBuildInfoFile": "dist/tsconfig.spec.tsbuildinfo"
   },
   "include": ["src/**/*.ts", "src/**/*.test.ts", "src/**/*.d.ts"]

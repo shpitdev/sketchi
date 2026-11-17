@@ -22,10 +22,7 @@ export default defineConfig({
 				.pathname,
 			"@sketchi/observability": new URL("../packages/observability/src/index.ts", import.meta.url)
 				.pathname,
-			"@sketchi/diagram-scenarios": new URL(
-				"../packages/diagram/scenarios/src/index.ts",
-				import.meta.url,
-			).pathname,
+			"@sketchi/diagram-scenarios": new URL("./scenarios/src/index.ts", import.meta.url).pathname,
 		},
 	},
 	test: {

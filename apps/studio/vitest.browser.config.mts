@@ -39,7 +39,7 @@ export default defineConfig({
 			},
 			{
 				find: "@sketchi/diagram-scenarios",
-				replacement: source("../../packages/diagram/scenarios/src/index.ts"),
+				replacement: source("../../tools/scenarios/src/index.ts"),
 			},
 			{
 				find: "@sketchi/editor/styles.css",

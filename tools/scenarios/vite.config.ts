@@ -11,8 +11,8 @@ const external = Object.keys(manifest.dependencies).filter((name) => !name.start
 
 export default defineConfig({
 	build: {
-		ssr: "packages/diagram/scenarios/src/cli.ts",
-		outDir: "packages/diagram/scenarios/dist",
+		ssr: "tools/scenarios/src/cli.ts",
+		outDir: "tools/scenarios/dist",
 		emptyOutDir: false,
 		target: "node24",
 		minify: false,

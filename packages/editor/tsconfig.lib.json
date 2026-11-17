@@ -21,7 +21,7 @@
       "path": "../icons/catalog/tsconfig.lib.json"
     },
     {
-      "path": "../diagram/scenarios/tsconfig.lib.json"
+      "path": "../../tools/scenarios/tsconfig.lib.json"
     }
   ]
 }

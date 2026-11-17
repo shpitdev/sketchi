@@ -71,7 +71,7 @@ prompt ─▶ model candidate ─▶ typed diagram ─▶ deterministic layout �
 | `packages/diagrams`          | family contracts, layout, readout, shared graph, build and generation    |
 | `packages/cloudflare`        | concrete shared AI Gateway binding adapter                             |
 | `packages/drawing` | Excalidraw conversion, real-scene validation and SVG import             |
-| `packages/diagram/scenarios`  | maintained scenarios and the scenario CLI                               |
+| `tools/scenarios`             | maintained scenarios and the scenario CLI                               |
 | `packages/editor`         | native React drawing editor; family compositions live in tools/storybook   |
 | `packages/icons/*`            | the icon catalog and search, community icons, and hand-drawn logos      |
 | `packages/observability`      | span telemetry for every Worker request                                 |
@@ -111,7 +111,7 @@ A CLI change that should ship gets a changeset (`pnpm changeset`); merging the
 Version Packages pull request publishes it.
 
 Graded evals run outside this repository against the scenarios in
-`packages/diagram/scenarios`. `pnpm sanity` runs three end-to-end checks
+`tools/scenarios`. `pnpm sanity` runs three end-to-end checks
 against production or a preview.
 
 ## Deployment

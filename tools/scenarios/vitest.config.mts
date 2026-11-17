@@ -2,12 +2,15 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig(() => ({
 	root: import.meta.dirname,
-	cacheDir: "../../../node_modules/.vite/packages/diagram/scenarios",
+	cacheDir: "../../node_modules/.vite/tools/scenarios",
 	resolve: {
 		alias: {
-			"@sketchi/diagrams": new URL("../../diagrams/src/", import.meta.url).pathname.slice(0, -1),
+			"@sketchi/diagrams": new URL("../../packages/diagrams/src/", import.meta.url).pathname.slice(
+				0,
+				-1,
+			),
 			"@sketchi/drawing/excalidraw": new URL(
-				"../../drawing/src/excalidraw/index.ts",
+				"../../packages/drawing/src/excalidraw/index.ts",
 				import.meta.url,
 			).pathname,
 		},
@@ -23,7 +26,7 @@ export default defineConfig(() => ({
 		testTimeout: 60_000,
 		reporters: ["default"],
 		coverage: {
-			reportsDirectory: "../../../coverage/packages/diagram/scenarios",
+			reportsDirectory: "../../coverage/tools/scenarios",
 			provider: "v8",
 		},
 	},

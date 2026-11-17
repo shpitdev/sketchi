@@ -604,7 +604,7 @@ importers:
     devDependencies:
       '@sketchi/diagram-scenarios':
         specifier: workspace:*
-        version: link:../../packages/diagram/scenarios
+        version: link:../../tools/scenarios
       '@tailwindcss/vite':
         specifier: 4.3.3
         version: 4.3.3(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))
@@ -645,30 +645,6 @@ importers:
       effect:
         specifier: 'catalog:'
         version: 4.1.4
-
-  packages/diagram/scenarios:
-    dependencies:
-      '@effect/platform-node':
-        specifier: 'catalog:'
-        version: 4.1.4(effect@4.1.4)(redis@6.3.0(@node-rs/xxhash@1.7.8)(@opentelemetry/api@1.10.0))
-      '@excalidraw/excalidraw':
-        specifier: 0.18.1
-        version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@sketchi/diagrams':
-        specifier: workspace:*
-        version: link:../../diagrams
-      '@sketchi/drawing':
-        specifier: workspace:*
-        version: link:../../drawing
-      '@sketchi/icon-catalog':
-        specifier: workspace:*
-        version: link:../../icons/catalog
-      effect:
-        specifier: 'catalog:'
-        version: 4.1.4
-      linkedom:
-        specifier: 0.18.14
-        version: 0.18.14
 
   packages/diagrams:
     dependencies:
@@ -745,7 +721,7 @@ importers:
     devDependencies:
       '@sketchi/diagram-scenarios':
         specifier: workspace:*
-        version: link:../diagram/scenarios
+        version: link:../../tools/scenarios
       '@sketchi/diagrams':
         specifier: workspace:*
         version: link:../diagrams
@@ -896,6 +872,30 @@ importers:
       '@sketchi/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
+      linkedom:
+        specifier: 0.18.14
+        version: 0.18.14
+
+  tools/scenarios:
+    dependencies:
+      '@effect/platform-node':
+        specifier: 'catalog:'
+        version: 4.1.4(effect@4.1.4)(redis@6.3.0(@node-rs/xxhash@1.7.8)(@opentelemetry/api@1.10.0))
+      '@excalidraw/excalidraw':
+        specifier: 0.18.1
+        version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@sketchi/diagrams':
+        specifier: workspace:*
+        version: link:../../packages/diagrams
+      '@sketchi/drawing':
+        specifier: workspace:*
+        version: link:../../packages/drawing
+      '@sketchi/icon-catalog':
+        specifier: workspace:*
+        version: link:../../packages/icons/catalog
       effect:
         specifier: 'catalog:'
         version: 4.1.4

@@ -27,7 +27,7 @@ document builds without requiring particular source, story or test filenames.
 | Studio chat | The family's `tool-<toolName>` entry in `BUILD_TOOLS` (`apps/studio/src/features/chat/build-result.ts`) and its line in the chat policy (`packages/diagrams/src/build/policy.ts`). | review; the chat agent test covers only the tool list |
 | CLI | `sketchi create`, `generate --type` and the offline builder read the registry. Add a changeset for `@sketchi/cli`. | offline-build pipeline, CLI behavior tests |
 | generate API request | `POST /api/v1/generate` decodes `GenerateRequest` (`packages/diagrams/src/generate/contract.ts`), whose `type` is any of `DIAGRAM_TYPES`, in `apps/studio/src/features/generate/api.server.ts`. | request schema |
-| maintained scenarios | `packages/diagram/scenarios`: scenarios with checks scored on the model's own diagram, registered in `diagramScenarios` or the reliability scenarios. | scenario regressions and Frontierclimb |
+| maintained scenarios | `tools/scenarios`: scenarios with checks scored on the model's own diagram, registered in `diagramScenarios` or the reliability scenarios. | scenario regressions and Frontierclimb |
 | Storybook story | `tools/storybook/families/<name>.stories.tsx`. | Storybook build and review |
 
 The offline-build pipeline parses document JSON through the CLI, builds it with

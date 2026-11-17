@@ -23,8 +23,10 @@ const config: StorybookConfig = {
 				"../../drawing/src/excalidraw/index.ts",
 				import.meta.url,
 			).pathname,
-			"@sketchi/diagram-scenarios": new URL("../../diagram/scenarios/src/index.ts", import.meta.url)
-				.pathname,
+			"@sketchi/diagram-scenarios": new URL(
+				"../../../tools/scenarios/src/index.ts",
+				import.meta.url,
+			).pathname,
 		};
 
 		return config;

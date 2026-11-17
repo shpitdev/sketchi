@@ -12,13 +12,13 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
-      "path": "../../icons/catalog/tsconfig.lib.json"
+      "path": "../../packages/icons/catalog/tsconfig.lib.json"
     },
     {
-      "path": "../../diagrams/tsconfig.lib.json"
+      "path": "../../packages/diagrams/tsconfig.lib.json"
     },
     {
-      "path": "../../drawing/tsconfig.lib.json"
+      "path": "../../packages/drawing/tsconfig.lib.json"
     }
   ]
 }
