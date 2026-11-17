@@ -13,13 +13,14 @@ import { families, familyForType } from "@sketchi/diagrams/family";
 import { type BuildFlowchartResult } from "@sketchi/diagrams/families/flowchart/build";
 import { type FlowchartDocument } from "@sketchi/diagrams/families/flowchart/document";
 import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
-import { Deferred, Effect, Schema, Stream } from "effect";
+import { Deferred, Duration, Effect, Exit, Layer, Schema, Scope, Stream } from "effect";
 import { AgUiSchema, LanguageModel, Response as AiResponse } from "effect/ai";
+import { TestClock } from "effect/testing";
 
 import { runPlaygroundEffect } from "../../../server/runtime.server";
 import { handleStudioAgentRequest } from "../agent.server";
 import { toAgUiMessages, type ChatMessage } from "../chat-message";
-import { PlaygroundAiModel } from "../model.server";
+import { PlaygroundAiModel, STUDIO_MODEL_IDLE_TIMEOUT } from "../model.server";
 import { makeStudioFlowchartToolExecutor } from "../studio-build-policy.server";
 import { attemptLimitIssue, turnAlreadyAcceptedIssue } from "../studio-build-tool.server";
 import { MAX_CHAT_TOTAL_CHARACTERS, studioChatRequestMessages } from "../studio-chat-request";
@@ -459,6 +460,103 @@ it.each(["request", "response body"])(
 		await body;
 		expect(signal?.aborted).toBe(true);
 		expect(calls).toBe(1);
+	},
+);
+
+it.each(["response headers", "the next event"])(
+	"fails a model turn that stalls before %s, cancels the gateway, and lets each event reset the bound",
+	async (stall) => {
+		const scope = Effect.runSync(Scope.make());
+		const clock = await Effect.runPromise(Layer.buildWithScope(TestClock.layer(), scope));
+		const adjust = (duration: Duration.Input) =>
+			Effect.runPromise(TestClock.adjust(duration).pipe(Effect.provide(clock)));
+		const almost = Duration.subtract(STUDIO_MODEL_IDLE_TIMEOUT, Duration.seconds(1));
+		const encoder = new TextEncoder();
+		const requested = Deferred.makeUnsafe<void>();
+		const cancelled = Deferred.makeUnsafe<void>();
+		let push = (_value: unknown) => {};
+		let signal: AbortSignal | undefined;
+		let calls = 0;
+		const request = new Request("https://studio.test/api/studio/chat", {
+			method: "POST",
+			body: JSON.stringify({
+				threadId: "studio",
+				runId: "stall",
+				messages: [{ id: "u", role: "user", content: "Draw a flowchart" }],
+			}),
+		});
+		const response = await runPlaygroundEffect(
+			handleStudioAgentRequest(request).pipe(Effect.provide(clock)),
+			{
+				request,
+				platform: { waitUntilPromise: () => undefined },
+				env: {
+					AI: {
+						gateway: () => ({
+							getUrl: async () => "",
+							run: async (_data, options) => {
+								calls++;
+								signal = options?.signal;
+								Effect.runSync(Deferred.succeed(requested, undefined));
+								if (stall === "response headers") return new Promise<Response>(() => {});
+								return new Response(
+									new ReadableStream<Uint8Array>({
+										start(controller) {
+											push = (value) => controller.enqueue(encoder.encode(event(value)));
+										},
+										cancel() {
+											Effect.runSync(Deferred.succeed(cancelled, undefined));
+										},
+									}),
+									{ headers: { "content-type": "text/event-stream" } },
+								);
+							},
+						}),
+					},
+				},
+			},
+		);
+		const reader = response.body?.getReader();
+		if (!reader) throw new Error("Expected the chat response stream.");
+		const decoder = new TextDecoder();
+		let body = "";
+		let ended = false;
+		let changed = () => {};
+		const consumed = (async () => {
+			for (let next = await reader.read(); !next.done; next = await reader.read()) {
+				body += decoder.decode(next.value, { stream: true });
+				changed();
+			}
+			ended = true;
+			changed();
+		})();
+		const until = async (text: string) => {
+			while (!body.includes(text)) {
+				if (ended) throw new Error(`The stream ended before ${text}:\n${body}`);
+				await new Promise<void>((resolve) => (changed = resolve));
+			}
+		};
+		await Effect.runPromise(Deferred.await(requested));
+		if (stall === "the next event") {
+			const [added, ...rest] = toolEvents(partial, 1);
+			push(added);
+			await until('"type":"TOOL_CALL_START"');
+			// Active events keep a turn alive past the bound in total.
+			for (const delta of ["alpha", "bravo"]) {
+				await adjust(almost);
+				push({ ...rest[0], delta });
+				await until(delta);
+			}
+			expect(body).not.toContain('"type":"RUN_ERROR"');
+		}
+		await adjust(STUDIO_MODEL_IDLE_TIMEOUT);
+		await consumed;
+		expect(body).toContain('"type":"RUN_ERROR"');
+		expect(body).not.toContain('"type":"RUN_FINISHED"');
+		expect(signal?.aborted).toBe(true);
+		expect(calls).toBe(1);
+		if (stall === "the next event") await Effect.runPromise(Deferred.await(cancelled));
+		await Effect.runPromise(Scope.close(scope, Exit.void));
 	},
 );
 

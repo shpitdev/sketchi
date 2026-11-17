@@ -1,7 +1,7 @@
 import "@tanstack/react-start/server-only";
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai";
-import { Context, Effect, Layer, Schema } from "effect";
-import type { LanguageModel } from "effect/ai";
+import { Context, Duration, Effect, Layer, Schema, Stream } from "effect";
+import { AiError, type LanguageModel } from "effect/ai";
 import { HttpClient } from "effect/http";
 import { makeGatewayHttpClient } from "@sketchi/cloudflare/ai-gateway";
 import { DIAGRAM_AGENT_TEMPERATURE, MAX_AGENT_OUTPUT_TOKENS } from "@sketchi/diagrams/build/policy";
@@ -27,6 +27,19 @@ export class PlaygroundAiModel extends Context.Service<
 	}
 >()("@sketchi/playground/PlaygroundAiModel") {}
 
+/**
+ * A healthy response (reasoning effort none) streams events every few seconds, so this
+ * long without one means the provider stalled. Tools run outside this window.
+ */
+export const STUDIO_MODEL_IDLE_TIMEOUT = Duration.seconds(60);
+const stalled = () =>
+	AiError.make({
+		module: "StudioModel",
+		method: "createResponseStream",
+		reason: new AiError.InternalProviderError({
+			description: `No model output for ${Duration.format(STUDIO_MODEL_IDLE_TIMEOUT)}.`,
+		}),
+	});
 const createStudioModel = Effect.fn("playground.ai.model")(function* () {
 	const env = yield* PlaygroundBindings;
 	const metadata = yield* PlaygroundRequestMetadata;
@@ -64,12 +77,28 @@ const createStudioModel = Effect.fn("playground.ai.model")(function* () {
 	}).pipe(
 		Effect.provideService(OpenAiClient.OpenAiClient, {
 			...client,
+			// The idle bound covers the wait for headers and then each gap between events.
 			createResponseStream: (options) =>
-				client
-					.createResponseStream(options)
-					.pipe(
-						Effect.map(([response, stream]) => [response, preserveOutputLimit(stream)] as const),
+				client.createResponseStream(options).pipe(
+					Effect.timeoutOrElse({
+						duration: STUDIO_MODEL_IDLE_TIMEOUT,
+						orElse: () => Effect.fail(stalled()),
+					}),
+					Effect.map(
+						([response, stream]) =>
+							[
+								response,
+								preserveOutputLimit(
+									stream.pipe(
+										Stream.timeoutOrElse({
+											duration: STUDIO_MODEL_IDLE_TIMEOUT,
+											orElse: () => Stream.fail(stalled()),
+										}),
+									),
+								),
+							] as const,
 					),
+				),
 		}),
 	);
 });
