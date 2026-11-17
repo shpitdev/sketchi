@@ -24,7 +24,7 @@ as its build system.
 
 Studio Stop disposition (2026-11-16): closed as a Preview-platform symptom, not a code regression.
 
-Worker Previews do not deliver client disconnect to the Worker, so Stop/cancellation cannot be verified on a Preview.
+Studio chat Stop/cancellation could not be verified on a Preview; the diagnosis attributed this to Previews not delivering the client disconnect to the Worker. A later MCP preview run did see a transport close interrupt the host `execute` spans, so this is not a rule for every Preview request. Chat Stop still needs the production check in the [plan](plans/product-structure.md#studio-stop-disposition--2026-11-16).
 
 ## Data isolation
 
