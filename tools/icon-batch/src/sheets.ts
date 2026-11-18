@@ -1,7 +1,7 @@
 /* oxlint-disable no-restricted-imports -- The offline batch review command combines local previews into sheet artifacts. */
-
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+/* oxlint-enable no-restricted-imports */
 import { join } from "node:path";
 
 import { svgPng, initializeResvg } from "./excalidraw-export";

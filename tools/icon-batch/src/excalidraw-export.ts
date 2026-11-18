@@ -3,9 +3,10 @@
  * service's harness page does with a browser canvas. The DOM it needs is the
  * CLI's headless PNG export setup (apps/cli/src/render/png-renderer-runtime.ts).
  */
-// oxlint-disable-next-line no-restricted-imports -- The native canvas adapter loads local font assets for offline Excalidraw export.
+/* oxlint-disable no-restricted-imports -- The native canvas adapter resolves the installed Excalidraw and resvg packages and loads their local font and WASM assets for offline export. */
 import { readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+/* oxlint-enable no-restricted-imports */
 import { dirname, join } from "node:path";
 
 import type { IconScene } from "@sketchi/icon-draw";

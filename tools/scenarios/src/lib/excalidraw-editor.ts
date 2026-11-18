@@ -1,3 +1,4 @@
+// oxlint-disable-next-line no-restricted-imports -- The Node editor shim resolves the installed Excalidraw bundle and registers its loader hooks.
 import { createRequire, registerHooks } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";

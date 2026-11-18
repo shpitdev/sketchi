@@ -188,11 +188,19 @@
 			}
 		},
 		{
-			// Node programs: path, os, url and zlib are pure helpers; the I/O modules are banned by name.
+			// Node programs: path, os, url and zlib are pure helpers; the I/O modules and the Node loaders that reach them are banned.
 			"files": ["apps/cli/src/**", "tools/*/src/**"],
 			"excludeFiles": ["**/tests/**"],
 			"rules": {
 				"effecttsgo/node-builtin-import": "off",
+				"eslint/no-restricted-properties": [
+					"error",
+					{
+						"object": "process",
+						"property": "getBuiltinModule",
+						"message": "getBuiltinModule loads Node I/O modules around the import bans."
+					}
+				],
 				"eslint/no-restricted-imports": [
 					"error",
 					{
@@ -206,7 +214,11 @@
 							{ "name": "node:child_process", "message": "Use Effect ChildProcess." },
 							{ "name": "node:http", "message": "Use Effect HttpClient or HttpServer." },
 							{ "name": "node:https", "message": "Use Effect HttpClient or HttpServer." },
-							{ "name": "node:net", "message": "Use an Effect platform service." }
+							{ "name": "node:net", "message": "Use an Effect platform service." },
+							{
+								"name": "node:module",
+								"message": "createRequire loads Node I/O modules around these bans; resolve paths with import.meta.resolve."
+							}
 						],
 						"patterns": [
 							{

@@ -114,8 +114,10 @@ Three scopes are configured once, each with its reason beside it in
   Node modules, fetch and construct promises.
 - Node programs (`apps/cli/src`, `tools/*/src`) may import pure Node helpers such
   as `node:path`, `node:os`, `node:url` and `node:zlib`. Oxlint bans `node:fs`,
-  `node:fs/promises`, `node:child_process`, `node:http`, `node:https` and
-  `node:net` there. Worker code keeps every Node built-in import an error.
+  `node:fs/promises`, `node:child_process`, `node:http`, `node:https`,
+  `node:net` and the loaders that reach them (`node:module`,
+  `process.getBuiltinModule`) there. Worker code keeps every Node built-in
+  import an error.
 
 Elsewhere, use `@effect-diagnostics-next-line rule:off -- <concrete reason>` for
 a necessary host call or deliberate synchronous boundary, and
