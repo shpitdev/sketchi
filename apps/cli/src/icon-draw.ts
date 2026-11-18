@@ -7,8 +7,8 @@ import {
 	IconDrawHttpApi,
 	type IconDrawSuccess,
 } from "@sketchi/icon-draw/http-api";
-import { Clock, Duration, Effect, Result, Schedule } from "effect";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
+import { Clock, Duration, Effect, Result, Schedule, Stream } from "effect";
+import { FetchHttpClient, HttpClient, HttpClientError, HttpClientRequest } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
 
 import { publishIcon, type PublishedIcon } from "./community-client";
@@ -183,12 +183,30 @@ export const requestIconDraw = Effect.fn("sketchi.cli.icon.draw")(function* (inp
 	const http = yield* HttpClient.HttpClient;
 	const client = yield* HttpApiClient.makeWith(IconDrawHttpApi, {
 		httpClient: http.pipe(
-			HttpClient.mapRequest((request) =>
-				request.pipe(
-					HttpClientRequest.setUrl(input.endpoint),
-					HttpClientRequest.setHeader("x-sketchi-client", "sketchi-cli"),
-				),
-			),
+			HttpClient.mapRequestEffect((request) => {
+				const { body } = request;
+				if (body._tag !== "Uint8Array") {
+					return Effect.fail(
+						new HttpClientError.HttpClientError({
+							reason: new HttpClientError.EncodeError({
+								request,
+								description: "Icon draw requires an encoded JSON body.",
+							}),
+						}),
+					);
+				}
+				// Node Fetch silently resends replayable bodies after HTTP 421. Send the generated
+				// JSON as a one-shot upload so only our decoded 429 policy can issue another POST.
+				return Effect.succeed(
+					request.pipe(
+						HttpClientRequest.setUrl(input.endpoint),
+						HttpClientRequest.setHeader("x-sketchi-client", "sketchi-cli"),
+						HttpClientRequest.bodyStream(Stream.succeed(body.body), {
+							contentType: body.contentType,
+						}),
+					),
+				);
+			}),
 			HttpClient.withScope,
 		),
 	});
@@ -219,6 +237,7 @@ export const requestIconDraw = Effect.fn("sketchi.cli.icon.draw")(function* (inp
 		return { refusal, wait };
 	}).pipe(
 		Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
+		Effect.provideService(FetchHttpClient.StreamBodyFallback, "error"),
 		Effect.scoped,
 		Effect.timeoutOrElse({
 			duration: ICON_DRAW_ATTEMPT_TIMEOUT,

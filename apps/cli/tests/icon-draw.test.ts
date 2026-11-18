@@ -274,6 +274,25 @@ describe("sketchi icon draw", () => {
 		}
 	});
 
+	it("does not replay a 421 even when a second POST would succeed", async () => {
+		const root = await workspace();
+		await writeFile(join(root, "acme.svg"), SVG);
+		const draws = await serve(({ body }, response) => {
+			if (draws.seen.length === 1) {
+				response.statusCode = 421;
+				response.end("{}");
+				return;
+			}
+			response.end(JSON.stringify(drawn(String(body["name"]))));
+		});
+		const result = await runCli(
+			["icon", "draw", "acme.svg", "--endpoint", `${draws.origin}/draw`],
+			root,
+		);
+		expect(draws.seen).toHaveLength(1);
+		expect(result.code).toBe(12);
+	});
+
 	it.effect("times out a stalled draw body without repeating the paid POST", () =>
 		Effect.gen(function* () {
 			const reading = Promise.withResolvers<void>();
