@@ -13,12 +13,12 @@ function isDiagramsApi(pathname: string): boolean {
 }
 
 async function serveDiagramsApi(request: Request): Promise<Response> {
-	const [{ getPlaygroundRequestBoundary }, http, { runPlaygroundEffect }] = await Promise.all([
+	const [{ getStudioRequestBoundary }, http, { runStudioEffect }] = await Promise.all([
 		import("./server/cloudflare-bindings.server"),
 		import("./features/build/http.server"),
 		import("./server/runtime.server"),
 	]);
-	return runPlaygroundEffect(http.serveDiagramsApi(request), getPlaygroundRequestBoundary(request));
+	return runStudioEffect(http.serveDiagramsApi(request), getStudioRequestBoundary(request));
 }
 
 export default {

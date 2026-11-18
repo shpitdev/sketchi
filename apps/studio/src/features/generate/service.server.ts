@@ -32,7 +32,7 @@ import { Context, Effect, Layer } from "effect";
 import { aiEnvironment } from "../../server/ai-env.server";
 import { logosNamedIn } from "../build/icon-catalog.server";
 import type { StudioEnv } from "../../server/studio-env.server";
-import { PlaygroundBindings } from "../../server/context.server";
+import { StudioBindings } from "../../server/context.server";
 
 export interface GenerateDiagramServiceInput {
 	/** The current diagram a revision starts from, as canonical diagram JSON. */
@@ -42,20 +42,19 @@ export interface GenerateDiagramServiceInput {
 	readonly type?: DiagramGenerationType;
 }
 
-export interface PlaygroundGenerationShape {
+export interface StudioGenerationShape {
 	readonly generate: (
 		input: GenerateDiagramServiceInput,
-	) => Effect.Effect<DiagramGenerationCandidate, DiagramGenerationError, PlaygroundBindings>;
+	) => Effect.Effect<DiagramGenerationCandidate, DiagramGenerationError, StudioBindings>;
 	readonly defaultModel: (env: StudioEnv) => string;
 }
 
-export class PlaygroundGeneration extends Context.Service<
-	PlaygroundGeneration,
-	PlaygroundGenerationShape
->()("@sketchi/studio/PlaygroundGeneration") {}
+export class StudioGeneration extends Context.Service<StudioGeneration, StudioGenerationShape>()(
+	"@sketchi/studio/PlaygroundGeneration",
+) {}
 
-export const PlaygroundGenerationLive = Layer.effect(
-	PlaygroundGeneration,
+export const StudioGenerationLive = Layer.effect(
+	StudioGeneration,
 	Effect.gen(function* () {
 		const scope = yield* Effect.scope;
 		const clients = new WeakMap<
@@ -107,10 +106,10 @@ export const PlaygroundGenerationLive = Layer.effect(
 			return yield* client;
 		});
 
-		return PlaygroundGeneration.of({
+		return StudioGeneration.of({
 			defaultModel: (env) => aiEnvironment(env).generateModel,
 			generate: Effect.fn("playground.generation.generate")(function* (input) {
-				const env = yield* PlaygroundBindings;
+				const env = yield* StudioBindings;
 				const config = aiEnvironment(env);
 				const model =
 					input.model && !isLegacyCliDefaultModel(input.model) ? input.model : config.generateModel;

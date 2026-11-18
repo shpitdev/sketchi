@@ -3,7 +3,7 @@ import "@tanstack/react-start/server-only";
 import { DynamicWorkerExecutor } from "@cloudflare/codemode";
 import { ICON_DRAW_BUDGET_MS } from "@sketchi/icon-draw";
 import { Context, Effect, Layer, Schema } from "effect";
-import { PlaygroundBindings } from "../../server/context.server";
+import { StudioBindings } from "../../server/context.server";
 
 export interface SandboxResult {
 	readonly result: unknown;
@@ -28,7 +28,7 @@ export class CodeModeSandbox extends Context.Service<
 		readonly execute: (
 			code: string,
 			functions: SandboxFunctions,
-		) => Effect.Effect<SandboxResult, CodeModeExecutionError, PlaygroundBindings>;
+		) => Effect.Effect<SandboxResult, CodeModeExecutionError, StudioBindings>;
 	}
 >()("studio/CodeModeSandbox") {}
 
@@ -39,7 +39,7 @@ export class CodeModeSandbox extends Context.Service<
  */
 export const CodeModeSandboxLive = Layer.succeed(CodeModeSandbox, {
 	execute: Effect.fn("studio.mcp.sandbox")(function* (code, functions) {
-		const { LOADER: loader } = yield* PlaygroundBindings;
+		const { LOADER: loader } = yield* StudioBindings;
 		if (!loader)
 			return yield* new CodeModeExecutionError({
 				cause: undefined,

@@ -2,12 +2,8 @@ import { assert, describe, it } from "@effect/vitest";
 import type { TelemetrySpanRow } from "@sketchi/observability";
 import { Effect, Stream } from "effect";
 
-import {
-	PlaygroundBindings,
-	PlaygroundPlatformCallbacks,
-	PlaygroundRequestMetadata,
-} from "../context.server";
-import { runPlaygroundEffect } from "../runtime.server";
+import { StudioBindings, StudioPlatformCallbacks, StudioRequestMetadata } from "../context.server";
+import { runStudioEffect } from "../runtime.server";
 
 describe("Playground request runtime", () => {
 	it.effect("isolates bindings, metadata, and callbacks across concurrent requests", () =>
@@ -20,9 +16,9 @@ describe("Playground request runtime", () => {
 					release.resolve();
 				}
 				yield* Effect.promise(() => release.promise);
-				const bindings = yield* PlaygroundBindings;
-				const metadata = yield* PlaygroundRequestMetadata;
-				const platform = yield* PlaygroundPlatformCallbacks;
+				const bindings = yield* StudioBindings;
+				const metadata = yield* StudioRequestMetadata;
+				const platform = yield* StudioPlatformCallbacks;
 				return { bindings, metadata, platform };
 			});
 			const firstWaitUntil = () => undefined;
@@ -34,14 +30,14 @@ describe("Playground request runtime", () => {
 				headers: { "x-sketchi-trace-id": "trace-second" },
 			});
 			const [first, second] = await Promise.all([
-				runPlaygroundEffect(readRequestServices, {
+				runStudioEffect(readRequestServices, {
 					env: { SKETCHI_STUDIO_MODEL: "first-model" },
 					platform: {
 						waitUntilPromise: firstWaitUntil,
 					},
 					request: firstRequest,
 				}),
-				runPlaygroundEffect(readRequestServices, {
+				runStudioEffect(readRequestServices, {
 					env: { SKETCHI_STUDIO_MODEL: "second-model" },
 					platform: {
 						waitUntilPromise: secondWaitUntil,
@@ -75,7 +71,7 @@ describe("Playground request runtime", () => {
 			const lateAtSend: (typeof late)[] = [];
 			let source!: ReadableStreamDefaultController<Uint8Array>;
 			const handler = Effect.gen(function* () {
-				const platform = yield* PlaygroundPlatformCallbacks;
+				const platform = yield* StudioPlatformCallbacks;
 				platform.waitUntil(
 					Effect.promise(() => callbackRelease.promise).pipe(
 						Effect.andThen(Effect.logInfo("late callback")),
@@ -91,7 +87,7 @@ describe("Playground request runtime", () => {
 					{ headers: { "content-type": "text/event-stream" } },
 				);
 			});
-			const response = await runPlaygroundEffect(handler, {
+			const response = await runStudioEffect(handler, {
 				env: {
 					TELEMETRY_SPANS: {
 						send: (batch) => {
@@ -168,7 +164,7 @@ describe("Playground request runtime", () => {
 						)
 					: Effect.never;
 			const handler = Effect.gen(function* () {
-				const { request } = yield* PlaygroundRequestMetadata;
+				const { request } = yield* StudioRequestMetadata;
 				const context = yield* Effect.context<never>();
 				const events = Stream.make("data: one\n\n").pipe(
 					Stream.concat(Stream.fromEffect(model.pipe(Effect.withSpan("test.model")))),
@@ -184,7 +180,7 @@ describe("Playground request runtime", () => {
 			const consoleError = console.error;
 			console.error = (...args: unknown[]) => void late.push(args);
 			try {
-				const response = await runPlaygroundEffect(handler, {
+				const response = await runStudioEffect(handler, {
 					env: {
 						TELEMETRY_SPANS: {
 							send: (batch) => {

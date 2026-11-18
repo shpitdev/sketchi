@@ -16,14 +16,14 @@ import { McpProtocol, McpSchema, McpServer } from "effect/ai";
 import { HttpMiddleware, HttpRouter, HttpServer, HttpServerRequest } from "effect/http";
 import type { StudioEnv } from "../../server/studio-env.server";
 import {
-	PlaygroundBindings,
-	PlaygroundClockLive,
-	PlaygroundIdsLive,
-	PlaygroundRequestMetadata,
+	StudioBindings,
+	StudioClockLive,
+	StudioIdsLive,
+	StudioRequestMetadata,
 } from "../../server/context.server";
 import { correlationIdHeader } from "../../server/correlation.server";
 import { StudioBuildHostLive, StudioBuildRequestLive } from "../build/capabilities.server";
-import { PlaygroundCodeModeUsageLive } from "../build/usage-events.server";
+import { StudioCodeModeUsageLive } from "../build/usage-events.server";
 import { SKETCHI_CODE_MODE_VERSION, formatCodeModeDocs } from "./mcp-docs.server";
 import { CodeModeSandboxLive } from "./sandbox.server";
 import { SketchiToolkit, SketchiToolHandlers } from "./toolkit.server";
@@ -79,9 +79,9 @@ function makeStudioMcpHandler(origin: string | null, env: StudioEnv): McpWebHand
 		Layer.provideMerge(
 			Layer.mergeAll(
 				StudioBuildHostLive,
-				PlaygroundClockLive,
-				PlaygroundIdsLive,
-				PlaygroundCodeModeUsageLive,
+				StudioClockLive,
+				StudioIdsLive,
+				StudioCodeModeUsageLive,
 				CodeModeSandboxLive,
 			),
 		),
@@ -94,7 +94,7 @@ function makeStudioMcpHandler(origin: string | null, env: StudioEnv): McpWebHand
 		middleware: (effect) =>
 			Effect.gen(function* () {
 				const target = yield* StudioMcpExport;
-				const metadata = yield* PlaygroundRequestMetadata;
+				const metadata = yield* StudioRequestMetadata;
 				const request = yield* HttpServerRequest.HttpServerRequest;
 				return yield* effect.pipe(
 					Effect.tap((response) =>
@@ -125,8 +125,8 @@ function makeStudioMcpHandler(origin: string | null, env: StudioEnv): McpWebHand
 			const url = new URL(request.url);
 			return runtime.handler(
 				request,
-				Context.make(PlaygroundBindings, env).pipe(
-					Context.add(PlaygroundRequestMetadata, {
+				Context.make(StudioBindings, env).pipe(
+					Context.add(StudioRequestMetadata, {
 						request,
 						method: request.method,
 						origin: url.origin,

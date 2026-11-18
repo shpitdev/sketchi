@@ -5,7 +5,7 @@ import { type OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";
 import "@tanstack/react-start/server-only";
 import { buildResponse, bindBuild } from "@sketchi/diagrams/build";
 import { toCodeModeJsonSchema } from "@sketchi/diagrams/build/contract";
-import type { PlaygroundCallbackEffect } from "../../server/runtime.server";
+import type { StudioCallbackEffect } from "../../server/runtime.server";
 import {
 	makeStudioFlowchartToolExecutor,
 	makeStudioSequenceToolExecutor,
@@ -21,7 +21,7 @@ function buildTool<Output>(
 		readonly contracts: { readonly output: Schema.Codec<Output, unknown> };
 		readonly docs: { readonly toolDescription: string; readonly toolName: string };
 	},
-	executor: { readonly execute: (input: unknown) => PlaygroundCallbackEffect<Output> },
+	executor: { readonly execute: (input: unknown) => StudioCallbackEffect<Output> },
 ) {
 	const tool = Tool.dynamic(family.docs.toolName, {
 		description: family.docs.toolDescription,

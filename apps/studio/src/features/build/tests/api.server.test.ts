@@ -13,7 +13,7 @@ import {
 import { CANVAS_LIMITS } from "@sketchi/drawing";
 
 import { type StudioEnv } from "../../../server/studio-env.server";
-import { runPlaygroundEffect } from "../../../server/runtime.server";
+import { runStudioEffect } from "../../../server/runtime.server";
 import { USAGE_EVENT_ATTRIBUTE, USAGE_ISSUES_ATTRIBUTE } from "../usage-events.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
@@ -30,7 +30,7 @@ function testBoundary(env: StudioEnv, request: Request) {
 
 /** Every route goes through the native diagrams API, as the Worker serves it. */
 function serve(env: StudioEnv, request: Request) {
-	return runPlaygroundEffect(serveDiagramsApi(request), testBoundary(env, request));
+	return runStudioEffect(serveDiagramsApi(request), testBoundary(env, request));
 }
 
 const handleBuildFlowchartRequest = serve;

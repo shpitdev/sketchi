@@ -20,11 +20,11 @@ import { TooltipProvider } from "@sketchi/ui/components/tooltip";
 import {
 	ArtifactActions,
 	AssistantFollowUp,
-	PlaygroundComposer,
-	PlaygroundIntro,
-	PlaygroundStarters,
+	StudioComposer,
+	StudioIntro,
+	StudioStarters,
 	assistantAsksQuestion,
-	type ReadyPlaygroundArtifact,
+	type ReadyStudioArtifact,
 } from "@/features/chat/surface";
 import {
 	deriveBuildState,
@@ -147,7 +147,7 @@ function DiagramStage({
 	onCompose,
 	onStop,
 }: {
-	artifact: ReadyPlaygroundArtifact | null;
+	artifact: ReadyStudioArtifact | null;
 	pending: boolean;
 	generating: boolean;
 	ghostLabels: string[];
@@ -328,8 +328,8 @@ function StudioRoute() {
 						    prompt swaps the content around it without remounting the field. */}
 						{isEmpty ? (
 							<>
-								<PlaygroundIntro />
-								<PlaygroundStarters onSelect={send} />
+								<StudioIntro />
+								<StudioStarters onSelect={send} />
 							</>
 						) : (
 							<Conversation className="studio__conversation">
@@ -369,7 +369,7 @@ function StudioRoute() {
 							</Conversation>
 						)}
 
-						<PlaygroundComposer
+						<StudioComposer
 							buildMode={buildMode}
 							composerRef={composerRef}
 							onSubmit={handleSubmit}

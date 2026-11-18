@@ -35,11 +35,11 @@ export function logosWithSlugs(slugs: readonly string[]): NamedLogo[] {
 		}));
 }
 
-export interface PlaygroundAssetsBinding {
+export interface StudioAssetsBinding {
 	fetch(input: Request | URL | string, init?: RequestInit): Promise<Response>;
 }
 
-const catalogs = new WeakMap<PlaygroundAssetsBinding, Map<string, BuildIconCatalog>>();
+const catalogs = new WeakMap<StudioAssetsBinding, Map<string, BuildIconCatalog>>();
 
 /**
  * Node-logo catalog backed by the Worker's static assets. The manifest and the
@@ -48,10 +48,7 @@ const catalogs = new WeakMap<PlaygroundAssetsBinding, Map<string, BuildIconCatal
  * Assets are addressed at the request's own origin: deployed ASSETS ignores the
  * host, and the local Vite dev server rejects hosts it does not serve.
  */
-export function playgroundIconCatalog(
-	assets: PlaygroundAssetsBinding,
-	origin: string,
-): BuildIconCatalog {
+export function studioIconCatalog(assets: StudioAssetsBinding, origin: string): BuildIconCatalog {
 	const byOrigin = catalogs.get(assets) ?? new Map<string, BuildIconCatalog>();
 	catalogs.set(assets, byOrigin);
 	const cached = byOrigin.get(origin);

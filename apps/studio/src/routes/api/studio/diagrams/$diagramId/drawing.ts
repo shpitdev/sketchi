@@ -4,35 +4,29 @@ export const Route = createFileRoute("/api/studio/diagrams/$diagramId/drawing")(
 	server: {
 		handlers: {
 			GET: async ({ request }) => {
-				const [
-					{ getPlaygroundRequestBoundary },
-					{ runPlaygroundEffect },
-					{ handleStudioProjectsRequest },
-				] = await Promise.all([
-					import("@/server/cloudflare-bindings.server"),
-					import("@/server/runtime.server"),
-					import("@/features/projects/host.server"),
-				]);
+				const [{ getStudioRequestBoundary }, { runStudioEffect }, { handleStudioProjectsRequest }] =
+					await Promise.all([
+						import("@/server/cloudflare-bindings.server"),
+						import("@/server/runtime.server"),
+						import("@/features/projects/host.server"),
+					]);
 
-				return runPlaygroundEffect(
+				return runStudioEffect(
 					handleStudioProjectsRequest(request),
-					getPlaygroundRequestBoundary(request),
+					getStudioRequestBoundary(request),
 				);
 			},
 			PUT: async ({ request }) => {
-				const [
-					{ getPlaygroundRequestBoundary },
-					{ runPlaygroundEffect },
-					{ handleStudioProjectsRequest },
-				] = await Promise.all([
-					import("@/server/cloudflare-bindings.server"),
-					import("@/server/runtime.server"),
-					import("@/features/projects/host.server"),
-				]);
+				const [{ getStudioRequestBoundary }, { runStudioEffect }, { handleStudioProjectsRequest }] =
+					await Promise.all([
+						import("@/server/cloudflare-bindings.server"),
+						import("@/server/runtime.server"),
+						import("@/features/projects/host.server"),
+					]);
 
-				return runPlaygroundEffect(
+				return runStudioEffect(
 					handleStudioProjectsRequest(request),
-					getPlaygroundRequestBoundary(request),
+					getStudioRequestBoundary(request),
 				);
 			},
 		},

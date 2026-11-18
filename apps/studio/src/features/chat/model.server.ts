@@ -6,7 +6,7 @@ import { HttpClient } from "effect/http";
 import { makeGatewayHttpClient } from "@sketchi/cloudflare/ai-gateway";
 import { DIAGRAM_AGENT_TEMPERATURE, MAX_AGENT_OUTPUT_TOKENS } from "@sketchi/diagrams/build/policy";
 import { aiEnvironment } from "../../server/ai-env.server";
-import { PlaygroundBindings, PlaygroundRequestMetadata } from "../../server/context.server";
+import { StudioBindings, StudioRequestMetadata } from "../../server/context.server";
 import { preserveOutputLimit } from "./response-stream.server";
 
 export class StudioAiModelError extends Schema.TaggedError<
@@ -16,13 +16,13 @@ export class StudioAiModelError extends Schema.TaggedError<
 	cause: Schema.Defect(),
 	message: Schema.String,
 }) {}
-export class PlaygroundAiModel extends Context.Service<
-	PlaygroundAiModel,
+export class StudioAiModel extends Context.Service<
+	StudioAiModel,
 	{
 		readonly model: Effect.Effect<
 			LanguageModel.LanguageModel,
 			StudioAiModelError,
-			PlaygroundBindings | PlaygroundRequestMetadata
+			StudioBindings | StudioRequestMetadata
 		>;
 	}
 >()("@sketchi/studio/PlaygroundAiModel") {}
@@ -41,8 +41,8 @@ const stalled = () =>
 		}),
 	});
 const createStudioModel = Effect.fn("playground.ai.model")(function* () {
-	const env = yield* PlaygroundBindings;
-	const metadata = yield* PlaygroundRequestMetadata;
+	const env = yield* StudioBindings;
+	const metadata = yield* StudioRequestMetadata;
 	const config = aiEnvironment(env);
 	const gateway = yield* Effect.try({
 		try: () => {
@@ -102,6 +102,6 @@ const createStudioModel = Effect.fn("playground.ai.model")(function* () {
 		}),
 	);
 });
-export const PlaygroundAiModelLive = Layer.succeed(PlaygroundAiModel, {
+export const StudioAiModelLive = Layer.succeed(StudioAiModel, {
 	model: createStudioModel(),
 });

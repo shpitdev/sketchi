@@ -9,7 +9,7 @@ import {
 	savedLogoSlugs,
 } from "./studio-chat-request";
 import { chatMessageViews, messageText } from "./chat-message";
-import { PlaygroundAiModel } from "./model.server";
+import { StudioAiModel } from "./model.server";
 import { logosNamedIn, logosWithSlugs } from "../build/icon-catalog.server";
 import { readBoundedJson } from "../../server/request-body.server";
 import { makeStudioFamilyTools } from "./studio-family-tools.server";
@@ -38,7 +38,7 @@ const handle = Effect.fn("playground.http.chat")(function* (request: Request) {
 		JSON.stringify(body.messages).length > MAX_CHAT_TOTAL_CHARACTERS
 	)
 		return new Response("Chat messages exceed the conversation limit.", { status: 413 });
-	const model = yield* (yield* PlaygroundAiModel).model;
+	const model = yield* (yield* StudioAiModel).model;
 	const users = body.messages.filter((message) => message.role === "user");
 	const named = logosNamedIn(users.map(messageText).join("\n"));
 	const logos = [

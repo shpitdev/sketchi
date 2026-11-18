@@ -8,12 +8,12 @@ import type { TelemetryPipeline } from "@sketchi/observability";
 
 import type { CodeModePngRendererNamespace } from "../features/render/browser-renderer.server";
 import type { IconDrawBudgetNamespace } from "../features/icons/budget-object.server";
-import type { PlaygroundAssetsBinding } from "../features/build/icon-catalog.server";
+import type { StudioAssetsBinding } from "../features/build/icon-catalog.server";
 
 export interface StudioEnv {
 	/** Workers AI: the AI Gateway for generation, and `run` for Jev's family narrowing. */
 	AI?: CloudflareAiGatewayProvider & Partial<WorkersAiRunner>;
-	ASSETS?: PlaygroundAssetsBinding;
+	ASSETS?: StudioAssetsBinding;
 	CODEMODE_PNG_RENDERER?: CodeModePngRendererNamespace;
 	/** D1: the community icons the icons app publishes, which diagrams draw by slug. */
 	COMMUNITY_ICONS?: CommunityEnv["COMMUNITY_ICONS"];

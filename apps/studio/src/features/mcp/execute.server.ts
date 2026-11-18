@@ -35,14 +35,10 @@ import { normalizeCode } from "@cloudflare/codemode";
 import { CodeModeSandbox, CodeModeExecutionError, type SandboxFunctions } from "./sandbox.server";
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { drawIconForAgent } from "../icons/draw.server";
-import {
-	PlaygroundBindings,
-	PlaygroundClock,
-	PlaygroundRequestMetadata,
-} from "../../server/context.server";
+import { StudioBindings, StudioClock, StudioRequestMetadata } from "../../server/context.server";
 import { PNG_EXPORT_TIMEOUT_MS } from "../render/browser-render-pool.server";
 import { SKETCHI_EXECUTE_CODE_DESCRIPTION } from "./mcp-docs.server";
-import { PlaygroundCodeModeUsage } from "../build/usage-events.server";
+import { StudioCodeModeUsage } from "../build/usage-events.server";
 /**
  * A script's default PNGs share this budget, so execute stays responsive; an explicit
  * "png" in artifactFormats waits for the renderer's own PNG_EXPORT_TIMEOUT_MS instead.
@@ -396,9 +392,9 @@ function artifactDeliveryFrom(
 export const executeSketchiCodeMode = Effect.fn("studio.mcp.execute")(function* (
 	input: typeof ExecuteRequestSchema.Type,
 ) {
-	const clock = yield* PlaygroundClock;
-	const metadata = yield* PlaygroundRequestMetadata;
-	const usage = yield* PlaygroundCodeModeUsage;
+	const clock = yield* StudioClock;
+	const metadata = yield* StudioRequestMetadata;
+	const usage = yield* StudioCodeModeUsage;
 	const sandbox = yield* CodeModeSandbox;
 	const usageContext = yield* usage.createContext;
 	const startedAt = yield* clock.nowMillis;
@@ -515,7 +511,7 @@ const makeSketchiFunctions = Effect.fn("studio.mcp.functions")(function* (
 	deadline: number,
 ) {
 	const run = yield* FiberSet.runtimePromise(fibers)<
-		BuildServices | PlaygroundBindings | PlaygroundRequestMetadata
+		BuildServices | StudioBindings | StudioRequestMetadata
 	>();
 	const deliver = Effect.fn("studio.mcp.deliver")(function* <
 		A extends BuildResult | ApplyDiagramPatchResult,
