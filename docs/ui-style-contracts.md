@@ -11,7 +11,7 @@ import { cn } from "@sketchi/ui/lib/utils";
 ```
 
 `packages/ui/src/styles.css` imports Tailwind, `tw-animate-css` and the shared
-theme (`packages/editor/src/theme.css`), then maps shadcn's token names onto
+theme (`packages/editor-surface/src/theme.css`), then maps shadcn's token names onto
 the theme. The theme is imported into Tailwind's `base` layer, so utilities win
 over its element rules while each app's own unlayered stylesheet still wins over
 both. Each app imports that file first and adds `@source` for its own

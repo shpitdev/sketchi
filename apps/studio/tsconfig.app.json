@@ -25,7 +25,7 @@
       "path": "../../packages/icons/catalog/tsconfig.lib.json"
     },
     {
-      "path": "../../packages/editor/tsconfig.lib.json"
+      "path": "../../packages/editor-surface/tsconfig.lib.json"
     },
     {
       "path": "../../packages/drawing/tsconfig.lib.json"

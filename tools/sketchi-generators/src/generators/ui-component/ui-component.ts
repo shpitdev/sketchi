@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { type UiComponentGeneratorSchema } from "./schema";
 
-const DEFAULT_PROJECT_ROOT = "packages/editor";
+const DEFAULT_PROJECT_ROOT = "packages/editor-surface";
 const DEFAULT_DIRECTORY = "components";
 
 function appendExport(tree: Tree, indexPath: string, exportPath: string) {

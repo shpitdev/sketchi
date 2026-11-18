@@ -34,7 +34,7 @@ not ship as an Nx executor in this workspace, so `chromatic` is a small
 ## MCP
 
 `@storybook/addon-mcp` is installed and registered in
-`packages/editor/.storybook/main.ts`. When Storybook is running, the
+`packages/editor-surface/.storybook/main.ts`. When Storybook is running, the
 local MCP server is available at:
 
 ```sh
@@ -90,7 +90,7 @@ the token from Infisical rather than pasting it into a shell history:
 infisical run --env=staging --path=/github -- \
   pnpm exec chromatic \
     --storybook-build-dir storybook-static/editor-surface \
-    --storybook-config-dir packages/editor/.storybook \
-    --storybook-base-dir packages/editor \
+    --storybook-config-dir packages/editor-surface/.storybook \
+    --storybook-base-dir packages/editor-surface \
     --patch-build=chore/chromatic-storybook-contrast...main
 ```

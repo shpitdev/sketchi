@@ -7,9 +7,9 @@ export default defineConfig({
 		environment: "jsdom",
 		globals: true,
 		coverage: {
-			reportsDirectory: new URL("../../coverage/packages/editor", import.meta.url).pathname,
+			reportsDirectory: new URL("../../coverage/packages/editor-surface", import.meta.url).pathname,
 		},
-		include: ["packages/editor/src/tests/**/*.test.tsx"],
+		include: ["packages/editor-surface/src/tests/**/*.test.tsx"],
 		server: { deps: { inline: [/@excalidraw\/excalidraw/] } },
 		// Hang guard, not a speed budget: the full scenario suite renders every
 		// scenario in jsdom and runs several times slower on loaded CI runners.

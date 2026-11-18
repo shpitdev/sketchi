@@ -29,7 +29,7 @@ import { describe, expect, it } from "vitest";
  * That obligation is a per-copy fact, not a repo-root one, so it is asserted
  * per copy here.
  */
-const THEME_PACKAGE = "packages/editor";
+const THEME_PACKAGE = "packages/editor-surface";
 
 const THEME_CSS = `${THEME_PACKAGE}/src/theme.css`;
 
@@ -58,7 +58,8 @@ function themeConsumers(): string[] {
 
 			// @sketchi/ui's stylesheet imports the theme for its Tailwind apps.
 			return (
-				appCss.includes("editor/src/theme.css") || appCss.includes("packages/ui/src/styles.css")
+				appCss.includes("editor-surface/src/theme.css") ||
+				appCss.includes("packages/ui/src/styles.css")
 			);
 		})
 		.map((app) => `apps/${app}`)

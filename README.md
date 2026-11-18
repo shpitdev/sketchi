@@ -72,7 +72,7 @@ prompt ─▶ model candidate ─▶ typed diagram ─▶ deterministic layout �
 | `packages/cloudflare`        | concrete shared AI Gateway binding adapter                             |
 | `packages/drawing` | Excalidraw conversion, real-scene validation and SVG import             |
 | `tools/scenarios`             | maintained scenarios and the scenario CLI                               |
-| `packages/editor`             | reusable React drawing surface (Nx `editor-surface`)                    |
+| `packages/editor-surface`     | reusable React drawing surface (Nx `editor-surface`)                    |
 | `packages/icons/*`            | the icon catalog and search, community icons, and hand-drawn logos      |
 | `packages/observability`      | span telemetry for every Worker request                                 |
 | `packages/ui`                 | shadcn primitives and tokens for the Tailwind apps                      |
