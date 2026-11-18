@@ -27,7 +27,6 @@ export default defineConfig({
 			reportsDirectory: "../../coverage/apps/editor",
 		},
 		include: ["apps/editor/src/tests/**/*.test.{ts,tsx}"],
-		exclude: ["apps/editor/src/tests/**/*.browser.test.tsx"],
 	},
 	resolve: {
 		alias: aliases,

@@ -315,7 +315,7 @@ Remove unused dependencies and old architecture text after verifying consumers. 
 
 Use the repository's current `pnpm ci:local --no-signoff` before each implementation push, then `pnpm ci:local` on the pushed clean head. Refactor its overlapping compiler/project-inventory work in slices 1–2 only after the replacement proves build and diagnostic coverage. No new paid CI, preview queue or synthetic architecture test suite is part of this plan.
 
-Run affected browser, Storybook, corpus/fuzz and Worker dry-run targets when their actual inputs change. Use the real preview/local product page with `agent-browser` or the existing Browserbase integration, including persistence after reload and error/cancellation. Browserless unit tests do not prove hydration, editor interaction, Worker request isolation, service bindings or browser storage.
+Run affected Storybook, corpus/fuzz and Worker dry-run targets when their actual inputs change. Use `agent-browser` on the real preview/local product page to check affected behavior, including persistence after reload and error/cancellation. Browserless unit tests do not prove hydration, editor interaction, Worker request isolation, service bindings or browser storage.
 
 Before replacing an HTTP/MCP/chat runtime on production, require its real preview proof, actual data migration receipt if applicable, measured bundle/CPU/cold-start impact and the same Frontierclimb quality/cost comparison. A deployment proof records the deployed revision and actual successful request; a local build or in-memory protocol test is not production proof.
 

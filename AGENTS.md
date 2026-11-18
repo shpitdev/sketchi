@@ -128,9 +128,6 @@ fuzz runs that write caller-selected diagnostic paths use `--skip-nx-cache`.
 
 These larger suites remain local proof when their inputs change:
 
-- `pnpm nx affected -t test-browser --base=origin/main` (browser-mode suites in a
-  Browserbase remote browser; needs `BROWSERBASE_API_KEY` and
-  `BROWSERBASE_PROJECT_ID`; never run in CI)
 - `pnpm nx run drawing:corpus-renderer`
 - `pnpm nx run diagrams:gantt-fuzz` (300 plans per Gantt fuzz; the gate runs 4)
 - `pnpm nx run diagrams:chart-fuzz` (300 chart seeds; the gate runs 1–12 plus decimal seed 27)
@@ -165,7 +162,7 @@ Cloudflare Worker Previews are already in use; no platform migration is needed.
 
 For UI-affecting changes, verify the changed flow against the real page.
 
-For real-page checks, use `agent-browser` against the PR preview or production, headless (its default) or with `-p browserbase`. Never open a visible browser window on the owner's machine (`--headed` or any automation that pops up). A browser test that is genuinely valuable calls Browserbase over its API instead of a local browser; Vitest browser-mode suites do this through `tools/testing/browserbase.ts`.
+For real-page checks, use `agent-browser` against the PR preview or production, headless (its default) or with `-p browserbase`. Never open a visible browser window on the owner's machine (`--headed` or any automation that pops up).
 
 ## Temporary Artifacts
 

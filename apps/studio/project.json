@@ -54,12 +54,6 @@
 				"command": "vitest run --config apps/studio/vitest.config.ts"
 			}
 		},
-		"test-browser": {
-			"executor": "nx:run-commands",
-			"options": {
-				"command": "vitest run --config apps/studio/vitest.browser.config.mts"
-			}
-		},
 		"typecheck": {
 			"executor": "nx:run-commands",
 			"options": {

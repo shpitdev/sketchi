@@ -202,8 +202,7 @@
 							"^\\.\\./\\.\\./tools/ops/src/vite/client-server-boundary$",
 							"^\\.\\./\\.\\./tools/ops/src/workers$",
 							"^(\\.\\./){2,4}tools/ops/src/vite/excalidraw-fonts$",
-							"^\\.\\./\\.\\./tools/local-dev-ports$",
-							"^\\.\\./\\.\\./tools/testing/browserbase$"
+							"^\\.\\./\\.\\./tools/local-dev-ports$"
 						],
 						"depConstraints": [
 							{

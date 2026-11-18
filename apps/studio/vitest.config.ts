@@ -11,7 +11,6 @@ export default defineConfig({
 			reportsDirectory: "../../coverage/apps/studio",
 		},
 		include: ["apps/studio/src/**/*.test.ts", "apps/studio/src/**/*.test.tsx"],
-		exclude: ["apps/studio/src/**/*.browser.test.tsx"],
 		passWithNoTests: true,
 	},
 	resolve: {
