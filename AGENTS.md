@@ -65,9 +65,12 @@ most `<name>.test.ts`, `<name>-fuzz.test.ts` and `regressions.test.ts`, in a
   Preserve explicit assignments.
 - Messages between agents are at most five lines plus a file path.
 - Anything touching production, and any failed pre-deploy check, goes to Fable
-  first. Only the user or Fable starts a production deploy or merges a change
-  that publishes a package (`release.yml` publishes on a push that changes
-  `apps/cli/package.json`).
+  first. Only the user or Fable starts a production deploy, dispatches
+  `release.yml`, or merges a change that starts a release. On main, a push under
+  `.changeset/` runs `changesets.yml`, which merges the Version Packages PR and
+  dispatches `release.yml`; a push that changes `apps/cli/package.json` starts
+  `release.yml` directly. `release.yml` submits `npm publish` only for an untagged,
+  unpublished CLI version, and npm may hold it for 2FA approval.
 
 ## Proof
 
