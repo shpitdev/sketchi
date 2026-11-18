@@ -212,12 +212,9 @@ to the Cloudflare execution context where required.
 
 Nx and type-aware Oxlint enforce dependency direction, including imports from
 configuration and Storybook files. Existing schema, Promise misuse and React
-synchronization restrictions remain. Upstream native Effect diagnostics enforce the
-fixed correctness policy and report native-operation migration warnings across all
-project purposes. Converted scopes promote the native group to error. Reasoned local
-exceptions describe a real host requirement; exact Promise-site counts and Effect-free
-project inventories are not gates. Project/reference inventory normalization remains
-slice 2 work. Wrangler dry-runs cover every mapped Worker.
+synchronization restrictions remain. Effect diagnostics and their exceptions are
+described in [Diagnostics](effect-conventions.md#diagnostics). Wrangler dry-runs
+cover every mapped Worker.
 
 Meaningful changes run the full Nx typecheck/test/build graph, repository-wide
 type-aware Oxlint, the composite TypeScript build, Storybook,
