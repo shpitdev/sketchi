@@ -1,25 +1,11 @@
 import { sanitizeSvg, SVG_INPUT_MAX_BYTES } from "@sketchi/icon-catalog";
 import { Effect, Result, Schema } from "effect";
 
+import { ICON_IMAGE_MAX_BYTES, ICON_NAME_MAX_LENGTH, IconDrawRequestSchema } from "../contract";
 import { IconInputError } from "./errors";
 
-export const ICON_NAME_MAX_LENGTH = 48;
-/** Largest decoded raster accepted. */
-export const ICON_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
 export const ICON_IMAGE_MAX_SIDE = 4096;
 export const ICON_IMAGE_MIN_SIDE = 16;
-/** A request carries one SVG or one base64 raster; this bounds the JSON around it. */
-export const ICON_DRAW_REQUEST_MAX_BYTES = Math.ceil((ICON_IMAGE_MAX_BYTES * 4) / 3) + 64 * 1024;
-
-export const IconDrawRequestSchema = Schema.Struct({
-	name: Schema.String,
-	svg: Schema.optional(Schema.String),
-	/** A PNG, JPEG or WebP file as base64, or as a `data:` URL. */
-	image: Schema.optional(Schema.String),
-	/** The author model; omitted uses the service default. */
-	model: Schema.optional(Schema.String),
-});
-export interface IconDrawRequest extends Schema.Schema.Type<typeof IconDrawRequestSchema> {}
 
 export type RasterMimeType = "image/png" | "image/jpeg" | "image/webp";
 
@@ -169,7 +155,9 @@ const DATA_URL = /^data:([\w/+.-]+)?(;[\w=-]+)*;base64,/iu;
 
 /** Check a draw request and turn its logo into a safe, measured source. */
 export const prepareIconInput = Effect.fn("iconDraw.prepareInput")(function* (request: unknown) {
-	const decoded = Schema.decodeUnknownResult(IconDrawRequestSchema)(request);
+	const decoded = yield* Schema.decodeUnknownEffect(IconDrawRequestSchema)(request).pipe(
+		Effect.result,
+	);
 	if (Result.isFailure(decoded)) {
 		return yield* inputError(
 			"invalid_request",

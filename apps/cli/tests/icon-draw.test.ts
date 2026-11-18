@@ -5,11 +5,13 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "@effect/vitest";
-import { Effect, Fiber } from "effect";
+import { Effect, Fiber, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import { publishIcon } from "../src/community-client";
+import { LocalFileSystem } from "../src/filesystem";
+import { requestIconDraw } from "../src/icon-draw";
 
 const binary = resolve(process.cwd(), "apps/cli/dist/sketchi.js");
 const testParent = resolve(process.cwd(), ".memory/cli-icon-tests");
@@ -17,6 +19,11 @@ const testParent = resolve(process.cwd(), ".memory/cli-icon-tests");
 const SVG =
 	'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="20" height="20" fill="#e01e5a"/></svg>';
 const PNG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]);
+const rateLimit = {
+	ok: false,
+	status: "rate_limited",
+	issues: [{ code: "rate_limited", message: "Slow down.", hint: "Wait." }],
+};
 
 interface Seen {
 	readonly path: string;
@@ -38,10 +45,24 @@ function drawn(name: string) {
 			source: "https://sketchi.app",
 			libraryItems: [{ id: `item-${name}`, status: "published", created: 1, name, elements: [] }],
 		},
-		judge: { recognizable: true, picked: "source", model: "gemini-3.8-flash" },
+		judge: {
+			recognizable: true,
+			picked: "source",
+			model: "gemini-3.8-flash",
+			lineup: ["source"],
+			attempts: 1,
+		},
 		palette: [["#e01e5a", 100]],
 		author: { model: "anthropic/claude-sonnet-5-5", rounds: 2, accepted: true, turns: [] },
-		usage: { calls: 3, ms: 9000, inputTokens: 100, outputTokens: 50 },
+		usage: {
+			calls: 3,
+			ms: 9000,
+			inputTokens: 100,
+			outputTokens: 50,
+			cacheReadTokens: 0,
+			cacheWriteTokens: 0,
+			byCall: [],
+		},
 	};
 }
 
@@ -194,7 +215,7 @@ describe("sketchi icon draw", () => {
 			serve((_seen, response) => {
 				response.statusCode = 429;
 				response.setHeader("retry-after", wait);
-				response.end(JSON.stringify({ error: { code: "rate_limited", message: "Slow down." } }));
+				response.end(JSON.stringify(rateLimit));
 			});
 		// Three retries after the first attempt, and none when the server asks for more than 90 s.
 		for (const [wait, attempts] of [
@@ -213,7 +234,11 @@ describe("sketchi icon draw", () => {
 		const draws = await serve(({ body }, response) =>
 			response.end(JSON.stringify(drawn(String(body["name"])))),
 		);
-		const store = await limited("0");
+		const store = await serve((_seen, response) => {
+			response.statusCode = 429;
+			response.setHeader("retry-after", "0");
+			response.end(JSON.stringify({ error: { code: "rate_limited", message: "Slow down." } }));
+		});
 		const kept = await runCli(
 			["icon", "draw", "acme.svg", "--publish", "--endpoint", `${draws.origin}/draw`],
 			root,
@@ -223,6 +248,76 @@ describe("sketchi icon draw", () => {
 		expect(store.seen).toHaveLength(4);
 		expect(kept.stdout).toContain("not published");
 	});
+
+	it("does not replay refusals after admission, malformed 429s, or redirects", async () => {
+		const root = await workspace();
+		await writeFile(join(root, "acme.svg"), SVG);
+		for (const [status, body, code] of [
+			[400, { ...rateLimit, status: "invalid_input" }, 4],
+			[504, { ...rateLimit, status: "draw_timeout" }, 11],
+			[429, { ...rateLimit, status: "draw_timeout" }, 12],
+			[307, {}, 12],
+		] as const) {
+			const draws = await serve((_seen, response) => {
+				response.statusCode = status;
+				response.setHeader("retry-after", "0");
+				response.setHeader("location", "/redirected");
+				response.end(JSON.stringify(body));
+			});
+			const result = await runCli(
+				["icon", "draw", "acme.svg", "--endpoint", `${draws.origin}/draw`],
+				root,
+			);
+			expect(result.code).toBe(code);
+			expect(draws.seen).toHaveLength(1);
+			if (status === 400 || status === 504) expect(result.stderr).toContain("Slow down.");
+		}
+	});
+
+	it.effect("times out a stalled draw body without repeating the paid POST", () =>
+		Effect.gen(function* () {
+			const reading = Promise.withResolvers<void>();
+			let posts = 0;
+			let cancelled = false;
+			const fetch: typeof globalThis.fetch = () => {
+				posts += 1;
+				return Promise.resolve(
+					new Response(
+						new ReadableStream<Uint8Array>(
+							{
+								pull() {
+									reading.resolve();
+								},
+								cancel() {
+									cancelled = true;
+								},
+							},
+							{ highWaterMark: 0 },
+						),
+					),
+				);
+			};
+			const fiber = yield* requestIconDraw({
+				endpoint: "https://studio.example/api/v1/icons/draw",
+				source: { path: "acme.svg", name: "Acme" },
+			}).pipe(
+				Effect.provideService(FetchHttpClient.Fetch, fetch),
+				Effect.provide(
+					Layer.mock(LocalFileSystem, {
+						readBytes: () => Effect.succeed(new TextEncoder().encode(SVG)),
+					}),
+				),
+				Effect.flip,
+				Effect.forkChild,
+			);
+			yield* Effect.promise(() => reading.promise);
+			yield* TestClock.adjust("120 seconds");
+			const failure = yield* Fiber.join(fiber);
+			expect(failure).toMatchObject({ code: "icon_timeout" });
+			expect(cancelled).toBe(true);
+			expect(posts).toBe(1);
+		}),
+	);
 
 	it.effect("times out a stalled publish and aborts its request", () =>
 		Effect.gen(function* () {

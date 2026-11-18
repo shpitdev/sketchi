@@ -53,17 +53,3 @@ export function decodeJudgeReply(text: string, count: number): number | undefine
 	const picked = fromJson ?? Number(/\b([1-9])\b/u.exec(text)?.[1]);
 	return Number.isInteger(picked) && picked >= 1 && picked <= count ? picked : undefined;
 }
-
-export interface IconJudgeVerdict {
-	/** True when the judge picked the source out of the lineup. */
-	readonly recognizable: boolean;
-	/** `source`, a look-alike's catalog slug, or undefined when the judge gave no answer. */
-	readonly picked?: string;
-	/** The lineup as shown, `source` among catalog slugs. */
-	readonly lineup: readonly string[];
-	readonly model: string;
-	/** How many times the drawing was judged; a second time follows one revision. */
-	readonly attempts: number;
-	/** Why the judge gave no verdict, when its call failed. */
-	readonly error?: string;
-}

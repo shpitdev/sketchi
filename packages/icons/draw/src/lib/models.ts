@@ -5,6 +5,7 @@ import { Array, Context, Effect, Layer, Option, Schedule, String } from "effect"
 import { makeAuthorCall } from "./author-model";
 import type { Prompt } from "effect/ai";
 import { IconModelError } from "./errors";
+import type { ModelCall } from "../contract";
 import { type IconSource, svgCurveSegments } from "./input";
 import { makeJudgeCall, stripOpenAiModelPrefix } from "./judge-model";
 
@@ -38,23 +39,6 @@ export function iconAuthorModel(model: string): IconAuthorModel | undefined {
 	return Option.getOrUndefined(
 		Array.findFirst(ICON_AUTHOR_MODELS, (candidate) => candidate === prefixed),
 	);
-}
-
-export interface ModelUsage {
-	/** Uncached input; cache reads and writes are counted separately. */
-	readonly inputTokens: number;
-	readonly outputTokens: number;
-	/** Input read from the provider's prompt cache, billed at a tenth. */
-	readonly cacheReadTokens: number;
-	/** Input written to the provider's prompt cache. */
-	readonly cacheWriteTokens: number;
-}
-
-export interface ModelCall {
-	readonly role: "author" | "judge";
-	readonly model: string;
-	readonly usage: ModelUsage;
-	readonly ms: number;
 }
 
 export interface AuthorCallReply {

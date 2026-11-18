@@ -1,6 +1,15 @@
 import { basename, extname, join, resolve } from "node:path";
 
-import { Clock, Duration, Effect, Schema } from "effect";
+import {
+	ICON_DRAW_PATH,
+	ICON_IMAGE_MAX_BYTES,
+	ICON_NAME_MAX_LENGTH,
+	IconDrawHttpApi,
+	type IconDrawSuccess,
+} from "@sketchi/icon-draw/http-api";
+import { Clock, Duration, Effect, Result, Schedule } from "effect";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
+import { HttpApiClient } from "effect/http-api";
 
 import { publishIcon, type PublishedIcon } from "./community-client";
 export { publishIcon } from "./community-client";
@@ -8,9 +17,9 @@ export type { PublishedIcon } from "./community-client";
 
 import { type CliFailure, type CliFilesystemError, CliIconError } from "./errors";
 import { LocalFileSystem } from "./filesystem";
-import { MAX_API_RESPONSE_BYTES, readBoundedText } from "./response-body";
+import { boundedResponse, MAX_API_RESPONSE_BYTES } from "./response-body";
 
-export const DEFAULT_ICON_DRAW_ENDPOINT = "https://playground.sketchi.app/api/v1/icons/draw";
+export const DEFAULT_ICON_DRAW_ENDPOINT = `https://playground.sketchi.app${ICON_DRAW_PATH}`;
 export const SKETCHI_ICON_DRAW_ENDPOINT_ENV = "SKETCHI_ICON_DRAW_ENDPOINT";
 export const DEFAULT_COMMUNITY_ENDPOINT = "https://icons.sketchi.app/api/community";
 export const SKETCHI_COMMUNITY_ENDPOINT_ENV = "SKETCHI_COMMUNITY_ENDPOINT";
@@ -20,8 +29,15 @@ const ICON_DRAW_ATTEMPT_TIMEOUT = "120 seconds";
 /** A rate-limited request waits for Retry-After up to this long, at most this many times. */
 const MAX_RETRY_WAIT_SECONDS = 90;
 const MAX_RATE_LIMIT_RETRIES = 3;
-const MAX_INPUT_BYTES = 4 * 1024 * 1024;
-const NAME_MAX_LENGTH = 48;
+const decodeDraw = HttpApiClient.decodeResponse(IconDrawHttpApi, {
+	group: "icons",
+	endpoint: "draw",
+});
+const retryPolicy = Schedule.recurs(MAX_RATE_LIMIT_RETRIES).pipe(
+	Schedule.addDelay(({ input }: Schedule.Metadata<number, { readonly wait: number | undefined }>) =>
+		Effect.succeed(Duration.seconds(input.wait ?? 0)),
+	),
+);
 
 const SOURCE_KINDS: Readonly<Record<string, "svg" | "image">> = {
 	".svg": "svg",
@@ -54,7 +70,7 @@ export function nameFromFile(path: string): string {
 		.replace(/[-_.]+/gu, " ")
 		.replace(/\s+/gu, " ")
 		.trim()
-		.slice(0, NAME_MAX_LENGTH);
+		.slice(0, ICON_NAME_MAX_LENGTH);
 }
 
 /** A name as a file stem: `Google Cloud Run` is `google-cloud-run`. */
@@ -67,118 +83,6 @@ export function fileStem(name: string): string {
 			.replace(/^-+|-+$/gu, "") || "icon"
 	);
 }
-
-const IconDrawSuccess = Schema.Struct({
-	ok: Schema.Literal(true),
-	name: Schema.String,
-	recipe: Schema.Struct({ parts: Schema.Array(Schema.Unknown) }),
-	previews: Schema.Struct({ png28: Schema.String, png112: Schema.String }),
-	excalidrawlib: Schema.Struct({
-		type: Schema.Literal("excalidrawlib"),
-		version: Schema.Number,
-		source: Schema.String,
-		libraryItems: Schema.Array(Schema.Unknown),
-	}),
-	judge: Schema.Struct({
-		recognizable: Schema.Boolean,
-		picked: Schema.optionalKey(Schema.String),
-		model: Schema.optionalKey(Schema.String),
-		error: Schema.optionalKey(Schema.String),
-	}),
-	author: Schema.Struct({ model: Schema.String, rounds: Schema.Number }),
-	usage: Schema.Struct({ calls: Schema.Number, ms: Schema.Number }),
-});
-type IconDrawSuccess = typeof IconDrawSuccess.Type;
-
-const EndpointFailure = Schema.Struct({
-	status: Schema.optionalKey(Schema.String),
-	issues: Schema.optionalKey(
-		Schema.Array(
-			Schema.Struct({
-				code: Schema.optionalKey(Schema.String),
-				message: Schema.optionalKey(Schema.String),
-				hint: Schema.optionalKey(Schema.String),
-			}),
-		),
-	),
-});
-
-const decodeSuccess = Schema.decodeUnknownEffect(Schema.fromJsonString(IconDrawSuccess));
-const decodeFailure = Schema.decodeUnknownEffect(Schema.fromJsonString(EndpointFailure));
-
-function base64(bytes: Uint8Array): string {
-	return Buffer.from(bytes).toString("base64");
-}
-
-function retryAfterSeconds(response: Response): number | undefined {
-	const value = response.headers.get("retry-after");
-	if (!value) return undefined;
-	const seconds = Number(value);
-	return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
-}
-
-/** What one POST answered: its status, its body, and how long it asks a rate-limited client to wait. */
-interface Answer {
-	readonly status: number;
-	readonly ok: boolean;
-	readonly text: string;
-}
-
-/**
- * One POST, waiting out a short rate limit and trying again, as the service asks. Each attempt
- * (request and body) has its own time limit, so a Retry-After wait never eats into the next
- * attempt's time.
- */
-const postWithRetry = Effect.fn("sketchi.cli.icon.post")(function* (
-	url: string,
-	body: string,
-	options: {
-		readonly attemptTimeout: Duration.Input;
-		readonly maxBytes: number;
-		readonly failNetwork: () => CliIconError;
-		readonly failMalformed: () => CliIconError;
-		readonly failTimeout: () => CliIconError;
-	},
-) {
-	for (let attempt = 0; ; attempt += 1) {
-		const { answer, wait } = yield* Effect.gen(function* () {
-			const response = yield* Effect.tryPromise({
-				try: (signal) =>
-					globalThis.fetch(url, {
-						method: "POST",
-						headers: { "content-type": "application/json", "x-sketchi-client": "sketchi-cli" },
-						body,
-						signal,
-					}),
-				catch: options.failNetwork,
-			});
-			const text = yield* readBoundedText(
-				response,
-				options.maxBytes,
-				options.failMalformed,
-				options.failNetwork,
-			);
-			return {
-				answer: { status: response.status, ok: response.ok, text } satisfies Answer,
-				wait: retryAfterSeconds(response),
-			};
-		}).pipe(
-			Effect.timeoutOrElse({
-				duration: options.attemptTimeout,
-				orElse: () => Effect.fail(options.failTimeout()),
-			}),
-		);
-		if (
-			answer.status !== 429 ||
-			attempt >= MAX_RATE_LIMIT_RETRIES ||
-			wait === undefined ||
-			wait > MAX_RETRY_WAIT_SECONDS
-		) {
-			return answer;
-		}
-		yield* Effect.sleep(Duration.seconds(wait));
-	}
-});
 
 export interface IconSourceFile {
 	readonly path: string;
@@ -231,10 +135,10 @@ export const iconSources = Effect.fn("sketchi.cli.icon.sources")(function* (
 		);
 	}
 	const chosen = (name ?? nameFromFile(path)).trim();
-	if (!chosen || chosen.length > NAME_MAX_LENGTH) {
+	if (!chosen || chosen.length > ICON_NAME_MAX_LENGTH) {
 		return yield* iconError(
 			"icon_input",
-			`The name must be 1-${NAME_MAX_LENGTH} characters.`,
+			`The name must be 1-${ICON_NAME_MAX_LENGTH} characters.`,
 			'Pass --name "Brand" with the logo\'s brand or product name.',
 		);
 	}
@@ -249,19 +153,21 @@ export const requestIconDraw = Effect.fn("sketchi.cli.icon.draw")(function* (inp
 }) {
 	const fs = yield* LocalFileSystem;
 	const bytes = yield* fs.readBytes(input.source.path);
-	if (bytes.byteLength > MAX_INPUT_BYTES) {
+	if (bytes.byteLength > ICON_IMAGE_MAX_BYTES) {
 		return yield* iconError(
 			"icon_input",
-			`${input.source.path} is larger than ${MAX_INPUT_BYTES / (1024 * 1024)} MB.`,
+			`${input.source.path} is larger than ${ICON_IMAGE_MAX_BYTES / (1024 * 1024)} MB.`,
 			"Send a smaller export of the logo; 512 px is plenty.",
 		);
 	}
 	const kind = SOURCE_KINDS[extname(input.source.path).toLowerCase()];
-	const body = JSON.stringify({
+	const payload = {
 		name: input.source.name,
-		...(kind === "svg" ? { svg: new TextDecoder().decode(bytes) } : { image: base64(bytes) }),
+		...(kind === "svg"
+			? { svg: new TextDecoder().decode(bytes) }
+			: { image: Buffer.from(bytes).toString("base64") }),
 		...(input.model ? { model: input.model } : {}),
-	});
+	};
 	const network = () =>
 		iconError(
 			"network_failure",
@@ -274,34 +180,84 @@ export const requestIconDraw = Effect.fn("sketchi.cli.icon.draw")(function* (inp
 			"The Sketchi icon service returned an unreadable response.",
 			"Retry once; if it persists, report the logo.",
 		);
-	const response = yield* postWithRetry(input.endpoint, body, {
-		attemptTimeout: ICON_DRAW_ATTEMPT_TIMEOUT,
-		maxBytes: MAX_API_RESPONSE_BYTES,
-		failNetwork: network,
-		failMalformed: malformed,
-		failTimeout: () =>
-			iconError("icon_timeout", "The Sketchi icon service did not answer in time.", "Retry once."),
+	const http = yield* HttpClient.HttpClient;
+	const client = yield* HttpApiClient.makeWith(IconDrawHttpApi, {
+		httpClient: http.pipe(
+			HttpClient.mapRequest((request) =>
+				request.pipe(
+					HttpClientRequest.setUrl(input.endpoint),
+					HttpClientRequest.setHeader("x-sketchi-client", "sketchi-cli"),
+				),
+			),
+			HttpClient.withScope,
+		),
 	});
-	if (response.ok) return yield* decodeSuccess(response.text).pipe(Effect.mapError(malformed));
-	const failure = yield* decodeFailure(response.text).pipe(Effect.mapError(malformed));
-	const issue = failure.issues?.[0];
-	const details = [`http_status:${String(response.status)}`, ...(issue?.code ? [issue.code] : [])];
-	const message = issue?.message ?? `The icon service answered HTTP ${String(response.status)}.`;
-	const hint = issue?.hint ?? "Retry once; if it persists, try another export of the logo.";
-	if (response.status === 429) {
-		return yield* iconError(
-			issue?.code === "daily_limit" ? "daily_limit" : "rate_limited",
-			message,
-			hint,
-			details,
-		);
-	}
-	if (response.status === 400 || response.status === 422) {
-		return yield* iconError("icon_rejected", message, hint, details);
-	}
-	if (response.status === 504) return yield* iconError("icon_timeout", message, hint, details);
-	return yield* iconError("endpoint_failure", message, hint, details);
-});
+	// The scope owns the whole exchange, including a body that stalls after headers arrive.
+	const attempt = Effect.gen(function* () {
+		const response = yield* client.icons
+			.draw({ payload, responseMode: "response-only" })
+			.pipe(Effect.mapError(network));
+		if (response.status === 204 || response.status === 205 || response.status === 304) {
+			return yield* malformed();
+		}
+		const bounded = yield* boundedResponse(response, MAX_API_RESPONSE_BYTES, malformed, network);
+		const decoded = yield* decodeDraw(bounded).pipe(Effect.result);
+		if (Result.isSuccess(decoded)) return { icon: decoded.success, wait: undefined };
+		const refusal = decoded.failure;
+		if (!("body" in refusal)) return yield* malformed();
+		const rawWait = response.headers["retry-after"];
+		const seconds = rawWait ? Number(rawWait) : NaN;
+		// Only a decoded admission refusal is safe to replay. No redirects or ambiguous paid outcomes.
+		const issueCode = refusal.body.issues[0].code;
+		const wait =
+			refusal.httpStatus === 429 &&
+			(issueCode === "rate_limited" || issueCode === "daily_limit") &&
+			seconds >= 0 &&
+			seconds <= MAX_RETRY_WAIT_SECONDS
+				? seconds
+				: undefined;
+		return { refusal, wait };
+	}).pipe(
+		Effect.provideService(FetchHttpClient.RequestInit, { redirect: "manual" }),
+		Effect.scoped,
+		Effect.timeoutOrElse({
+			duration: ICON_DRAW_ATTEMPT_TIMEOUT,
+			orElse: () =>
+				Effect.fail(
+					iconError(
+						"icon_timeout",
+						"The Sketchi icon service did not answer in time.",
+						"Retry once.",
+					),
+				),
+		}),
+	);
+	const answer = yield* attempt.pipe(
+		Effect.repeat({ schedule: retryPolicy, while: ({ wait }) => wait !== undefined }),
+	);
+	if (answer.icon) return answer.icon;
+	const {
+		httpStatus,
+		body: {
+			issues: [issue],
+		},
+	} = answer.refusal;
+	const code =
+		httpStatus === 429
+			? issue.code === "daily_limit"
+				? "daily_limit"
+				: "rate_limited"
+			: httpStatus === 400 || httpStatus === 422
+				? "icon_rejected"
+				: httpStatus === 504
+					? "icon_timeout"
+					: "endpoint_failure";
+	return yield* iconError(code, issue.message, issue.hint, [
+		`http_status:${httpStatus}`,
+		issue.code,
+	]);
+	// @effect-diagnostics-next-line strictEffectProvide:off -- This CLI adapter owns the Fetch transport.
+}, Effect.provide(FetchHttpClient.layer));
 
 export interface DrawnIcon {
 	readonly name: string;

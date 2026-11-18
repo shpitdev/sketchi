@@ -1,7 +1,7 @@
 import type { CloudflareAiGatewayProvider } from "@sketchi/cloudflare/ai-gateway";
 import { takeClientRequest } from "@sketchi/community-icons";
 import { lookAlikeMarks } from "@sketchi/icon-catalog/look-alikes";
-import type { IconImagingJob } from "@sketchi/icon-draw";
+import { ICON_DRAW_REQUEST_MAX_BYTES, type IconImagingJob } from "@sketchi/icon-draw";
 import { describe, expect, it, vi } from "vitest";
 
 import type { StudioEnv } from "../../../server/studio-env.server";
@@ -92,10 +92,19 @@ describe("drawing is bounded per client and per day", () => {
 		{ accept: true, recipe: null },
 		{ accept: true, recipe: null },
 	];
-	const withRequest = (env: StudioEnv, body: unknown, ip = "203.0.113.7") => {
+	const withRequest = (
+		env: StudioEnv,
+		body: unknown,
+		ip = "203.0.113.7",
+		contentLength?: number,
+	) => {
 		const request = new Request("https://studio.example/api/v1/icons/draw", {
 			method: "POST",
-			headers: { "content-type": "application/json", "cf-connecting-ip": ip },
+			headers: {
+				"content-type": "application/json",
+				"cf-connecting-ip": ip,
+				...(contentLength === undefined ? {} : { "content-length": String(contentLength) }),
+			},
 			body: JSON.stringify(body),
 		});
 		return runPlaygroundEffect(handleDrawIconRequest(request), {
@@ -191,7 +200,27 @@ describe("drawing is bounded per client and per day", () => {
 			at("2026-11-09T23:59:00Z");
 			// A request the input checks refuse never counts against the budget.
 			expect((await withRequest(env, { name: "Acme", svg: "<svg" })).status).toBe(400);
-			expect((await withRequest(env, { name: "Acme", svg: SVG })).status).toBe(200);
+			const drawn = await withRequest(env, { name: "Acme", svg: SVG });
+			expect(drawn.status).toBe(200);
+			expect(drawn.headers.get("cache-control")).toBe("no-store");
+			expect(drawn.headers.get("x-sketchi-event-id")).toBeTruthy();
+			expect(await drawn.json()).toMatchObject({
+				ok: true,
+				status: "drawn",
+				name: "Acme",
+				previews: { png28: expect.any(String), png112: expect.any(String) },
+				excalidrawlib: { type: "excalidrawlib", libraryItems: [{ elements: expect.any(Array) }] },
+				usage: {
+					byCall: expect.arrayContaining([
+						{
+							role: "author",
+							model: expect.any(String),
+							usage: expect.any(Object),
+							ms: expect.any(Number),
+						},
+					]),
+				},
+			});
 			const refused = await withRequest(env, { name: "Acme", svg: SVG }, "198.51.100.2");
 			expect(refused.status).toBe(429);
 			expect(await refused.json()).toMatchObject({ issues: [{ code: "daily_limit" }] });
@@ -210,6 +239,17 @@ describe("drawing is bounded per client and per day", () => {
 		}
 	});
 
+	it("refuses a body above the upload cap before admission", async () => {
+		const body = { name: "Acme", svg: SVG };
+		const response = await withRequest({}, body, undefined, ICON_DRAW_REQUEST_MAX_BYTES + 1);
+		expect(response.status).toBe(400);
+		expect(await response.json()).toMatchObject({
+			ok: false,
+			status: "invalid_input",
+			issues: [{ code: "request_too_large" }],
+		});
+	});
+
 	it("does not draw when the budget cannot be counted", async () => {
 		const calls: Calls = { gateway: [], jobs: [], assets: [] };
 		const env: StudioEnv = {
@@ -218,6 +258,7 @@ describe("drawing is bounded per client and per day", () => {
 		};
 		const response = await withRequest(env, { name: "Acme", svg: SVG });
 		expect(response.status).toBe(503);
+		expect(response.headers.get("retry-after")).toBe("60");
 		expect(await response.json()).toMatchObject({ issues: [{ code: "budget_unavailable" }] });
 		expect(calls.gateway).toEqual([]);
 	});
