@@ -1,6 +1,4 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The imaging contract test loads real SVG input files from the catalog.
 import { readFile } from "node:fs/promises";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The imaging contract test loads real SVG input files from the catalog.
 import { join, resolve } from "node:path";
 
 import { type IconRecipe } from "@sketchi/drawing";

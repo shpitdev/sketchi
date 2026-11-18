@@ -1,10 +1,10 @@
+// @effect-diagnostics globalConsoleInEffect:off globalJsonInEffect:off -- The scenario CLI writes its exact formatted JSON output and errors to native stdout/stderr for its external grader.
 import { Option, Effect, FileSystem, Result, Schema } from "effect";
 import {
 	type ScenarioEvaluation,
 	evaluateScenarioDiagram,
 	type ScenarioCheck,
 } from "./lib/evaluate";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The scenario command resolves host-native paths before passing them to FileSystem.
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -303,9 +303,7 @@ export const runScenarioCli = Effect.fn("diagramScenarios.cli")(function* (
 	const options = yield* parseScenarioOptions(argv);
 
 	if (options.list) {
-		// @effect-diagnostics-next-line globalConsoleInEffect:off -- The scenario CLI writes its machine-readable output and errors to native stdout/stderr.
 		console.log(
-			// @effect-diagnostics-next-line globalJsonInEffect:off -- Preserve the scenario CLI’s exact formatted JSON output for its external grader.
 			JSON.stringify(
 				diagramScenarios.map((scenario) => ({
 					id: scenario.id,
@@ -426,7 +424,6 @@ export const runScenarioCli = Effect.fn("diagramScenarios.cli")(function* (
 	if (options.reportOut) {
 		yield* writeJson(options.reportOut, output);
 	}
-	// @effect-diagnostics-next-line globalConsoleInEffect:off globalJsonInEffect:off -- The scenario CLI writes its machine-readable output and errors to native stdout/stderr. Preserve the scenario CLI’s exact formatted JSON output for its external grader.
 	console.log(JSON.stringify(output, null, 2));
 	if (!ok) process.exitCode = 1;
 });
@@ -438,7 +435,6 @@ export function scenarioCliExitCode(error: { readonly _tag?: string }): number {
 const main = runScenarioCli(process.argv.slice(2)).pipe(
 	Effect.catch((error) =>
 		Effect.sync(() => {
-			// @effect-diagnostics-next-line globalConsoleInEffect:off -- The scenario CLI writes its machine-readable output and errors to native stdout/stderr.
 			console.error(error.message);
 			process.exitCode = scenarioCliExitCode(error);
 		}),

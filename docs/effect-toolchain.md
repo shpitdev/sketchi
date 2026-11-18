@@ -29,8 +29,8 @@ is not needed. All native project targets and the tooling compiler use it.
   omitted from compiler logs; style suggestions are not promoted to errors.
 
 Oxlint's upstream `effecttsgo` plugin also enforces the raw I/O rules, including
-in JavaScript and standalone build scripts outside the compiler's project graph.
-Both runners recognize `@effect-diagnostics` directives. See
+in JavaScript outside the compiler's project graph, with the same test, build
+script and Node program scopes. Both runners recognize `@effect-diagnostics` directives. See
 [Effect conventions](effect-conventions.md) for exceptions and advisory rules.
 
 Slice 1c removes the old Effect exclusions and Promise/runtime syntax census after

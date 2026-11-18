@@ -1,4 +1,4 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The process adapter owns native stdio close, process-group probes and Windows tree termination separately.
+// oxlint-disable-next-line no-restricted-imports -- The process adapter owns native stdio close, process-group probes and Windows tree termination separately.
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 
 import { Clock, Context, Effect, Layer, Schema, Scope } from "effect";

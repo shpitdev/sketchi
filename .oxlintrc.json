@@ -188,6 +188,52 @@
 			}
 		},
 		{
+			// Node programs: path, os, url and zlib are pure helpers; the I/O modules are banned by name.
+			"files": ["apps/cli/src/**", "tools/*/src/**"],
+			"excludeFiles": ["**/tests/**"],
+			"rules": {
+				"effecttsgo/node-builtin-import": "off",
+				"eslint/no-restricted-imports": [
+					"error",
+					{
+						"paths": [
+							{
+								"name": "zod",
+								"message": "Sketchi models data with Effect Schema; decode with Schema instead of Zod."
+							},
+							{ "name": "node:fs", "message": "Use Effect FileSystem." },
+							{ "name": "node:fs/promises", "message": "Use Effect FileSystem." },
+							{ "name": "node:child_process", "message": "Use Effect ChildProcess." },
+							{ "name": "node:http", "message": "Use Effect HttpClient or HttpServer." },
+							{ "name": "node:https", "message": "Use Effect HttpClient or HttpServer." },
+							{ "name": "node:net", "message": "Use an Effect platform service." }
+						],
+						"patterns": [
+							{
+								"group": ["zod/**"],
+								"message": "Sketchi models data with Effect Schema; decode with Schema instead of Zod."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			// Build scripts, configs and tests run on Node and drive the host directly.
+			"files": ["**/scripts/**", "**/*.mjs", "**/*.config.*", "**/tests/**"],
+			"rules": {
+				"effecttsgo/global-fetch": "off",
+				"effecttsgo/new-promise": "off",
+				"effecttsgo/node-builtin-import": "off"
+			}
+		},
+		{
+			"files": ["**/tests/**"],
+			"rules": {
+				"effecttsgo/global-timers": "off"
+			}
+		},
+		{
 			// Vendored AI Elements registry components stay close to upstream so
 			// registry updates apply cleanly. Their React idioms are upstream's.
 			"files": ["apps/studio/src/components/ai-elements/**"],

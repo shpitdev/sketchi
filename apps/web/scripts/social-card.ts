@@ -8,9 +8,7 @@
  * Re-export that PNG if you replace the diagram, then run
  * `pnpm nx run web:social-card`.
  */
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This offline builder writes the social card into the web assets directory.
 import { readFileSync, writeFileSync } from "node:fs";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This offline builder writes the social card into the web assets directory.
 import { resolve } from "node:path";
 
 import {

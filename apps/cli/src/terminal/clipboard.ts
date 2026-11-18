@@ -1,6 +1,5 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The detached clipboard helper owns native stdio and process unref during CLI exit.
+// oxlint-disable-next-line no-restricted-imports -- The detached clipboard helper owns native stdio and process unref during CLI exit.
 import { spawn } from "node:child_process";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The clipboard helper synchronously resolves host PATH entries.
 import { join } from "node:path";
 
 import { Context, type Duration, Effect, FileSystem, Layer } from "effect";

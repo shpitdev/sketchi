@@ -1,8 +1,6 @@
 // Telemetry commands through the real entrypoint, with `pnpm` (Wrangler), `duckdb` and
 // `infisical` as recording stubs on PATH.
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The telemetry operations test reads the generated configuration inputs and file outputs directly.
 import { mkdirSync, readFileSync } from "node:fs";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The telemetry operations test reads the generated configuration inputs and file outputs directly.
 import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
@@ -31,7 +29,6 @@ if (${JSON.stringify(name)} === "pnpm") {
 		);
 	}
 	return {
-		// @effect-diagnostics-next-line processEnv:off -- The subprocess test prepends fixture binaries to the real host PATH.
 		env: { PATH: `${bin}:${process.env["PATH"]}` },
 		calls: () =>
 			readFileSync(calls, "utf8")

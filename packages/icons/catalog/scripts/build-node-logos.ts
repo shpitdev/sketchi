@@ -1,6 +1,4 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This build step reads source logos and emits the generated logo catalog.
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This build step reads source logos and emits the generated logo catalog.
 import { resolve } from "node:path";
 
 import { getIconSourceFile, nodeLogoIcons, standaloneWordmarkIcons } from "../src/catalog";

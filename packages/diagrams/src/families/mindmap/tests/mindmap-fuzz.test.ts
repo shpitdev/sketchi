@@ -10,7 +10,6 @@ import {
 import { type Mindmap, parseMindmap, renderMindmap, mindmapLayoutIssues } from "../index";
 
 /** CI draws a handful of seeds; `MINDMAP_FUZZ_SEEDS=2000` runs the full local proof. */
-// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 const SEEDS = Number(process.env["MINDMAP_FUZZ_SEEDS"] ?? 8);
 /** Hosted PNGs frame the drawing this tightly. */
 const EXPORT_PADDING = 20;

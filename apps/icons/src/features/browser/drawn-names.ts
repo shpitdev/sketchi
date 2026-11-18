@@ -1,3 +1,4 @@
+// @effect-diagnostics strictEffectProvide:off -- Each browser preference read and write reacquires the native store, so a transient access denial cannot poison a retained runtime layer.
 import { BrowserKeyValueStore, BrowserStream } from "@effect/platform-browser";
 import { Cause, Effect, Option, Schema, SchemaGetter, Stream } from "effect";
 import { KeyValueStore } from "effect/persistence";
@@ -17,7 +18,6 @@ const RawChoice = Schema.Literals(["on", "off"]).pipe(
 const readStored = Effect.flatMap(KeyValueStore.KeyValueStore, (store) =>
 	store.get(DRAWN_NAMES_KEY),
 ).pipe(
-	// @effect-diagnostics-next-line strictEffectProvide:off -- Each browser preference read owns fresh acquisition so an initial getter denial cannot poison a retained runtime layer.
 	Effect.provide(BrowserKeyValueStore.layerLocalStorage),
 	Effect.catchDefect((cause) =>
 		Effect.fail(
@@ -32,7 +32,6 @@ const readStored = Effect.flatMap(KeyValueStore.KeyValueStore, (store) =>
 );
 const writeStored = Effect.fn("Icons.names.persistRaw")((raw: string) =>
 	Effect.flatMap(KeyValueStore.KeyValueStore, (store) => store.set(DRAWN_NAMES_KEY, raw)).pipe(
-		// @effect-diagnostics-next-line strictEffectProvide:off -- Each user preference write reacquires the native browser store after transient access denial.
 		Effect.provide(BrowserKeyValueStore.layerLocalStorage),
 		Effect.catchDefect((cause) =>
 			Effect.fail(

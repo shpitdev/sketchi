@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off -- The offline batch review command combines local previews into sheet artifacts.
+/* oxlint-disable no-restricted-imports -- The offline batch review command combines local previews into sheet artifacts. */
 
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

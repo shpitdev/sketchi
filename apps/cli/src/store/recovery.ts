@@ -1,4 +1,3 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The recovery boundary derives native paths for leases left by earlier processes.
 import { dirname, join } from "node:path";
 
 import { Effect } from "effect";

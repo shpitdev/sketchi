@@ -1,6 +1,5 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The offline sheet builder loads recipes and writes rendered PNG review sheets.
+// oxlint-disable-next-line no-restricted-imports -- The offline sheet builder loads recipes and writes rendered PNG review sheets.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The offline sheet builder loads recipes and writes rendered PNG review sheets.
 import { join } from "node:path";
 
 import { type IconRecipe } from "@sketchi/drawing";

@@ -30,7 +30,6 @@ function build(spec: unknown) {
 		}).pipe(
 			buildResponse,
 			Effect.provideService(BuildRuntimeEnvironment, {
-				// @effect-diagnostics-next-line globalRandom:off -- The build test supplies opaque fixture IDs; their values do not affect the assertions.
 				createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 			}),
 			Effect.provideService(ArtifactStorage, storage),
@@ -76,7 +75,6 @@ const shapesSpec = {
 describe("Code Mode class diagram", () => {
 	it("builds the documented spec into grouped class boxes with UML members", async () => {
 		const { built, excalidraw } = await excalidrawOf(shapesSpec);
-		// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 		expect(() => Schema.decodeUnknownSync(classBuild.result)(built)).not.toThrow();
 		expect(built.normalizedSpec.classes[0]).toEqual({
 			id: "Shape",

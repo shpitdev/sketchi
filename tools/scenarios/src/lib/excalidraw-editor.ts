@@ -1,5 +1,4 @@
 import { createRequire, registerHooks } from "node:module";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The Node editor shim resolves the installed browser bundle before loading it.
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 

@@ -172,7 +172,6 @@ function randomChart(index: number): QuadrantDiagram {
 
 /** Charts the full fuzz checks locally; CI samples the first few of every mode. */
 const CHARTS =
-	// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 	process.env["QUADRANT_FUZZ"] === "full" ? 700 : Number(process.env["QUADRANT_FUZZ"] ?? 14);
 
 /**

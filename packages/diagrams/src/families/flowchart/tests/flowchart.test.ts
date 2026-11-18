@@ -377,7 +377,6 @@ describe("flowchart validator", () => {
 	});
 
 	it.each(Object.entries(canonical))("raises %s for a minimal bad diagram", (code, change) => {
-		// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 		const diagram = Schema.decodeUnknownSync(FlowchartDiagram)({ ...flowchartFixture, ...change });
 		expect(getFlowchartValidationIssues(diagram).map((issue) => issue.code)).toContain(code);
 	});

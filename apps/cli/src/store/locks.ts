@@ -1,4 +1,4 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- These synchronous host-native path calculations feed the scoped CLI filesystem operations.
+// @effect-diagnostics cryptoRandomUUIDInEffect:off -- Filesystem lease tokens must stay unpredictable across processes sharing the lock directory.
 import { join } from "node:path";
 
 import { Effect, Schedule } from "effect";
@@ -113,7 +113,6 @@ export function makeLocks(
 				fs.makeTempDirectory(parent, `${LOCK_INIT_PREFIX}${encodedId(diagramId)}.`),
 				(candidate) =>
 					Effect.gen(function* () {
-						// @effect-diagnostics-next-line cryptoRandomUUIDInEffect:off -- Filesystem lease tokens must stay unpredictable across processes sharing the lock directory.
 						const token = crypto.randomUUID();
 						yield* fs.writeText(
 							join(candidate, `${LOCK_FREE_PREFIX}${token}${LOCK_ENTRY_SUFFIX}`),
@@ -242,7 +241,6 @@ export function makeLocks(
 			};
 		}
 
-		// @effect-diagnostics-next-line cryptoRandomUUIDInEffect:off -- Filesystem lease tokens must stay unpredictable across processes sharing the lock directory.
 		const token = crypto.randomUUID();
 		const ownerPath = join(directory, `${LOCK_OWNER_PREFIX}${token}${LOCK_ENTRY_SUFFIX}`);
 		const candidatePath = join(
@@ -299,7 +297,6 @@ export function makeLocks(
 		diagramId: string,
 		lock: LockHandle,
 	) {
-		// @effect-diagnostics-next-line cryptoRandomUUIDInEffect:off -- Filesystem lease tokens must stay unpredictable across processes sharing the lock directory.
 		const token = crypto.randomUUID();
 		const freePath = join(
 			lock.directory,

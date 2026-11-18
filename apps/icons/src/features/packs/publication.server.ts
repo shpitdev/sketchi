@@ -1,3 +1,4 @@
+// @effect-diagnostics strictEffectProvide:off -- The page, publication HTTP and background entry points each own their request-bound D1 and HTTP scopes; background work acquires fresh ones beyond the response.
 import { type ClientLimitNamespace, clientAddress } from "@sketchi/community-icons";
 import { D1Client } from "@effect/sql-d1";
 import {
@@ -357,7 +358,6 @@ function scheduleRefresh(
 	waitUntil(
 		Effect.runPromise(
 			refreshPullRequests(env, pulls, now).pipe(
-				// @effect-diagnostics-next-line strictEffectProvide:off -- Cloudflare background entry point owns fresh SQL and HTTP scopes beyond the response.
 				Effect.provide(
 					Layer.merge(D1Client.layer({ db: env.COMMUNITY_ICONS }), FetchHttpClient.layer),
 				),
@@ -402,7 +402,6 @@ export const loadPackExcalidrawStates = Effect.fn("Icons.publication.pageStates"
 			yield* Effect.sync(() => scheduleRefresh(env, due, now, waitUntil));
 		return packExcalidrawStates(packs, stored, { enabled: publishingEnabled(env) });
 	}).pipe(
-		// @effect-diagnostics-next-line strictEffectProvide:off -- Page entry point owns its request D1 binding; background work acquires separately.
 		Effect.provide(D1Client.layer({ db: env.COMMUNITY_ICONS })),
 		Effect.catch((error) =>
 			Effect.logWarning("Excalidraw publication state unavailable", { error }).pipe(Effect.as({})),
@@ -659,10 +658,7 @@ const publish = Effect.fn("Icons.publication.publish")(function* (
 				return result;
 			}),
 		);
-	}).pipe(
-		// @effect-diagnostics-next-line strictEffectProvide:off -- Publication HTTP entry point owns request-bound D1 and HTTP lifetimes.
-		Effect.provide(Layer.merge(D1Client.layer({ db: database }), FetchHttpClient.layer)),
-	);
+	}).pipe(Effect.provide(Layer.merge(D1Client.layer({ db: database }), FetchHttpClient.layer)));
 });
 const handlers = HttpApiBuilder.group(PackPublicationApi, "packs", (handlers) =>
 	handlers.handle("publish", ({ params, payload }) =>

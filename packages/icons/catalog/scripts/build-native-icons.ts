@@ -1,7 +1,5 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This build step emits the native icon data shipped with the CLI.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This build step emits the native icon data shipped with the CLI.
 import { resolve } from "node:path";
 
 import { getIconBySlug } from "../src/catalog";

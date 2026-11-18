@@ -1,6 +1,3 @@
-// @effect-diagnostics newPromise:off -- The Playwright fixture returns controllable native Promises for browser acquisition and cancellation.
-// @effect-diagnostics strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
-
 import type { Browser } from "@cloudflare/playwright";
 import { launch } from "@cloudflare/playwright";
 import { assert, describe, expect, it } from "@effect/vitest";
@@ -101,7 +98,6 @@ const trackedClock = Layer.effect(
 	),
 );
 
-// @effect-diagnostics-next-line globalTimers:off -- The browser fixture delays a native Playwright callback to exercise real interruption.
 const macrotask = Effect.promise(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
 
 /** Lets forked renders run until `ready` holds; a state that never comes fails on the test timeout. */
@@ -153,8 +149,7 @@ describe("Browser Run harness page pool", () => {
 			const rendered = yield* Fiber.join(renders);
 
 			expect(rendered).toHaveLength(3);
-			// @effect-diagnostics-next-line multipleEffectProvide:off -- The test entry point separately provides its isolated runtime and browser fixture layers.
-		}).pipe(Effect.provide(poolLayer), Effect.provide(trackedClock)),
+		}).pipe(Effect.provide(Layer.provideMerge(poolLayer, trackedClock))),
 	);
 
 	it.effect("keeps the page and does not retry a deterministic export failure", () =>

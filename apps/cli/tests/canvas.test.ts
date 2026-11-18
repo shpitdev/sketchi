@@ -1,5 +1,3 @@
-// @effect-diagnostics strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
-
 import { CreateCanvasRequest } from "@sketchi/diagrams/canvas/create-contract";
 import { afterEach, assert, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Schema } from "effect";
@@ -11,7 +9,6 @@ import { exitCodeForFailure } from "../src/errors";
 import { DiagramStore } from "../src/store/service";
 import { swappableFetch } from "./fixtures";
 
-// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 const canvasSpec = Schema.decodeUnknownSync(CreateCanvasRequest.fields.spec)({
 	kind: "canvas",
 	version: 1,
@@ -123,7 +120,6 @@ describe("Universal Canvas public API client", () => {
 				globalThis.fetch = (_input, init) => {
 					signal = init?.signal;
 					if (stall === "headers")
-						// @effect-diagnostics-next-line newPromise:off -- The test fetch deliberately stalls until the CLI aborts the native request.
 						return new Promise<Response>(() => {
 							Deferred.doneUnsafe(started, Effect.void);
 						});
@@ -200,7 +196,6 @@ describe("Universal Canvas public API client", () => {
 		globalThis.fetch = (input, init) => {
 			const request = new Request(input, init);
 			return request.json().then((body) => {
-				// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 				decodedRequest = Schema.decodeUnknownSync(CreateCanvasRequest, {
 					errors: "all",
 					reportInput: true,

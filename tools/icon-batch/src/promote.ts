@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off -- The offline promotion command writes chosen recipes into the catalog checkout.
+/* oxlint-disable no-restricted-imports -- The offline promotion command writes chosen recipes into the catalog checkout. */
 
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";

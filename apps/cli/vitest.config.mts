@@ -1,4 +1,3 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- Vitest reads this package fixture synchronously while loading its configuration.
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { gzipSync } from "node:zlib";

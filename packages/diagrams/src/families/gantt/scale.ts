@@ -1,3 +1,4 @@
+// @effect-diagnostics globalDate:off -- UTC calendar arithmetic uses an explicit epoch value, not the host clock.
 import { estimateTextWidth } from "@sketchi/drawing";
 import { formatGanttDay } from "./document";
 
@@ -46,7 +47,6 @@ interface Calendar {
 }
 
 function calendar(day: number): Calendar {
-	// @effect-diagnostics-next-line globalDate:off -- UTC calendar arithmetic uses an explicit epoch value, not the host clock.
 	const date = new Date(day * 86_400_000);
 	return {
 		year: date.getUTCFullYear(),
@@ -58,7 +58,6 @@ function calendar(day: number): Calendar {
 
 function dayOf(year: number, month: number, day = 1): number {
 	// Date.UTC reads years 0–99 as 1900–1999; setUTCFullYear keeps them.
-	// @effect-diagnostics-next-line globalDate:off -- UTC calendar arithmetic uses an explicit epoch value, not the host clock.
 	const date = new Date(0);
 	date.setUTCFullYear(year, month - 1, day);
 	return Math.round(date.getTime() / 86_400_000);

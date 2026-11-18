@@ -1,6 +1,4 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The D1 fixture loads the real migration SQL from disk for the in-memory database.
 import { mkdir, mkdtemp, writeFile, rm } from "node:fs/promises";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The D1 fixture loads the real migration SQL from disk for the in-memory database.
 import { resolve } from "node:path";
 import { getPlatformProxy } from "wrangler";
 import type { D1Client } from "@effect/sql-d1";

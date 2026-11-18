@@ -1,5 +1,3 @@
-// @effect-diagnostics nodeBuiltinImport:off -- The gate test owns subprocesses and fixtures to verify the preinstall and exec boundary.
-
 // The local CI gate at its real command boundary: `ops ci-local` (and the bootstrap) in a real
 // temporary Git repository, with `pnpm` and `gh` as recording stubs. These prove base, selection,
 // failure, signoff, slot and interruption behavior, not Nx execution.
@@ -78,7 +76,6 @@ if (args.includes("-t") && process.env.GATE_NX_HANG) {
 	const unitBase = repo.head();
 	const env = (extra: Record<string, string> = {}) => ({
 		...process.env,
-		// @effect-diagnostics-next-line processEnv:off -- The subprocess test prepends fixture binaries to the real host PATH.
 		PATH: `${bin}:${process.env["PATH"]}`,
 		XDG_CACHE_HOME: join(state, "cache"),
 		GATE_CALLS: calls,
@@ -265,12 +262,9 @@ describe("ci-local gate", () => {
 		onTestFinished(() => {
 			gate.kill("SIGKILL");
 		});
-		// @effect-diagnostics-next-line globalDate:off -- Measure the actual subprocess deadline, independently of the gate’s Effect clock.
 		const deadline = Date.now() + 30_000;
 		while (!existsSync(pidFile) || !readFileSync(pidFile, "utf8")) {
-			// @effect-diagnostics-next-line globalDate:off -- Measure the actual subprocess deadline, independently of the gate’s Effect clock.
 			if (Date.now() > deadline) throw new Error("the hanging check never started");
-			// @effect-diagnostics-next-line globalTimers:off newPromise:off -- The harness bounds real child-process assertions independently of the gate runtime. The gate test bridges real subprocess output and exit events into the harness.
 			await new Promise((resolve) => setTimeout(resolve, 50));
 		}
 		const grandchild = Number(readFileSync(pidFile, "utf8"));
@@ -286,11 +280,8 @@ describe("ci-local gate", () => {
 		gate.kill("SIGINT");
 		const [code, signal] = (await once(gate, "exit")) as [number | null, string | null];
 		expect(code !== 0 || signal !== null).toBe(true);
-		// @effect-diagnostics-next-line globalDate:off -- Measure the actual subprocess deadline, independently of the gate’s Effect clock.
 		const gone = Date.now() + 15_000;
-		// @effect-diagnostics-next-line globalDate:off -- Measure the actual subprocess deadline, independently of the gate’s Effect clock.
 		while (alive(grandchild) && Date.now() < gone) {
-			// @effect-diagnostics-next-line globalTimers:off newPromise:off -- The harness bounds real child-process assertions independently of the gate runtime. The gate test bridges real subprocess output and exit events into the harness.
 			await new Promise((resolve) => setTimeout(resolve, 50));
 		}
 		expect(alive(grandchild)).toBe(false);
@@ -322,7 +313,6 @@ describe("gate slots", () => {
 					expect(yield* Fiber.join(third)).toBe(0);
 				}),
 			);
-			// @effect-diagnostics-next-line strictEffectProvide:off -- This command harness owns the isolated Node and fixture layers for the test invocation.
 		}).pipe(Effect.provide(NodeServices.layer)),
 	);
 
@@ -359,7 +349,6 @@ describe("gate slots", () => {
 			expect(yield* Deferred.await(waitedOn)).toBe(other.pid);
 			other.kill("SIGKILL");
 			expect(yield* Fiber.join(waiting)).toBe(0);
-			// @effect-diagnostics-next-line strictEffectProvide:off -- This command harness owns the isolated Node and fixture layers for the test invocation.
 		}).pipe(Effect.provide(NodeServices.layer)),
 	);
 

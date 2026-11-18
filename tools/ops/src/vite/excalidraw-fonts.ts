@@ -1,7 +1,6 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- Vite resolves and copies fonts synchronously during plugin setup.
+// oxlint-disable-next-line no-restricted-imports -- Vite resolves and copies fonts synchronously during plugin setup.
 import { createReadStream, existsSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- Vite resolves and copies fonts synchronously during plugin setup.
 import { dirname, join } from "node:path";
 
 import type { Plugin } from "vite";

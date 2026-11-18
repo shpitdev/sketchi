@@ -3,9 +3,7 @@
  * their counts and marks always match what the pages serve: one for the site,
  * and one per pack with its name, its count and a strip of its marks.
  */
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This offline asset builder renders and writes pack social cards.
 import { readdir, readFile } from "node:fs/promises";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This offline asset builder renders and writes pack social cards.
 import { resolve } from "node:path";
 
 import {

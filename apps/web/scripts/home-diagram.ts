@@ -14,10 +14,8 @@
  * which an SVG drawn by an <img> needs. Replace the scene, then run
  * `pnpm nx run web:home-diagram`.
  */
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This offline build renders the authored homepage scene and writes its static assets.
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This offline build renders the authored homepage scene and writes its static assets.
 import { dirname, join, resolve } from "node:path";
 
 import * as Linkedom from "linkedom";
@@ -145,7 +143,6 @@ function installHeadlessDom(): void {
 				},
 			);
 		}
-		// @effect-diagnostics-next-line globalFetch:off -- The offline renderer intercepts font requests and delegates other requests to the original host fetch.
 		return realFetch(input, init);
 	});
 }

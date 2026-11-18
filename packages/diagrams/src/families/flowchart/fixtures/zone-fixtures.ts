@@ -1,3 +1,4 @@
+// @effect-diagnostics schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Result, Schema } from "effect";
 import { FlowchartDiagram, parseFlowchartDiagram } from "../document";
@@ -213,7 +214,6 @@ const STRESS_EDGES: readonly (readonly [number, number])[] = [
 export const zoneStressFixtures: Readonly<
 	Record<"depth-four" | "thirty-services", FlowchartDiagram>
 > = {
-	// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 	"depth-four": Schema.decodeUnknownSync(FlowchartDiagram)({
 		id: "depth-four",
 		title: "Two availability zones, four zones deep",
@@ -252,7 +252,6 @@ export const zoneStressFixtures: Readonly<
 		],
 		layout: { direction: "LR", edgeRouting: "orthogonal" },
 	}),
-	// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 	"thirty-services": Schema.decodeUnknownSync(FlowchartDiagram)({
 		id: "thirty-services",
 		title: "Thirty services in eight zones",

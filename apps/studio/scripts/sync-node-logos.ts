@@ -1,7 +1,5 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This build step copies generated logo assets into the Studio static directory.
 import { cp, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This build step copies generated logo assets into the Studio static directory.
 import { dirname, resolve } from "node:path";
 
 // Node-logo SVGs ship as static assets, outside the Worker script size limit.

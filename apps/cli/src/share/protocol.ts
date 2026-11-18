@@ -1,3 +1,4 @@
+// @effect-diagnostics globalJsonInEffect:off -- The share byte codec wraps native JSON in its protocol-specific typed failure and preserves the existing payload.
 import { inflateSync } from "node:zlib";
 
 import { CANVAS_LIMITS } from "@sketchi/drawing";
@@ -400,7 +401,6 @@ export function serializeForShare(value: unknown): Effect.Effect<Uint8Array, Cli
 				try: () => {
 					const scene = sceneParts(value);
 					return textEncoder.encode(
-						// @effect-diagnostics-next-line globalJsonInEffect:off -- The share byte codec wraps native JSON in its protocol-specific typed failure and preserves the existing payload.
 						JSON.stringify(
 							{
 								type: scene.type,
@@ -563,7 +563,6 @@ export const decodeSharePayload = Effect.fn("sketchi.cli.share.decode")(function
 			if (!metadata || !iv || !encrypted || iv.byteLength !== 12) {
 				throw new Error("invalid encrypted payload chunks");
 			}
-			// @effect-diagnostics-next-line globalJsonInEffect:off -- The share byte codec wraps native JSON in its protocol-specific typed failure and preserves the existing payload.
 			const metadataValue: unknown = JSON.parse(fatalTextDecoder.decode(metadata));
 			if (
 				!isRecord(metadataValue) ||
@@ -599,7 +598,6 @@ export const decodeSharePayload = Effect.fn("sketchi.cli.share.decode")(function
 				throw new Error("unsupported contents metadata");
 			}
 			assertJsonDepth(inner[1]);
-			// @effect-diagnostics-next-line globalJsonInEffect:off -- The share byte codec wraps native JSON in its protocol-specific typed failure and preserves the existing payload.
 			return JSON.parse(fatalTextDecoder.decode(inner[1]));
 		},
 		catch: (cause) =>

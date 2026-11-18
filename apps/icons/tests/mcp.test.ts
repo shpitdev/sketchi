@@ -133,7 +133,6 @@ describe("icons MCP tools", () => {
 				const ended = yield* serve({ start: (controller) => controller.close() });
 				yield* Effect.promise(() => ended.response.text());
 				expect(yield* Effect.promise(ended.disposed)).toBe(1);
-				// @effect-diagnostics-next-line newPromise:off -- The Worker waitUntil fixture blocks background work in a native Promise.
 				const cancelled = yield* serve({ pull: () => new Promise(() => {}) });
 				yield* Effect.promise(() => cancelled.response.body!.cancel());
 				expect(yield* Effect.promise(cancelled.disposed)).toBe(1);

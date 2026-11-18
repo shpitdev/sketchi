@@ -1,7 +1,6 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The offline catalog generator reads its word-list input synchronously.
+// @effect-diagnostics nodeBuiltinImport:off -- The offline catalog generator reads its word-list input synchronously.
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The offline catalog generator reads its word-list input synchronously.
 import { dirname, join } from "node:path";
 
 import type { SearchableIcon } from "./search";
