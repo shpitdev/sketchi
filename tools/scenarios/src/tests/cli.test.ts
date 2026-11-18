@@ -1,5 +1,6 @@
 // The scenario CLI as Frontierclimb calls it: `--list` for cases, `--scenario <id> --input <file>`
 // for a JSON grade on stdout, exit 0 or 1 for a grade and anything else for a crash.
+import { NodeFileSystem } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -43,7 +44,7 @@ function cli(argv: readonly string[]) {
 		process.exitCode = undefined;
 		const log = vi.spyOn(console, "log").mockImplementation(() => {});
 		const exit = yield* Effect.exit(
-			runScenarioCli(argv).pipe(Effect.provide(ToolProcessSpawnerLive)),
+			runScenarioCli(argv).pipe(Effect.provide([ToolProcessSpawnerLive, NodeFileSystem.layer])),
 		);
 		const stdout = log.mock.calls.map((call) => String(call[0])).join("\n");
 		const exitCode = Exit.isFailure(exit)
@@ -145,6 +146,46 @@ describe("scenario CLI", () => {
 				assert.isTrue(report.ok);
 			}),
 		);
+
+	it.live("saves a scene and report with JSON newlines and copies input candidate bytes", () =>
+		Effect.scoped(
+			Effect.gen(function* () {
+				const dir = yield* workDir;
+				const inputPath = path.join(dir, "input.json");
+				const input = `\uFEFFrésultat\r\n${envelope()}\r\n`;
+				yield* Effect.promise(() => writeFile(inputPath, input));
+				const candidateDir = path.join(dir, "candidates");
+				const scenePath = path.join(dir, "scenes", "scene.excalidraw");
+				const reportPath = path.join(dir, "reports", "report.json");
+				const { stdout, exitCode } = yield* cli([
+					"--scenario",
+					onboarding.id,
+					"--input",
+					inputPath,
+					"--out",
+					scenePath,
+					"--candidate-out-dir",
+					candidateDir,
+					"--report-out",
+					reportPath,
+				]);
+				assert.strictEqual(exitCode, 0);
+				assert.isTrue((yield* Schema.decodeUnknownEffect(Report)(stdout)).ok);
+				assert.strictEqual(
+					yield* Effect.promise(() => readFile(reportPath, "utf8")),
+					`${stdout}\n`,
+				);
+				const scene = yield* Effect.promise(() => readFile(scenePath, "utf8"));
+				assert.strictEqual(scene, `${JSON.stringify(JSON.parse(scene), null, 2)}\n`);
+				assert.property(JSON.parse(scene), "elements");
+				const candidatePath = path.join(candidateDir, `${onboarding.id}.candidate.txt`);
+				assert.deepStrictEqual(
+					yield* Effect.promise(() => readFile(candidatePath)),
+					Buffer.from(input),
+				);
+			}),
+		),
+	);
 
 	it.live("grades the returned build's receipt, not a later success or another family", () =>
 		Effect.gen(function* () {

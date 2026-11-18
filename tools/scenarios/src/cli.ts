@@ -1,14 +1,13 @@
-import { Option, Effect, Result, Schema } from "effect";
+import { Option, Effect, FileSystem, Result, Schema } from "effect";
 import {
 	type ScenarioEvaluation,
 	evaluateScenarioDiagram,
 	type ScenarioCheck,
 } from "./lib/evaluate";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { NodeRuntime } from "@effect/platform-node";
+import { NodeFileSystem, NodeRuntime } from "@effect/platform-node";
 import {
 	candidateFromText,
 	enforceCandidateRequestRequirements,
@@ -129,42 +128,34 @@ function runCommand(
 	);
 }
 
+function fileError(action: string, filePath: string) {
+	return Effect.mapError((cause) =>
+		scenarioToolError(`Unable to ${action} file ${filePath}.`, cause),
+	);
+}
+
+const writeScenarioFile = Effect.fn("diagramScenarios.writeFile")(function* (
+	filePath: string,
+	value: string,
+	format: "JSON" | "text",
+) {
+	const fs = yield* FileSystem.FileSystem;
+	yield* fs
+		.makeDirectory(path.dirname(filePath), { recursive: true })
+		.pipe(fileError(`prepare ${format}`, filePath));
+	yield* fs.writeFileString(filePath, value).pipe(fileError(`write ${format}`, filePath));
+});
+
 function writeJson(filePath: string, value: unknown) {
-	const prepare = Effect.tryPromise({
-		try: () => mkdir(path.dirname(filePath), { recursive: true }),
-		catch: (cause) => scenarioToolError(`Unable to prepare JSON file ${filePath}.`, cause),
-	});
-	return prepare.pipe(
-		Effect.andThen(
-			Effect.tryPromise({
-				try: () => writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`),
-				catch: (cause) => scenarioToolError(`Unable to write JSON file ${filePath}.`, cause),
-			}),
-		),
-	);
+	return writeScenarioFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "JSON");
 }
 
-function writeText(filePath: string, value: string) {
-	const prepare = Effect.tryPromise({
-		try: () => mkdir(path.dirname(filePath), { recursive: true }),
-		catch: (cause) => scenarioToolError(`Unable to prepare text file ${filePath}.`, cause),
-	});
-	return prepare.pipe(
-		Effect.andThen(
-			Effect.tryPromise({
-				try: () => writeFile(filePath, value),
-				catch: (cause) => scenarioToolError(`Unable to write text file ${filePath}.`, cause),
-			}),
-		),
-	);
-}
-
-function readText(filePath: string) {
-	return Effect.tryPromise({
-		try: () => readFile(filePath, "utf8"),
-		catch: (cause) => scenarioToolError(`Unable to read input file ${filePath}.`, cause),
-	});
-}
+const readText = Effect.fn("diagramScenarios.readInput")(function* (filePath: string) {
+	const fs = yield* FileSystem.FileSystem;
+	const bytes = yield* fs.readFile(filePath).pipe(fileError("read input", filePath));
+	// Keep a leading UTF-8 BOM in saved candidates; readFileString would strip it.
+	return new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes);
+});
 
 interface ScenarioRunEvaluation {
 	readonly candidateOutput: string;
@@ -280,7 +271,7 @@ function evaluateScenario(
 	| ToolProcessExitError
 	| ToolProcessPolicyError
 	| ToolProcessSpawnError,
-	ToolProcessSpawner
+	FileSystem.FileSystem | ToolProcessSpawner
 > {
 	if (input.useFixture) {
 		const candidateOutput = JSON.stringify(scenario.expectedDiagram, null, 2);
@@ -383,7 +374,9 @@ export const runScenarioCli = Effect.fn("diagramScenarios.cli")(function* (
 					out && result.evaluation
 						? writeJson(out, result.evaluation.excalidrawScene)
 						: Effect.void,
-					candidateOut ? writeText(candidateOut, result.candidateOutput) : Effect.void,
+					candidateOut
+						? writeScenarioFile(candidateOut, result.candidateOutput, "text")
+						: Effect.void,
 					result.evaluation
 						? editabilityMetrics(result.evaluation.excalidrawScene.elements)
 						: Effect.succeed(undefined),
@@ -449,5 +442,5 @@ const main = runScenarioCli(process.argv.slice(2)).pipe(
 
 const entryPointPath = process.argv[1];
 if (entryPointPath && import.meta.url === pathToFileURL(entryPointPath).href) {
-	NodeRuntime.runMain(main.pipe(Effect.provide(ToolProcessSpawnerLive)));
+	NodeRuntime.runMain(main.pipe(Effect.provide([ToolProcessSpawnerLive, NodeFileSystem.layer])));
 }
