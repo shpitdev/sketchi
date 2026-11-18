@@ -3,7 +3,7 @@
    Shares the web surface tokens; adds a full-height no-auth app shell.
    Fonts loaded via <link> in routes/__root.tsx.
    ===================================================================== */
-@import "../../../../packages/editor/src/theme.css";
+@import "../../../../packages/editor-surface/src/theme.css";
 
 /* ===================================================================== */
 /* App shell                                                             */

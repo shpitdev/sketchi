@@ -1,7 +1,7 @@
 {
 	"name": "editor-surface",
 	"$schema": "../../node_modules/nx/schemas/project-schema.json",
-	"sourceRoot": "packages/editor/src",
+	"sourceRoot": "packages/editor-surface/src",
 	"projectType": "library",
 	"tags": ["scope:package", "type:ui"],
 	"targets": {
@@ -10,8 +10,8 @@
 			"outputs": ["{projectRoot}/dist"],
 			"options": {
 				"commands": [
-					"vite build --config packages/editor/vite.config.ts",
-					"effect-tsgo tsc@7.0.2 -p packages/editor/tsconfig.lib.json"
+					"vite build --config packages/editor-surface/vite.config.ts",
+					"effect-tsgo tsc@7.0.2 -p packages/editor-surface/tsconfig.lib.json"
 				],
 				"parallel": false
 			}
@@ -26,7 +26,7 @@
 			"executor": "nx:run-commands",
 			"dependsOn": ["build-storybook"],
 			"options": {
-				"command": "chromatic --storybook-build-dir storybook-static/editor-surface --storybook-config-dir packages/editor/.storybook --storybook-base-dir packages/editor"
+				"command": "chromatic --storybook-build-dir storybook-static/editor-surface --storybook-config-dir packages/editor-surface/.storybook --storybook-base-dir packages/editor-surface"
 			}
 		},
 		"static-storybook": {
@@ -41,17 +41,17 @@
 		},
 		"test": {
 			"executor": "nx:run-commands",
-			"outputs": ["{workspaceRoot}/coverage/packages/editor"],
+			"outputs": ["{workspaceRoot}/coverage/packages/editor-surface"],
 			"options": {
-				"command": "vitest run --config packages/editor/vitest.config.ts"
+				"command": "vitest run --config packages/editor-surface/vitest.config.ts"
 			}
 		},
 		"typecheck": {
 			"executor": "nx:run-commands",
 			"options": {
 				"commands": [
-					"effect-tsgo tsc@7.0.2 -p packages/editor/tsconfig.spec.json --noEmit",
-					"effect-tsgo tsc@7.0.2 -p packages/editor/tsconfig.lib.json --noEmit"
+					"effect-tsgo tsc@7.0.2 -p packages/editor-surface/tsconfig.spec.json --noEmit",
+					"effect-tsgo tsc@7.0.2 -p packages/editor-surface/tsconfig.lib.json --noEmit"
 				],
 				"parallel": false
 			}

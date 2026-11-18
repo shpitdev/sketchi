@@ -22,7 +22,7 @@
 				"default",
 				"^production",
 				"testEnvironment",
-				"{workspaceRoot}/packages/editor/src/theme.css"
+				"{workspaceRoot}/packages/editor-surface/src/theme.css"
 			]
 		},
 		"typecheck": {
@@ -379,7 +379,7 @@
 				"testEnvironment",
 				"{projectRoot}/src/graph/**/*",
 				"{projectRoot}/src/families/flowchart/**/*",
-				"{workspaceRoot}/packages/editor/public/fonts/**/*",
+				"{workspaceRoot}/packages/editor-surface/public/fonts/**/*",
 				"{workspaceRoot}/.npmrc",
 				"!{projectRoot}/src/graph/tests/text-fit-fuzz.test.ts"
 			],
@@ -396,7 +396,7 @@
 				"default",
 				"^production",
 				"testEnvironment",
-				"{workspaceRoot}/packages/editor/public/fonts/**/*"
+				"{workspaceRoot}/packages/editor-surface/public/fonts/**/*"
 			],
 			"cache": true,
 			"outputs": [],

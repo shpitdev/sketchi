@@ -25,7 +25,7 @@ flowchart LR
 The four Worker projects are `web`, `studio`, `editor`, and `icons`. `studio`
 deploys as `sketchi-studio` and owns chat, the HTTP build and artifact APIs, MCP,
 Browser Rendering, and Studio persistence. The internal `editor` app deploys as
-`sketchi-excalidraw`; the reusable drawing surface in `packages/editor` is the
+`sketchi-excalidraw`; the reusable drawing surface in `packages/editor-surface` is the
 separate `editor-surface` project. The Worker map in `tools/ops/src/workers.ts`
 resolves project IDs to deployed identities; `tools/ops/src/deploy/` owns
 Preview and production route policy. Operator commands (`pnpm ops`, `pnpm ci:local`,
@@ -45,7 +45,7 @@ Preview and production route policy. Operator commands (`pnpm ops`, `pnpm ci:loc
 | Icon drawing        | `packages/icons/draw`                    | a logo in, a judged hand-drawn recipe out: author rounds, renders, and the judge |
 | Studio persistence  | `apps/studio/src/features/projects`      | typed ownership and scoped R2 persistence services                               |
 | Telemetry           | `packages/observability`                 | span rows with full content, batched per request to a Pipelines stream           |
-| UI                  | `packages/editor` and app components | React rendering and local view state                                             |
+| UI                  | `packages/editor-surface` and app components | React rendering and local view state                                             |
 | UI primitives       | `packages/ui`                            | shared shadcn primitives and tokens for the Tailwind apps                        |
 
 Studio chat, HTTP `buildFlowchart`, and MCP `execute` call the same

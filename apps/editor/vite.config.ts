@@ -39,7 +39,8 @@ export default defineConfig({
 			},
 			{
 				find: "@sketchi/editor-surface/styles.css",
-				replacement: new URL("../../packages/editor/src/styles.css", import.meta.url).pathname,
+				replacement: new URL("../../packages/editor-surface/src/styles.css", import.meta.url)
+					.pathname,
 			},
 			{
 				find: "@sketchi/drawing/excalidraw",
@@ -48,7 +49,8 @@ export default defineConfig({
 			},
 			{
 				find: "@sketchi/editor-surface",
-				replacement: new URL("../../packages/editor/src/index.ts", import.meta.url).pathname,
+				replacement: new URL("../../packages/editor-surface/src/index.ts", import.meta.url)
+					.pathname,
 			},
 		],
 	},

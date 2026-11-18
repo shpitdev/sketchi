@@ -5,7 +5,7 @@ import { excalidrawFonts } from "../../../../tools/ops/src/vite/excalidraw-fonts
 const config: StorybookConfig = {
 	stories: [
 		"../../families/*.stories.tsx",
-		"../../../../packages/editor/src/components/excalidraw-scene-canvas/*.stories.tsx",
+		"../../../../packages/editor-surface/src/components/excalidraw-scene-canvas/*.stories.tsx",
 		"../../../../apps/icons/src/components/icon-conversion-preview/*.stories.tsx",
 		"../../../../apps/editor/src/components/svg-icon-workspace/*.stories.tsx",
 	],
@@ -49,11 +49,11 @@ const config: StorybookConfig = {
 			"@sketchi/diagram-scenarios": new URL("../../../scenarios/src/index.ts", import.meta.url)
 				.pathname,
 			"@sketchi/editor-surface/styles.css": new URL(
-				"../../../../packages/editor/src/styles.css",
+				"../../../../packages/editor-surface/src/styles.css",
 				import.meta.url,
 			).pathname,
 			"@sketchi/editor-surface": new URL(
-				"../../../../packages/editor/src/index.ts",
+				"../../../../packages/editor-surface/src/index.ts",
 				import.meta.url,
 			).pathname,
 		};

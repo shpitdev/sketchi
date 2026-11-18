@@ -4,9 +4,9 @@ import { defineConfig } from "vite";
 export default defineConfig({
 	plugins: [react()],
 	build: {
-		outDir: "packages/editor/dist",
+		outDir: "packages/editor-surface/dist",
 		lib: {
-			entry: "packages/editor/src/index.ts",
+			entry: "packages/editor-surface/src/index.ts",
 			formats: ["es"],
 			fileName: "index",
 		},

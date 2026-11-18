@@ -16,7 +16,7 @@
 		"projectRoot": {
 			"type": "string",
 			"description": "Nx project root that owns the component.",
-			"default": "packages/editor"
+			"default": "packages/editor-surface"
 		},
 		"directory": {
 			"type": "string",

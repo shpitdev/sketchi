@@ -18,7 +18,7 @@
       "path": "./packages/social-card"
     },
     {
-      "path": "./packages/editor"
+      "path": "./packages/editor-surface"
     },
     {
       "path": "./packages/ui"

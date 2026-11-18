@@ -8,7 +8,7 @@
       "@sketchi/observability": ["../packages/observability/src/index.ts"],
       "@sketchi/drawing/artifacts": ["../packages/drawing/src/artifacts.ts"],
       "@sketchi/drawing": ["../packages/drawing/src/index.ts"],
-      "@sketchi/editor-surface": ["../packages/editor/dist/index.d.ts"],
+      "@sketchi/editor-surface": ["../packages/editor-surface/dist/index.d.ts"],
       "@sketchi/cloudflare/*": ["../packages/cloudflare/src/*"],
       "@sketchi/diagrams/*": ["../packages/diagrams/src/*"]
     },

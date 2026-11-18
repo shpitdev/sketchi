@@ -80,7 +80,7 @@ describe("Excalidraw fonts", () => {
 	});
 
 	test("vendored Excalifont subsets are the package's own files", () => {
-		const vendored = join(repoRoot, "packages/editor/public/fonts/Excalifont");
+		const vendored = join(repoRoot, "packages/editor-surface/public/fonts/Excalifont");
 		for (const file of excalidrawFontFiles().filter((name) => name.startsWith("Excalifont/"))) {
 			expect(readFileSync(join(vendored, file.slice("Excalifont/".length))), file).toEqual(
 				readFileSync(join(excalidrawFontsDirectory(), file)),

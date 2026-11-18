@@ -25,7 +25,7 @@ function byCodeUnit(left: string, right: string) {
 }
 
 const editorRequire = createRequire(
-	new URL("../../../../packages/editor/package.json", import.meta.url),
+	new URL("../../../../packages/editor-surface/package.json", import.meta.url),
 );
 
 export function excalidrawFontsDirectory() {

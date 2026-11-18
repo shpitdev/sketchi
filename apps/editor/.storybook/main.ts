@@ -27,11 +27,13 @@ const config: StorybookConfig = {
 				import.meta.url,
 			).pathname,
 			"@sketchi/editor-surface/styles.css": new URL(
-				"../../../packages/editor/src/styles.css",
+				"../../../packages/editor-surface/src/styles.css",
 				import.meta.url,
 			).pathname,
-			"@sketchi/editor-surface": new URL("../../../packages/editor/src/index.ts", import.meta.url)
-				.pathname,
+			"@sketchi/editor-surface": new URL(
+				"../../../packages/editor-surface/src/index.ts",
+				import.meta.url,
+			).pathname,
 		};
 
 		return config;
