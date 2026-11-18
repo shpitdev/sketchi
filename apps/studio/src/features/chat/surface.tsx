@@ -2,6 +2,7 @@ import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { mindmapTopics } from "@sketchi/diagrams/families/mindmap/index";
 import { type StudioBuildResult } from "./build-result";
 import { DrawingEditor } from "@sketchi/editor-surface";
+import { useHydrated } from "@tanstack/react-router";
 import { type ChatStatus, type ChatMessage } from "@/features/chat/chat-message";
 import { type RefObject } from "react";
 
@@ -327,6 +328,8 @@ export function StudioComposer({
 	onSubmit: PromptInputProps["onSubmit"];
 	status: ChatStatus;
 }) {
+	// Keep the draft editable, but block native submission until React can handle it.
+	const hydrated = useHydrated();
 	return (
 		<div className="studio__composer">
 			<PromptInput onSubmit={onSubmit}>
@@ -347,6 +350,7 @@ export function StudioComposer({
 					    the send glyph; the error message above says what went wrong. */}
 					<PromptInputSubmit
 						aria-label={status === "submitted" || status === "streaming" ? "Stop" : "Send"}
+						disabled={!hydrated}
 						status={status === "error" ? "ready" : status}
 					/>
 				</PromptInputFooter>
