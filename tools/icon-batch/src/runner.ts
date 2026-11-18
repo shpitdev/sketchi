@@ -23,13 +23,15 @@ export interface RunOptions {
 	readonly draw: (mark: CatalogMark, author: BatchAuthor, attempt: number) => Promise<MarkAttempt>;
 	readonly log?: (line: string) => void;
 	/** The most one attempt by this author can cost; the cap holds as long as no attempt exceeds it. */
-	readonly ceilingUsd?: (author: BatchAuthor) => number;
+	readonly ceilingUsd?: (author: BatchAuthor, mark: CatalogMark) => number;
 }
 
 export interface RunOutcome {
 	readonly settled: number;
 	readonly pending: number;
 	readonly spentUsd: number;
+	/** Marks with a durable reservation but no outcome; their ceiling counts toward spend. */
+	readonly unresolved: readonly string[];
 	/** True when the spend cap left a mark unsettled. */
 	readonly capped: boolean;
 }
@@ -66,13 +68,21 @@ function settle(mark: CatalogMark, attempts: readonly StoredAttempt[], final: bo
 const messageOf = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));
 
 const runWorkers = Effect.fn("sketchi.iconBatch.run")(function* (options: RunOptions) {
-	const ceiling = options.ceilingUsd ?? attemptCeilingUsd;
+	const ceiling = options.ceilingUsd ?? ((author) => attemptCeilingUsd(author));
 	const records = yield* Effect.tryPromise(() => options.store.records());
 	const existing = new Map(records.map((record) => [record.slug, record]));
-	const queue = options.marks.filter((mark) => existing.get(mark.slug)?.status === undefined);
-	let settled = options.marks.length - queue.length;
+	const marks = [...new Map(options.marks.map((mark) => [mark.slug, mark])).values()];
+	const unresolved = records
+		.filter((record) => record.reservation !== undefined)
+		.map((record) => record.slug);
+	const queue = marks.filter((mark) => {
+		const record = existing.get(mark.slug);
+		return record?.status === undefined && record?.reservation === undefined;
+	});
+	let settled = marks.filter((mark) => existing.get(mark.slug)?.status !== undefined).length;
 	let spent = records.reduce((sum, record) => sum + recordCost(record), 0);
 	let held = 0;
+	let live = 0;
 	let capped = false;
 	let changed = Deferred.makeUnsafe<void>();
 	let firstFailure: { readonly operation: string; readonly cause: unknown } | undefined;
@@ -92,9 +102,10 @@ const runWorkers = Effect.fn("sketchi.iconBatch.run")(function* (options: RunOpt
 		while (!firstFailure) {
 			if (spent + held + reservation <= options.spendCapUsd) {
 				held += reservation;
+				live += 1;
 				return true;
 			}
-			if (held === 0) {
+			if (live === 0) {
 				capped = true;
 				return false;
 			}
@@ -102,14 +113,25 @@ const runWorkers = Effect.fn("sketchi.iconBatch.run")(function* (options: RunOpt
 		}
 		return false;
 	});
+	const release = (reservation: number, charge: number) => {
+		spent += charge;
+		live -= 1;
+		// Floating point residue must never make a worker wait with nobody left to wake it.
+		held = live === 0 ? 0 : held - reservation;
+		wakeClaims();
+	};
 	const save = Effect.fnUntraced(function* (record: MarkRecord) {
 		const saved = yield* Effect.result(Effect.tryPromise(() => options.store.save(record)));
 		if (Result.isFailure(saved)) {
-			unwritten.push(record);
-			stop(`mark record for ${record.slug}`, saved.failure.cause);
-		} else if (record.status !== undefined) {
-			settled += 1;
+			if (record.reservation === undefined) unwritten.push(record);
+			stop(
+				`${record.reservation === undefined ? "mark record" : "reservation"} for ${record.slug}`,
+				saved.failure.cause,
+			);
+			return false;
 		}
+		if (record.status !== undefined) settled += 1;
+		return true;
 	});
 
 	const plan: readonly BatchAuthor[] = [options.authors.first, options.authors.retry];
@@ -121,10 +143,27 @@ const runWorkers = Effect.fn("sketchi.iconBatch.run")(function* (options: RunOpt
 			return;
 		}
 		for (const author of plan.slice(attempts.length)) {
-			const reservation = ceiling(author);
+			const reservation = ceiling(author, mark);
 			if (!(yield* claim(reservation))) return;
 			const index = attempts.length;
 			const startedAt = new Date().toISOString();
+			const checkpoint = settle(mark, attempts, false);
+			// Replacing this reservation with the result is one atomic mark write. A process
+			// death or failed result write leaves the ceiling charged and blocks replay.
+			const reserved = yield* save({
+				...checkpoint,
+				reservation: { author, startedAt, ceilingUsd: reservation },
+			});
+			if (!reserved) {
+				release(reservation, 0);
+				return;
+			}
+			if (firstFailure) {
+				// A sibling closed admissions during the write. This draw never dispatched.
+				const cleared = yield* save(checkpoint);
+				release(reservation, cleared ? 0 : reservation);
+				return;
+			}
 			const { previews, ...stored } = yield* Effect.tryPromise(() =>
 				options.draw(mark, author, index),
 			).pipe(
@@ -155,10 +194,9 @@ const runWorkers = Effect.fn("sketchi.iconBatch.run")(function* (options: RunOpt
 			attempts = [...attempts, stored];
 			const record = settle(mark, attempts, attempts.length >= plan.length);
 			// The recipe and charge are still recoverable without its preview PNGs.
-			yield* save(record);
-			spent += attemptCost(stored);
-			held -= reservation;
-			wakeClaims();
+			const saved = yield* save(record);
+			const charge = attemptCost(stored);
+			release(reservation, saved ? charge : Math.max(reservation, charge));
 			options.log?.(
 				`${mark.slug} ${(stored.author ?? author).replace("anthropic/claude-", "")}: ${stored.outcome === "failed" ? `failed (${stored.error?.tag})` : stored.judge?.recognizable ? "recognized" : `judge picked ${stored.judge?.picked ?? "nothing"}`} $${attemptCost(stored).toFixed(4)} ${(stored.ms / 1000).toFixed(1)}s | spent $${spent.toFixed(2)}`,
 			);
@@ -186,9 +224,10 @@ const runWorkers = Effect.fn("sketchi.iconBatch.run")(function* (options: RunOpt
 	}
 	return {
 		settled,
-		pending: options.marks.length - settled,
+		pending: marks.length - settled,
 		spentUsd: spent,
-		capped: capped && settled < options.marks.length,
+		unresolved,
+		capped: capped && settled < marks.length,
 	} satisfies RunOutcome;
 });
 

@@ -65,6 +65,13 @@ const AUTHOR_FIXED_INPUT_TOKENS = 6_000;
 const IMAGE_INPUT_TOKENS = 1_600;
 /** A turn's request or review text. */
 const TURN_TEXT_TOKENS = 1_000;
+export const REVIEW_NOTE_MAX_BYTES = 1_024;
+/** The note's fixed prompt prefix and delimiter, added alongside its UTF-8 bytes. */
+const REVIEW_NOTE_PREFIX_TOKENS = 64;
+
+export function reviewNoteFits(note: string): boolean {
+	return Buffer.byteLength(note, "utf8") <= REVIEW_NOTE_MAX_BYTES;
+}
 /** The judge's calls per draw (one revision is judged again) and the images it sees; it replies within its output limit. */
 const JUDGE_CALLS = 2;
 const JUDGE_IMAGES = 6;
@@ -77,21 +84,24 @@ const JUDGE_IMAGES = 6;
  * The batch does not replay model requests. An author chosen from the source
  * is not known until the draw reads it, so it counts at the dearer model.
  */
-export function attemptCeilingUsd(author: BatchAuthor): number {
+export function attemptCeilingUsd(author: BatchAuthor, note?: string): number {
 	if (author === "source") {
 		return Math.max(
-			attemptCeilingUsd("anthropic/claude-sonnet-5-5"),
-			attemptCeilingUsd("anthropic/claude-opus-5-5"),
+			attemptCeilingUsd("anthropic/claude-sonnet-5-5", note),
+			attemptCeilingUsd("anthropic/claude-opus-5-5", note),
 		);
 	}
 	const price = authorPrice(author);
+	// Budget one token per UTF-8 byte. The note stays in the prompt on every author round.
+	const noteTokens = note ? REVIEW_NOTE_PREFIX_TOKENS + Buffer.byteLength(note, "utf8") : 0;
 	let authorUsd = 0;
 	for (let call = 0; call < ICON_DRAW_MAX_ROUNDS; call += 1) {
 		const input =
 			AUTHOR_FIXED_INPUT_TOKENS +
 			(1 + 2 * call) * IMAGE_INPUT_TOKENS +
 			call * AUTHOR_MAX_TOKENS +
-			TURN_TEXT_TOKENS;
+			TURN_TEXT_TOKENS +
+			noteTokens;
 		authorUsd += input * price.cacheWrite + AUTHOR_MAX_TOKENS * price.output;
 	}
 	const judgeUsd =
@@ -197,6 +207,9 @@ export async function drawMark(
 		| undefined;
 	let author = request.author === "source" ? undefined : request.author;
 	try {
+		if (request.note !== undefined && !reviewNoteFits(request.note)) {
+			throw new Error(`Reviewer note must be at most ${REVIEW_NOTE_MAX_BYTES} UTF-8 bytes.`);
+		}
 		const svg = await request.loadCatalogSvg(request.slug);
 		if (svg === undefined) throw new Error(`${request.slug} has no source SVG.`);
 		outcome = await Effect.runPromise(
@@ -223,7 +236,7 @@ export async function drawMark(
 	// A subset of the dispatched POSTs can never establish the full charge.
 	const costUsd =
 		posts === logIds.length ? await Effect.runPromise(priceLogs(access, logIds)) : undefined;
-	const ceiling = attemptCeilingUsd(author ?? request.author);
+	const ceiling = attemptCeilingUsd(author ?? request.author, request.note);
 	if (Result.isFailure(outcome)) {
 		const error = outcome.failure;
 		return {
@@ -262,7 +275,7 @@ export async function drawMark(
 		...(costUsd === undefined ? {} : { costUsd }),
 		// The engine can return a recipe even when a judge or timed-out revision didn't report usage.
 		estimatedCostUsd:
-			posts > result.usage.calls
+			posts !== result.usage.byCall.length || !result.usageReported
 				? ceiling
 				: result.usage.byCall.reduce((sum, call) => sum + estimateCallCost(call), 0),
 		logIds,

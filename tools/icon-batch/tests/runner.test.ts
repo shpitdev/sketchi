@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { attemptCeilingUsd, type BatchAuthor, drawMark, type MarkAttempt } from "../src/draw-mark";
 import { initializeResvg, svgPng } from "../src/excalidraw-export";
 import { promote } from "../src/promote";
-import { runBatch } from "../src/runner";
+import { BatchWriteError, runBatch } from "../src/runner";
 import { marksToDraw } from "../src/selection";
 import { verdictLine, writeSheets } from "../src/sheets";
 import { RunStore } from "../src/store";
@@ -250,6 +250,79 @@ describe("runBatch", () => {
 		expect(outcome.spentUsd).toBeCloseTo(0.05);
 	});
 
+	it("does not strand a waiter when settled draws spend the exact cap", async () => {
+		const store = new RunStore(root);
+		const ceiling = attemptCeilingUsd(OPUS);
+		const draw = vi.fn(async () => attempt(OPUS, "recognized", ceiling));
+		const outcome = await runBatch({
+			marks: ["a", "b", "c", "d", "e"].map((slug) => icon(slug)),
+			store,
+			concurrency: 4,
+			spendCapUsd: 4 * ceiling,
+			authors: { first: OPUS, retry: OPUS },
+			draw,
+		});
+		expect(outcome).toMatchObject({ settled: 4, pending: 1, capped: true, spentUsd: 4 * ceiling });
+		expect(draw).toHaveBeenCalledTimes(4);
+	}, 5_000);
+
+	it("keeps a failed checkpoint's reservation across restart without replaying the draw", async () => {
+		const store = new RunStore(root);
+		const tmp = join(store.marksDir, "charged.json.tmp");
+		const ceiling = attemptCeilingUsd(OPUS);
+		const draw = vi
+			.fn(async () => attempt(OPUS, "recognized", ceiling))
+			.mockImplementationOnce(async () => {
+				await mkdir(tmp);
+				return attempt(OPUS, "recognized", ceiling);
+			});
+		const options = {
+			marks: [icon("charged")],
+			concurrency: 1,
+			spendCapUsd: ceiling,
+			authors: { first: OPUS, retry: OPUS },
+		};
+		const failure = await runBatch({ ...options, store, draw }).catch((error: unknown) => error);
+		expect(failure).toMatchObject({ spentUsd: ceiling });
+		await rm(tmp, { recursive: true });
+		const restart = new RunStore(root);
+		for (const spendCapUsd of [ceiling, 2 * ceiling]) {
+			const outcome = await runBatch({ ...options, store: restart, spendCapUsd, draw });
+			expect(outcome).toMatchObject({
+				settled: 0,
+				pending: 1,
+				spentUsd: ceiling,
+				unresolved: ["charged"],
+			});
+		}
+		const unresolved = await restart.records();
+		expect(summarize(unresolved)).toMatchObject({ attempts: 0, unresolved: 1, costUsd: ceiling });
+		expect(ledgerCsv(unresolved)).toContain("charged,CHARGED,devtools-ci,unresolved,0,");
+		if (!(failure instanceof BatchWriteError)) throw new Error("Expected a write failure");
+		for (const replacement of failure.unwritten) await restart.save(replacement);
+		const reconciled = await runBatch({ ...options, store: restart, draw });
+		expect(reconciled).toMatchObject({ settled: 1, pending: 0, spentUsd: ceiling, unresolved: [] });
+		expect(draw).toHaveBeenCalledTimes(1);
+	});
+
+	it("does not dispatch if the reservation cannot be written", async () => {
+		const store = new RunStore(root);
+		await mkdir(join(store.marksDir, "blocked.json.tmp"), { recursive: true });
+		const draw = vi.fn(async () => attempt(SONNET, "recognized"));
+		await expect(
+			runBatch({
+				marks: [icon("blocked")],
+				store,
+				concurrency: 1,
+				spendCapUsd: 2,
+				authors,
+				draw,
+			}),
+		).rejects.toMatchObject({ spentUsd: 0 });
+		expect(draw).not.toHaveBeenCalled();
+		expect(await store.records()).toEqual([]);
+	});
+
 	it.each(["preview", "record"] as const)(
 		"closes admissions on a failed %s write, then drains and charges the live draw",
 		async (step) => {
@@ -257,34 +330,40 @@ describe("runBatch", () => {
 			const failWrite = Promise.withResolvers<void>();
 			const finishLive = Promise.withResolvers<void>();
 			const liveStarted = Promise.withResolvers<void>();
-			const fail = async () => {
+			const writeEnded = Promise.withResolvers<void>();
+			const fail = async (write: () => Promise<void>) => {
 				writing.resolve();
 				await failWrite.promise;
+				try {
+					await write();
+				} finally {
+					writeEnded.resolve();
+				}
 			};
 			const store = new RunStore(root);
 			const broken = icon("broken");
 			const { previews: _, ...previous } = attempt(SONNET, "missed", 0.125);
 			const checkpoint = { ...broken, attempts: [previous] };
 			await store.save(checkpoint);
-			const savePreviews = store.savePreviews.bind(store);
-			const save = store.save.bind(store);
-			const write =
-				step === "preview"
-					? vi.spyOn(store, "savePreviews").mockImplementation(async (slug, index, previews) => {
-							if (slug === broken.slug) {
-								await fail();
-								// A directory in place of the PNG blocks its atomic rename.
-								await mkdir(store.previewPath(slug, index, 28), { recursive: true });
-							}
-							await savePreviews(slug, index, previews);
-						})
-					: vi.spyOn(store, "save").mockImplementation(async (record) => {
-							if (record.slug === broken.slug) {
-								await fail();
-								await mkdir(join(store.marksDir, `${broken.slug}.json.tmp`));
-							}
-							await save(record);
-						});
+			if (step === "preview") {
+				const savePreviews = store.savePreviews.bind(store);
+				vi.spyOn(store, "savePreviews").mockImplementation((slug, index, previews) => {
+					if (slug !== broken.slug) return savePreviews(slug, index, previews);
+					return fail(async () => {
+						await mkdir(store.previewPath(slug, index, 28), { recursive: true });
+						await savePreviews(slug, index, previews);
+					});
+				});
+			} else {
+				const save = store.save.bind(store);
+				vi.spyOn(store, "save").mockImplementation((record) => {
+					if (record.slug !== broken.slug || record.reservation) return save(record);
+					return fail(async () => {
+						await mkdir(join(store.marksDir, `${broken.slug}.json.tmp`));
+						await save(record);
+					});
+				});
+			}
 
 			const draws: string[] = [];
 			const marks = [broken, icon("live"), icon("waiting"), icon("queued")];
@@ -313,20 +392,19 @@ describe("runBatch", () => {
 			});
 			await Promise.all([liveStarted.promise, writing.promise]);
 			await setImmediate();
-			const beforeFailure = [...draws];
+			const beforeFailure = [...draws].sort();
 			failWrite.resolve();
-			// Read the failure from the actual filesystem before releasing the live draw.
-			await expect(write.mock.results[0]?.value).rejects.toBeDefined();
+			await writeEnded.promise;
 			await setImmediate();
 			const finishedBeforeDrain = finished;
 			finishLive.resolve();
 			const error = await failure;
-			expect({ beforeFailure, draws, finishedBeforeDrain }).toEqual({
+			expect({ beforeFailure, draws: draws.sort(), finishedBeforeDrain }).toEqual({
 				beforeFailure: ["broken:1", "live:0"],
 				draws: ["broken:1", "live:0"],
 				finishedBeforeDrain: false,
 			});
-			expect(error).toMatchObject({ spentUsd: 0.875 });
+			expect(error).toMatchObject({ spentUsd: step === "record" ? 1.375 : 0.875 });
 			const records = await store.records();
 			expect(records.find((record) => record.slug === "live")).toMatchObject({
 				status: "recognized",
@@ -334,7 +412,11 @@ describe("runBatch", () => {
 			});
 			const saved = records.find((record) => record.slug === "broken");
 			if (step === "record") {
-				expect(saved).toEqual(checkpoint);
+				expect(saved).toMatchObject({
+					...checkpoint,
+					reservation: { author: OPUS, ceilingUsd: 1 },
+				});
+				expect(saved).not.toHaveProperty("status");
 				expect(error).toMatchObject({
 					unwritten: [{ slug: "broken", attempts: [previous, { costUsd: 0.5, logIds: ["log"] }] }],
 				});
@@ -481,7 +563,7 @@ it("charges the failed draw's ceiling when its log never prices and does not rep
 	}
 });
 
-it.each(["disconnect", "refusal", "invalid SVG", "missing source"] as const)(
+it.each(["disconnect", "refusal", "invalid SVG", "missing source", "oversized note"] as const)(
 	"distinguishes an unpriced model POST from pre-dispatch failure: %s",
 	async (failure) => {
 		await initializeResvg();
@@ -501,6 +583,8 @@ it.each(["disconnect", "refusal", "invalid SVG", "missing source"] as const)(
 				name: "Source",
 				author: SONNET,
 				traceId: "dispatch-proof",
+				// 257 characters, 1028 UTF-8 bytes.
+				...(failure === "oversized note" ? { note: "🖍".repeat(257) } : {}),
 				loadCatalogSvg: async (slug) => {
 					if (slug !== "source") return undefined;
 					if (failure === "missing source") throw new Error("source unreadable");
@@ -518,6 +602,73 @@ it.each(["disconnect", "refusal", "invalid SVG", "missing source"] as const)(
 			},
 		});
 		expect(mark).not.toHaveProperty("costUsd");
+	},
+);
+
+it.each(["missing", "reported"] as const)(
+	"accounts for a successful draw with %s judge usage",
+	async (usage) => {
+		const dispatches: string[] = [];
+		let authors = 0;
+		const fetch: typeof globalThis.fetch = async (_url, init) => {
+			const operation = JSON.parse(new Headers(init?.headers).get("cf-aig-metadata") ?? "{}") as {
+				sketchiOperation?: string;
+			};
+			dispatches.push(`${init?.method}:${operation.sketchiOperation}`);
+			if (operation.sketchiOperation === "icon-author") {
+				const reply = authors++ === 0 ? { accept: false, recipe } : { accept: true, recipe: null };
+				return Response.json({
+					id: "msg_test",
+					type: "message",
+					role: "assistant",
+					model: "claude-sonnet-5-5",
+					content: [{ type: "text", text: JSON.stringify(reply) }],
+					stop_reason: "end_turn",
+					stop_sequence: null,
+					usage: { input_tokens: 1, output_tokens: 1 },
+				});
+			}
+			if (usage === "missing") return Response.json({});
+			return Response.json({
+				id: "resp_test",
+				object: "response",
+				created_at: 0,
+				status: "completed",
+				model: "gpt-6-sol",
+				output: [
+					{
+						id: "msg_test",
+						type: "message",
+						status: "completed",
+						role: "assistant",
+						content: [{ type: "output_text", annotations: [], text: '{"logo":0}' }],
+					},
+				],
+				usage: {
+					input_tokens: 300,
+					input_tokens_details: { cached_tokens: 100 },
+					output_tokens: 40,
+					output_tokens_details: { reasoning_tokens: 30 },
+					total_tokens: 340,
+				},
+			});
+		};
+		const result = await drawMark(
+			{ accountId: "acct", token: "token", fetch },
+			{
+				slug: "docker",
+				name: "Docker",
+				author: SONNET,
+				traceId: "judge-usage",
+				loadCatalogSvg: async () => validSvg,
+			},
+		);
+		expect(dispatches).toEqual(["POST:icon-author", "POST:icon-author", "POST:icon-judge"]);
+		expect(result).toMatchObject({ outcome: "drawn", logIds: [] });
+		expect(result.estimatedCostUsd).toBeCloseTo(
+			usage === "missing" ? attemptCeilingUsd(SONNET) : 0.000844,
+			9,
+		);
 	},
 );
 

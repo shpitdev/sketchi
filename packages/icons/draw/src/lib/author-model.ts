@@ -140,9 +140,11 @@ export const makeAuthorCall = (options: {
 		const finish = Option.getOrUndefined(
 			Array.findFirst(response.content, (part) => part.type === "finish"),
 		);
+		const inputTokens = response.usage.inputTokens.uncached;
+		const outputTokens = response.usage.outputTokens.total;
 		const usage = {
-			inputTokens: response.usage.inputTokens.uncached ?? 0,
-			outputTokens: response.usage.outputTokens.total ?? 0,
+			inputTokens: inputTokens ?? 0,
+			outputTokens: outputTokens ?? 0,
 			cacheReadTokens: response.usage.inputTokens.cacheRead ?? 0,
 			cacheWriteTokens: response.usage.inputTokens.cacheWrite ?? 0,
 		};
@@ -162,6 +164,7 @@ export const makeAuthorCall = (options: {
 				role: "author",
 				model: metadata?.modelId ?? model,
 				usage,
+				usageReported: inputTokens !== undefined && outputTokens !== undefined,
 				ms: finishedAt - startedAt,
 			},
 		} satisfies AuthorCallReply;

@@ -2,8 +2,9 @@ import { type MarkRecord, recordCost } from "./store";
 
 export interface BatchSummary {
 	readonly settled: number;
-	/** Marks with an attempt that the spend cap left unsettled. */
+	/** Marks with an attempt or reservation that are not settled. */
 	readonly pending: number;
+	readonly unresolved: number;
 	readonly recognized: number;
 	/** Recognized on the service's own author, without a retry. */
 	readonly recognizedFirst: number;
@@ -47,6 +48,9 @@ function stats(values: readonly number[]): Stats {
 	};
 }
 
+const hasSpend = (record: MarkRecord) =>
+	record.attempts.length > 0 || record.reservation !== undefined;
+
 const chosenAttempt = (record: MarkRecord) =>
 	record.chosen === undefined ? undefined : record.attempts[record.chosen];
 
@@ -64,7 +68,7 @@ function sumAttempts(
  */
 export function summarize(records: readonly MarkRecord[]): BatchSummary {
 	const settled = records.filter((record) => record.status !== undefined);
-	const spent = records.filter((record) => record.attempts.length > 0);
+	const spent = records.filter(hasSpend);
 	const recognized = settled.filter((record) => record.status === "recognized");
 	const drawn = spent.flatMap((record) => {
 		const chosen = chosenAttempt(record);
@@ -74,6 +78,7 @@ export function summarize(records: readonly MarkRecord[]): BatchSummary {
 	return {
 		settled: settled.length,
 		pending: spent.length - settled.length,
+		unresolved: spent.filter((record) => record.reservation !== undefined).length,
 		recognized: recognized.length,
 		recognizedFirst: recognized.filter((record) => record.chosen === 0).length,
 		rescued: recognized.filter((record) => (record.chosen ?? 0) > 0).length,
@@ -124,35 +129,34 @@ function csvField(value: string | number): string {
 	return /[",\n]/u.test(text) ? `"${text.replace(/"/gu, '""')}"` : text;
 }
 
-/** One row per mark with an attempt, attempts summed; a mark the cap left unsettled is `pending`. */
+/** One row per mark with an attempt or unresolved reservation. */
 export function ledgerCsv(records: readonly MarkRecord[]): string {
-	const rows = records
-		.filter((record) => record.attempts.length > 0)
-		.map((record) => {
-			const chosen = chosenAttempt(record);
-			const row: Record<(typeof CSV_COLUMNS)[number], string | number> = {
-				slug: record.slug,
-				name: record.name,
-				collection: record.collection,
-				status: record.status ?? "pending",
-				attempts: record.attempts.length,
-				author: chosen?.author ?? record.attempts.at(-1)?.author ?? "",
-				judge_picked: chosen?.judge?.picked ?? "",
-				rounds: chosen?.rounds ?? "",
-				parts: chosen?.recipe?.parts.length ?? "",
-				recipe_bytes: chosen?.recipe ? JSON.stringify(chosen.recipe).length : "",
-				calls: sumAttempts(record, (attempt) => attempt.calls),
-				input_tokens: sumAttempts(record, (attempt) => attempt.inputTokens),
-				output_tokens: sumAttempts(record, (attempt) => attempt.outputTokens),
-				cost_usd: recordCost(record).toFixed(5),
-				cost_priced: record.attempts.every((attempt) => attempt.costUsd !== undefined)
+	const rows = records.filter(hasSpend).map((record) => {
+		const chosen = chosenAttempt(record);
+		const row: Record<(typeof CSV_COLUMNS)[number], string | number> = {
+			slug: record.slug,
+			name: record.name,
+			collection: record.collection,
+			status: record.reservation ? "unresolved" : (record.status ?? "pending"),
+			attempts: record.attempts.length,
+			author: record.reservation?.author ?? chosen?.author ?? record.attempts.at(-1)?.author ?? "",
+			judge_picked: chosen?.judge?.picked ?? "",
+			rounds: chosen?.rounds ?? "",
+			parts: chosen?.recipe?.parts.length ?? "",
+			recipe_bytes: chosen?.recipe ? JSON.stringify(chosen.recipe).length : "",
+			calls: sumAttempts(record, (attempt) => attempt.calls),
+			input_tokens: sumAttempts(record, (attempt) => attempt.inputTokens),
+			output_tokens: sumAttempts(record, (attempt) => attempt.outputTokens),
+			cost_usd: recordCost(record).toFixed(5),
+			cost_priced:
+				!record.reservation && record.attempts.every((attempt) => attempt.costUsd !== undefined)
 					? "yes"
 					: "estimate",
-				seconds: (sumAttempts(record, (attempt) => attempt.ms) / 1000).toFixed(1),
-				error: record.attempts.at(-1)?.error?.message ?? "",
-			};
-			return CSV_COLUMNS.map((column) => csvField(row[column])).join(",");
-		});
+			seconds: (sumAttempts(record, (attempt) => attempt.ms) / 1000).toFixed(1),
+			error: record.attempts.at(-1)?.error?.message ?? "",
+		};
+		return CSV_COLUMNS.map((column) => csvField(row[column])).join(",");
+	});
 	return `${[CSV_COLUMNS.join(","), ...rows].join("\n")}\n`;
 }
 
@@ -176,11 +180,11 @@ export function summaryMarkdown(
 	return [
 		`# Icon batch ledger`,
 		"",
-		`| Marks settled | Recognized | First author | After retry | Unrecognized | Failed | Pending (cap) |`,
+		`| Marks settled | Recognized | First author | After retry | Unrecognized | Failed | Pending |`,
 		`| --- | --- | --- | --- | --- | --- | --- |`,
 		`| ${summary.settled} | ${summary.recognized} (${percent(summary.recognized)}) | ${summary.recognizedFirst} | ${summary.rescued} | ${summary.unrecognized} | ${summary.failed} | ${summary.pending} |`,
 		"",
-		`Spend: ${money(summary.costUsd)} over ${summary.attempts} attempts (${summary.pricedAttempts} priced by the gateway's logs, the rest estimated). Marks not yet settled: ${context.remaining}, about ${money(perMark.costUsd.mean * context.remaining)} at this mean.`,
+		`Accounted spend: ${money(summary.costUsd)} (${summary.pricedAttempts} of ${summary.attempts} finished attempts priced, ${summary.unresolved} unresolved at their ceilings). Marks not yet settled: ${context.remaining}, about ${money(perMark.costUsd.mean * context.remaining)} at this mean.`,
 		"",
 		`| Per mark | mean | p50 | p90 | max |`,
 		`| --- | --- | --- | --- | --- |`,

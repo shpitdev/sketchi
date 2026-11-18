@@ -18,7 +18,7 @@ import { IconInputError, IconRecipeError, IconTimeoutError } from "./errors";
 import { IconImaging, type IconImageExport, type IconImagePrepare } from "./imaging";
 import { type IconDrawInput, type IconSource } from "./input";
 import { decodeJudgeReply, JUDGE_LOOK_ALIKES, type JudgeCandidate, judgeLineup } from "./judge";
-import { type IconAuthorModel, IconDrawModels } from "./models";
+import { type AccountedModelCall, type IconAuthorModel, IconDrawModels } from "./models";
 import {
 	ICON_EXPORT_SCALE,
 	iconLibrary,
@@ -57,7 +57,10 @@ export interface IconDrawOptions {
 	readonly note?: string;
 }
 
-export interface IconDrawResult extends Omit<IconDrawSuccess, "ok" | "status"> {}
+export interface IconDrawResult extends Omit<IconDrawSuccess, "ok" | "status"> {
+	/** Internal spend check. False when any recorded call lacks provider-reported usage. */
+	readonly usageReported: boolean;
+}
 
 /** A measured color this far from every paint is something the paint reader missed, such as an embedded image. */
 const PAINT_MATCH_DISTANCE = 120;
@@ -150,7 +153,7 @@ export const drawIcon = Effect.fn("iconDraw.draw")(function* (
 	const startedAt = yield* Clock.currentTimeMillis;
 	const maxRounds = options.maxRounds ?? ICON_DRAW_MAX_ROUNDS;
 	const budgetMs = options.budgetMs ?? ICON_DRAW_BUDGET_MS;
-	const calls: ModelCall[] = [];
+	const calls: AccountedModelCall[] = [];
 	const deadline = startedAt + budgetMs;
 	const timeLeft = Effect.map(Clock.currentTimeMillis, (now) => deadline - now);
 	/**
@@ -452,6 +455,7 @@ export const drawIcon = Effect.fn("iconDraw.draw")(function* (
 		judge,
 		palette,
 		author: { model: options.authorModel, rounds, accepted, turns },
+		usageReported: calls.every((call) => call.usageReported),
 		usage: {
 			calls: calls.length,
 			inputTokens: sum(
@@ -461,7 +465,7 @@ export const drawIcon = Effect.fn("iconDraw.draw")(function* (
 			cacheWriteTokens: sum((call) => call.usage.cacheWriteTokens),
 			outputTokens: sum((call) => call.usage.outputTokens),
 			ms: finishedAt - startedAt,
-			byCall: calls,
+			byCall: calls.map(({ role, model, usage, ms }): ModelCall => ({ role, model, usage, ms })),
 		},
 	} satisfies IconDrawResult;
 });
