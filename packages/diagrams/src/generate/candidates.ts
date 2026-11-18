@@ -1,3 +1,4 @@
+// @effect-diagnostics schemaSync:off -- This synchronous candidate transform round-trips an already typed Sequence document.
 import { slug } from "../clean-text";
 import { isDiagramIconSlug, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 import { Array as Arr, Match, Result, Schema, SchemaIssue } from "effect";
@@ -1087,14 +1088,12 @@ function groundDiagramIcons(
 			: { diagnostics: [], diagram, flowchart: candidate.flowchart };
 	}
 	if (diagram.type === "sequence") {
-		// @effect-diagnostics-next-line schemaSync:off -- This synchronous candidate transform round-trips an already typed Sequence document.
 		const encoded = Schema.encodeSync(SequenceDiagram)(diagram);
 		const placement = placeNodeLogos(encoded.participants, logos, "participant");
 		return placement.diagnostics.length === 0
 			? { diagnostics: [], diagram }
 			: {
 					diagnostics: placement.diagnostics,
-					// @effect-diagnostics-next-line schemaSync:off -- This synchronous candidate transform round-trips an already typed Sequence document.
 					diagram: Schema.decodeUnknownSync(SequenceDiagram)({
 						...encoded,
 						participants: placement.nodes,

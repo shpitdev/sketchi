@@ -17,7 +17,6 @@ import {
 import { type ExportedElement, midWordBreaks } from "./text-fit-helpers";
 
 // Keep every invariant and direction in the smoke run; the local target restores the full matrix.
-// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 const FULL = process.env["ROUTING_FUZZ"] === "full";
 
 type Kind = "start" | "process" | "decision" | "end";

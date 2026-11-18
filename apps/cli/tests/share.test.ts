@@ -1,6 +1,3 @@
-// @effect-diagnostics nodeBuiltinImport:off -- The share contract harness owns the real HTTP socket and on-disk input/output fixtures.
-// @effect-diagnostics strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
-
 import { strict as assert } from "node:assert";
 import { once } from "node:events";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -47,7 +44,6 @@ describe("Excalidraw share transport", () => {
 				let requestSignal: AbortSignal | null | undefined;
 				globalThis.fetch = (_input, init) => {
 					requestSignal = init?.signal;
-					// @effect-diagnostics-next-line newPromise:off -- A controllable fetch Promise lets the test observe whether the CLI aborts the native request.
 					return new Promise<Response>(() => {
 						Deferred.doneUnsafe(started, Effect.void);
 					});
@@ -71,7 +67,6 @@ describe("Excalidraw share transport", () => {
 			let requestSignal: AbortSignal | null | undefined;
 			globalThis.fetch = (_input, init) => {
 				requestSignal = init?.signal;
-				// @effect-diagnostics-next-line newPromise:off -- A controllable fetch Promise lets the test observe whether the CLI aborts the native request.
 				return new Promise<Response>(() => {
 					Deferred.doneUnsafe(started, Effect.void);
 				});
@@ -97,7 +92,6 @@ describe("Excalidraw share transport", () => {
 						const server = createServer((_request, response) => {
 							response.writeHead(status);
 							response.write("error chunk\n");
-							// @effect-diagnostics-next-line globalTimers:off -- The local HTTP fixture writes until the response is cancelled so the test can observe body release.
 							const writes = setInterval(() => response.write("error chunk\n"), 50);
 							response.once("close", () => {
 								clearInterval(writes);
@@ -116,7 +110,6 @@ describe("Excalidraw share transport", () => {
 							// through the close check so garbage collection cannot release the body.
 							let fetched: Response | undefined;
 							globalThis.fetch = async (_input, init) => {
-								// @effect-diagnostics-next-line globalFetch:off -- A test stub forwards this request to the real local HTTP fixture.
 								fetched = await originalFetch(`http://127.0.0.1:${address.port}`, init);
 								return fetched;
 							};
@@ -218,9 +211,7 @@ const openWithFakeOpener = (script: string) =>
 						mode: 0o755,
 					}),
 				);
-				// @effect-diagnostics-next-line processEnvInEffect:off -- The test sets or restores an endpoint override in the CLI’s actual host environment.
 				const path = process.env["PATH"];
-				// @effect-diagnostics-next-line processEnvInEffect:off -- The test sets or restores an endpoint override in the CLI’s actual host environment.
 				process.env["PATH"] = `${directory}:${path ?? ""}`;
 				const result = yield* Effect.gen(function* () {
 					return yield* (yield* LinkOpener).open("https://excalidraw.com/#json=a,b");
@@ -230,7 +221,6 @@ const openWithFakeOpener = (script: string) =>
 					),
 					Effect.ensuring(
 						Effect.sync(() => {
-							// @effect-diagnostics-next-line processEnvInEffect:off -- The test sets or restores an endpoint override in the CLI’s actual host environment.
 							process.env["PATH"] = path;
 						}),
 					),
@@ -268,7 +258,6 @@ describe("Excalidraw share-link protocol", () => {
 				Buffer.from(upstreamFixtureBase64, "base64"),
 				fixtureKey,
 			);
-			// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 			assert.deepEqual(decoded, JSON.parse(fixtureJson));
 		}).pipe(Effect.provide(ShareCryptoLive)),
 	);
@@ -280,7 +269,6 @@ describe("Excalidraw share-link protocol", () => {
 				fixtureKey,
 				fixtureIv,
 			);
-			// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 			assert.deepEqual(yield* decodeSharePayload(encoded, fixtureKey), JSON.parse(fixtureJson));
 			assert.equal(Buffer.from(encoded).toString("base64"), upstreamFixtureBase64);
 		}).pipe(Effect.provide(ShareCryptoLive)),

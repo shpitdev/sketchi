@@ -1,5 +1,3 @@
-// @effect-diagnostics nodeBuiltinImport:off -- The resume harness uses real temporary run files and Node timers at the Promise adapter boundary.
-
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

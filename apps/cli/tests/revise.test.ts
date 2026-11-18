@@ -1,6 +1,4 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The CLI revise test exercises local files in an isolated temporary workspace.
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The CLI revise test exercises local files in an isolated temporary workspace.
 import { join, resolve } from "node:path";
 
 import { ArtifactStorageMemory, makeBuildRuntimeEnvironmentLayer } from "@sketchi/diagrams/build";
@@ -85,6 +83,14 @@ function stubFetch(handler: (body: Record<string, unknown>) => string | Promise<
 	};
 }
 
+/** Answer the request only after `edit` commits through its own runtime, as a competing writer would. */
+function stubFetchAfter<A, E>(edit: Effect.Effect<A, E>, response: string): void {
+	stubFetch(async () => {
+		await Effect.runPromise(edit);
+		return response;
+	});
+}
+
 function reviseRequest(diagramId = "release-flow") {
 	return reviseDiagram({
 		endpoint: DEFAULT_GENERATE_ENDPOINT,
@@ -107,7 +113,6 @@ function withRealStore<A, E>(
 		}),
 		(root) =>
 			use.pipe(
-				// @effect-diagnostics-next-line strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
 				Effect.provide(
 					Layer.merge(
 						Layer.fresh(DiagramStoreLive).pipe(
@@ -137,13 +142,10 @@ describe("revising a stored diagram with a request", () => {
 				const store = yield* DiagramStore;
 				yield* store.create(builtDiagram());
 				const response = yield* Effect.promise(() => successBody(revisedInput));
-				stubFetch(async () => {
-					// @effect-diagnostics-next-line runEffectInsideEffect:off -- The test invokes the CLI as a separate runtime with its own input and output services.
-					await Effect.runPromise(
-						store.edit("release-flow", builtDiagram({ title: "Edited meanwhile" })),
-					);
-					return response;
-				});
+				stubFetchAfter(
+					store.edit("release-flow", builtDiagram({ title: "Edited meanwhile" })),
+					response,
+				);
 
 				const error = yield* Effect.flip(reviseRequest());
 				assert.strictEqual(error._tag, "CliStorageError");

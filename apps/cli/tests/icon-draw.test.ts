@@ -1,6 +1,3 @@
-// @effect-diagnostics newPromise:off -- The HTTP fixture exposes native server lifecycle and controllable fetch stalls to the CLI.
-// @effect-diagnostics nodeBuiltinImport:off -- The CLI draw boundary test exercises a local HTTP server and the actual Node process and output files.
-
 import type { CommunityPublished } from "@sketchi/community-icons/http-api";
 import { spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -324,7 +321,6 @@ describe("sketchi icon draw", () => {
 				source: { path: "acme.svg", name: "Acme" },
 			}).pipe(
 				Effect.provideService(FetchHttpClient.Fetch, fetch),
-				// @effect-diagnostics-next-line strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
 				Effect.provide(
 					Layer.mock(LocalFileSystem, {
 						readBytes: () => Effect.succeed(new TextEncoder().encode(SVG)),

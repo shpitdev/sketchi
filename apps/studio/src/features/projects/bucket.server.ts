@@ -1,3 +1,4 @@
+// @effect-diagnostics asyncFunction:off -- The existing local R2 binding implements the platform Promise interface; domain effects adapt it at StudioObjectStore.
 import { nanoid } from "nanoid";
 import { Context, Effect, Layer, Schema, DateTime, Array, String as Str } from "effect";
 
@@ -161,19 +162,16 @@ export function makeStudioObjectStoreLayer(binding: unknown) {
 export class MemoryStudioObjectBucket implements StudioObjectBucket {
 	readonly objects = new Map<string, string | Uint8Array>();
 	readonly metadata = new Map<string, StudioObjectMetadata>();
-	// @effect-diagnostics-next-line asyncFunction:off -- The existing local R2 binding implements the platform Promise interface; domain effects adapt it at StudioObjectStore.
 	async head(key: string) {
 		return this.objects.has(key) ? (this.metadata.get(key) ?? null) : null;
 	}
 
-	// @effect-diagnostics-next-line asyncFunction:off -- The existing local R2 binding implements the platform Promise interface; domain effects adapt it at StudioObjectStore.
 	async delete(key: string): Promise<unknown> {
 		this.objects.delete(key);
 		this.metadata.delete(key);
 		return null;
 	}
 
-	// @effect-diagnostics-next-line asyncFunction:off -- The existing local R2 binding implements the platform Promise interface; domain effects adapt it at StudioObjectStore.
 	async get(key: string): Promise<StudioObjectBucketObject | null> {
 		const value = this.objects.get(key);
 		if (value === undefined) {
@@ -188,18 +186,15 @@ export class MemoryStudioObjectBucket implements StudioObjectBucket {
 				etag: "fixture",
 			}),
 			size: bytes.byteLength,
-			// @effect-diagnostics-next-line asyncFunction:off -- The existing local R2 binding implements the platform Promise interface; domain effects adapt it at StudioObjectStore.
 			arrayBuffer: async () => {
 				const buffer = new ArrayBuffer(bytes.byteLength);
 				new Uint8Array(buffer).set(bytes);
 				return buffer;
 			},
-			// @effect-diagnostics-next-line asyncFunction:off -- The existing local R2 binding implements the platform Promise interface; domain effects adapt it at StudioObjectStore.
 			text: async () => (typeof value === "string" ? value : new TextDecoder().decode(value)),
 		};
 	}
 
-	// @effect-diagnostics-next-line asyncFunction:off -- The existing local R2 binding implements the platform Promise interface; domain effects adapt it at StudioObjectStore.
 	async put(key: string, value: StudioObjectBucketBody): Promise<StudioObjectMetadata> {
 		this.objects.set(key, typeof value === "string" ? value : new Uint8Array(value));
 		const metadata = { uploaded: DateTime.toDateUtc(DateTime.nowUnsafe()), etag: nanoid() };
@@ -207,7 +202,6 @@ export class MemoryStudioObjectBucket implements StudioObjectBucket {
 		return metadata;
 	}
 
-	// @effect-diagnostics-next-line asyncFunction:off -- The existing local R2 binding implements the platform Promise interface; domain effects adapt it at StudioObjectStore.
 	async list(options: StudioObjectBucketListOptions): Promise<StudioObjectBucketListResult> {
 		return {
 			objects: Array.map(

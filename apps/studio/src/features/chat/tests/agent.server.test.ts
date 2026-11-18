@@ -1,5 +1,3 @@
-// @effect-diagnostics newPromise:off -- The model stub returns controlled native Promises so Stop and timeout reach the foreign provider.
-
 import { describe, expect, it, vi } from "@effect/vitest";
 import type { CloudflareAiGateway } from "@sketchi/cloudflare/ai-gateway";
 import {
@@ -119,11 +117,9 @@ it("keeps the gateway settings, all family contracts and compact build results o
 			strict: false,
 			parameters: toCodeModeJsonSchema(family.studioInput),
 		}));
-	// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 	const first = Schema.decodeUnknownSync(Schema.Struct({ tools: Schema.Unknown }))(calls[0]?.query);
 	expect(first.tools).toEqual(expected);
 	const next = JSON.stringify(
-		// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 		Schema.decodeUnknownSync(Schema.Struct({ input: Schema.Unknown }))(calls[1]?.query).input,
 	);
 	for (const heavy of ['\\"elements\\"', '\\"normalizedSpec\\"', '\\"formats\\"', '\\"inline\\"'])
@@ -203,7 +199,6 @@ async function runWire(respond: (round: number) => Response, content = "Draw a f
 	const response = await runStudioEffect(
 		handleStudioAgentRequest(request).pipe(
 			Effect.provideService(ArtifactStorage, { ...storage, write }),
-			// @effect-diagnostics-next-line strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
 			Effect.provide(makeWorkersTelemetryLayer({ resource: { serviceName: "studio-test" }, sink })),
 		),
 		{
@@ -230,13 +225,11 @@ function buildResults<A>(body: string, schema: Schema.Codec<A, unknown>) {
 		.split("\n")
 		.filter((line) => line.startsWith("data:"))
 		.flatMap((line) => {
-			// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 			const event = Schema.decodeUnknownSync(Schema.fromJsonString(AgUiSchema.Event))(
 				line.slice(5),
 			);
 			return event.type === "TOOL_CALL_RESULT"
-				? // @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
-					[Schema.decodeUnknownSync(Schema.fromJsonString(schema))(event.content)]
+				? [Schema.decodeUnknownSync(Schema.fromJsonString(schema))(event.content)]
 				: [];
 		});
 }

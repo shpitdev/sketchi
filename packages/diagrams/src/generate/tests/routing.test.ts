@@ -51,7 +51,6 @@ const route = (request: DiagramGenerationRequest, ai: WorkersAiRunner) =>
 	Effect.gen(function* () {
 		const narrowing = yield* DiagramFamilyNarrowing;
 		return yield* withNarrowedFamilyRoute(request, narrowing);
-		// @effect-diagnostics-next-line strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
 	}).pipe(Effect.provide(workersAiFamilyNarrowingLayer({ ai, timeoutMs: 50 })));
 
 const untyped = (request: string): DiagramGenerationRequest => ({
@@ -78,7 +77,6 @@ describe("routing a request to its family", () => {
 
 	for (const [name, respond] of [
 		["fails", () => Promise.reject(new Error("Rate limit exceeded"))],
-		// @effect-diagnostics-next-line newPromise:off -- The fake provider returns a pending native response to expose cancellation at the boundary.
 		["never answers", () => new Promise<never>(() => {})],
 	] as const) {
 		it.live(`routes by the words alone when Jev ${name}`, () =>

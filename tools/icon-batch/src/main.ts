@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off -- The Node command host loads local catalog, review notes and ledger files before and after a run.
+/* oxlint-disable no-restricted-imports -- The Node command host loads local catalog, review notes and ledger files before and after a run. */
 
 /**
  * Draw the icon catalog by hand: `draw` runs the draw service's engine over

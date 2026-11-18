@@ -351,6 +351,51 @@
                 "preferEffectString": "off"
               }
             }
+          },
+          // Node programs: path, os, url and zlib are pure helpers. Oxlint bans the I/O modules by name here.
+          {
+            "include": ["apps/cli/src/**/*", "tools/*/src/**/*"],
+            "options": {
+              "diagnosticSeverity": {
+                "nodeBuiltinImport": "off"
+              }
+            }
+          },
+          // Build scripts and configs run on Node at build time, where Node modules, fetch and promises are the host.
+          {
+            "include": ["**/scripts/**/*", "**/*.mjs", "**/*.config.*"],
+            "options": {
+              "diagnosticSeverity": {
+                "globalFetch": "off",
+                "newPromise": "off",
+                "nodeBuiltinImport": "off"
+              }
+            }
+          },
+          // Tests drive the host directly: Node, env, clock, randomness, JSON, console, timers, fetch, promises and per-test layers. Correctness rules stay errors.
+          {
+            "include": ["**/tests/**/*"],
+            "options": {
+              "diagnosticSeverity": {
+                "asyncFunction": "off",
+                "globalConsole": "off",
+                "globalConsoleInEffect": "off",
+                "globalDate": "off",
+                "globalDateInEffect": "off",
+                "globalFetch": "off",
+                "globalJson": "off",
+                "globalJsonInEffect": "off",
+                "globalRandom": "off",
+                "globalRandomInEffect": "off",
+                "globalTimers": "off",
+                "newPromise": "off",
+                "nodeBuiltinImport": "off",
+                "processEnv": "off",
+                "processEnvInEffect": "off",
+                "schemaSync": "off",
+                "strictEffectProvide": "off"
+              }
+            }
           }
         ]
       }

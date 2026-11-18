@@ -36,9 +36,7 @@ describe("tall column fuzz", () => {
 			const aspects = scenes.map(
 				({ width, height }) => (Math.max(width, height) - 56) / (Math.min(width, height) - 56),
 			);
-			// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 			if (process.env.PRINT_ROUTING)
-				// @effect-diagnostics-next-line globalConsole:off -- The offline fuzz run prints its reproduction data directly to the invoking terminal.
 				console.log(
 					"PIN tall",
 					direction,

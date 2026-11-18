@@ -1,3 +1,4 @@
+// @effect-diagnostics processEnv:off -- The synchronous help renderer honors the caller terminal’s color conventions.
 import { Chalk, type ChalkInstance } from "chalk";
 import stringWidth from "string-width";
 import wrapAnsi from "wrap-ansi";
@@ -366,7 +367,6 @@ export function terminalPaletteForBackground(
 // absence must not disable colour — it only means we cannot detect a light
 // background and fall back to the dark palette.
 function terminalPalette(colors: Exclude<HelpBrandOptions["colors"], "none">): TerminalPalette {
-	// @effect-diagnostics-next-line processEnv:off -- The synchronous help renderer honors the caller terminal’s color conventions.
 	const colorForegroundBackground = process.env["COLORFGBG"];
 	const background = colorForegroundBackground?.split(";").at(-1);
 	if (!background || !/^\d+$/u.test(background)) {
@@ -382,11 +382,8 @@ export function terminalRootHelp(): string {
 			: process.stdout.columns;
 	const unicode = terminalSupportsUnicode();
 	const disabled =
-		// @effect-diagnostics-next-line processEnv:off -- The synchronous help renderer honors the caller terminal’s color conventions.
 		process.env["NO_COLOR"] !== undefined ||
-		// @effect-diagnostics-next-line processEnv:off -- The synchronous help renderer honors the caller terminal’s color conventions.
 		process.env["TERM"] === "dumb" ||
-		// @effect-diagnostics-next-line processEnv:off -- The synchronous help renderer honors the caller terminal’s color conventions.
 		process.env["TERM"] === "ansi" ||
 		process.stdout.isTTY !== true;
 	const colors = disabled

@@ -1,4 +1,4 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The CLI translates host paths synchronously before handing them to its filesystem adapter.
+// @effect-diagnostics processEnv:off -- Endpoint overrides are read from the invoking CLI environment when selecting a remote host.
 import { basename, extname, join, resolve } from "node:path";
 
 import {
@@ -50,12 +50,10 @@ const SOURCE_KINDS: Readonly<Record<string, "svg" | "image">> = {
 };
 
 export function resolveIconDrawEndpoint(): string {
-	// @effect-diagnostics-next-line processEnv:off -- Endpoint overrides are read from the invoking CLI environment when selecting a remote host.
 	return process.env[SKETCHI_ICON_DRAW_ENDPOINT_ENV]?.trim() || DEFAULT_ICON_DRAW_ENDPOINT;
 }
 
 export function resolveCommunityEndpoint(): string {
-	// @effect-diagnostics-next-line processEnv:off -- Endpoint overrides are read from the invoking CLI environment when selecting a remote host.
 	return process.env[SKETCHI_COMMUNITY_ENDPOINT_ENV]?.trim() || DEFAULT_COMMUNITY_ENDPOINT;
 }
 

@@ -101,7 +101,6 @@ function generate(
 	input: typeof request & { temperature?: number } = request,
 ) {
 	return Effect.flatMap(DiagramGenerationClient, (client) => client.generate(input)).pipe(
-		// @effect-diagnostics-next-line strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
 		Effect.provide(layer),
 	);
 }
@@ -270,7 +269,6 @@ describe("the gateway client", () => {
 		let aborted = false;
 		const layer = clientLayer(
 			(_data, options) =>
-				// @effect-diagnostics-next-line newPromise:off -- The provider stub models pending and abort-aware native requests, not an Effect timer.
 				new Promise<Response>((_resolve, reject) => {
 					options?.signal?.addEventListener(
 						"abort",
@@ -302,7 +300,6 @@ describe("the gateway client", () => {
 					new ReadableStream<Uint8Array>({
 						pull(controller) {
 							reading.resolve();
-							// @effect-diagnostics-next-line newPromise:off -- The provider stub models pending and abort-aware native requests, not an Effect timer.
 							return new Promise<void>((_resolve, reject) => {
 								signal.addEventListener(
 									"abort",
@@ -420,7 +417,6 @@ describe("the generation policy", () => {
 			const oversized = candidateFromText({
 				model: "fixture-model",
 				provider: "fixture",
-				// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 				text: JSON.stringify({
 					title: "Every topic",
 					diagram: {

@@ -1,6 +1,5 @@
 // Another gate on the machine: `hold <dir>` takes a slot and keeps it until killed;
 // `contend <dir> <active>` takes and releases a slot 200 times and prints the most it saw held.
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The separate Node fixture writes a marker for the parent slot test after acquiring the lock.
 import { readdirSync, rmSync, writeFileSync } from "node:fs";
 
 import { NodeRuntime } from "@effect/platform-node";
@@ -28,13 +27,11 @@ const contend = Effect.gen(function* () {
 				const marker = `${active}/${process.pid}`;
 				writeFileSync(marker, "");
 				most = Math.max(most, readdirSync(active).length);
-				// @effect-diagnostics-next-line globalRandomInEffect:off -- The native subprocess fixture randomizes contention to exercise overlapping slot holders.
 				yield* Effect.sleep(`${Math.random()} millis`);
 				rmSync(marker);
 			}),
 		);
 	}
-	// @effect-diagnostics-next-line globalJsonInEffect:off -- The child fixture emits its peak concurrency as JSON for the parent test.
 	yield* Console.log(JSON.stringify(most));
 });
 

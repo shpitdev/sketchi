@@ -1,5 +1,3 @@
-// @effect-diagnostics newPromise:off -- The provider stub returns a native Promise that can stall or settle after interruption.
-
 // @vitest-environment jsdom
 import { loadLibraryFromBlob } from "@excalidraw/excalidraw";
 import { describe, expect, it } from "@effect/vitest";
@@ -93,7 +91,6 @@ function scripted(script: Script) {
 			Effect.sleep(script.authorDelayMs ?? 0).pipe(
 				Effect.andThen(
 					Effect.sync(() => {
-						// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 						const text = JSON.stringify(authorReplies.shift());
 						return {
 							content: Prompt.make([{ role: "assistant", content: text }]),
@@ -127,7 +124,6 @@ const draw = <E, R>(
 				...(budgetMs === undefined ? {} : { budgetMs }),
 			}),
 		),
-		// @effect-diagnostics-next-line strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
 		Effect.provide(layer),
 	);
 
@@ -236,7 +232,6 @@ describe("drawIcon", () => {
 			expect(judged).toEqual([5]);
 			const loaded = yield* Effect.promise(() =>
 				loadLibraryFromBlob(
-					// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 					new Blob([JSON.stringify(icon.excalidrawlib)], {
 						type: "application/vnd.excalidrawlib+json",
 					}),
@@ -267,7 +262,6 @@ describe("drawIcon", () => {
 				judge: ['{"logo": 0}'],
 			});
 			const lineup = (yield* draw(layer)).judge.lineup;
-			// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 			const lookAlike = JSON.stringify({ logo: lineup.findIndex((name) => name !== "source") + 1 });
 			const mistaken = scripted({
 				author: [
@@ -312,7 +306,6 @@ describe("drawIcon", () => {
 					outputTokens: 40,
 				});
 				// Every image in the lineup goes at low detail, the judge's main spend.
-				// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 				const images = JSON.stringify(judged.queries["icon-judge"][0]).match(/"detail":"[a-z]+"/g);
 				expect(images).toEqual(Array.from({ length: 6 }, () => '"detail":"low"'));
 				expect(judged.queries["icon-judge"][0]).toMatchObject({
@@ -435,7 +428,6 @@ describe("drawIcon spend bounds", () => {
 				),
 			);
 			yield* TestClock.adjust("76 seconds");
-			// @effect-diagnostics-next-line globalTimers:off -- The timeout boundary test makes the foreign provider Promise settle late in real time.
 			yield* Effect.promise(() => new Promise((resolve) => setTimeout(resolve, 0)));
 			expect(aborted).toBe(true);
 			expect(stalled.dispatches).toEqual({ "icon-author": 1, "icon-judge": 0 });
@@ -468,7 +460,6 @@ describe("drawIcon spend bounds", () => {
 				),
 			);
 			yield* TestClock.adjust("31 seconds");
-			// @effect-diagnostics-next-line globalTimers:off -- The timeout boundary test makes the foreign provider Promise settle late in real time.
 			yield* Effect.promise(() => new Promise((resolve) => setTimeout(resolve, 0)));
 			expect(judgeAborted).toBe(true);
 			const marked = yield* Fiber.join(judging);

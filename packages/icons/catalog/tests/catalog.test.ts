@@ -1,6 +1,4 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The catalog test checks the generated assets against the files actually shipped.
 import { readFileSync } from "node:fs";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The catalog test checks the generated assets against the files actually shipped.
 import { resolve } from "node:path";
 
 import { beforeAll, describe, expect, it } from "vitest";

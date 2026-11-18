@@ -18,7 +18,6 @@ export function render(ui: ReactElement, options?: RenderOptions) {
 	registry.set(
 		queryHttpLayer,
 		FetchHttpClient.layer.pipe(
-			// @effect-diagnostics-next-line globalFetch:off -- This test Fetch service delegates to the current browser fetch stub; application requests use HttpClient.
 			Layer.provide(Layer.succeed(FetchHttpClient.Fetch, (...args) => globalThis.fetch(...args))),
 		),
 	);

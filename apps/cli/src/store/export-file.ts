@@ -1,4 +1,3 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- These synchronous host-native path calculations feed the scoped CLI filesystem operations.
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { Effect } from "effect";

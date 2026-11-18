@@ -1,8 +1,6 @@
 // Production domain commands at their real boundaries: the command line, the files they write,
 // and a fixture Cloudflare API.
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The deploy command test inspects the recorded CLI fixture files, not live Workers.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The deploy command test inspects the recorded CLI fixture files, not live Workers.
 import { join } from "node:path";
 
 import { it } from "@effect/vitest";
@@ -128,7 +126,6 @@ describe("production domains", () => {
 			zoneStatus = "active";
 			const { exit, out, outputs } = yield* domains("icons", source);
 			expect(failure(exit)).toBeUndefined();
-			// @effect-diagnostics-next-line globalJsonInEffect:off -- The harness reads or writes the fixture JSON independently of the command codec.
 			const written = JSON.parse(readFileSync(out, "utf8"));
 			expect(written).toEqual({
 				name: "sketchi-icons",

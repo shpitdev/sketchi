@@ -1,7 +1,5 @@
 // @vitest-environment node
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The HTTP harness reads catalog assets from a local checkout for its Worker ASSETS stub.
 import { existsSync } from "node:fs";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The HTTP harness reads catalog assets from a local checkout for its Worker ASSETS stub.
 import { resolve } from "node:path";
 
 import { openD1 } from "./support/d1";

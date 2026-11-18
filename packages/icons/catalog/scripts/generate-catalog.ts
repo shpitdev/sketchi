@@ -1,6 +1,4 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This offline catalog generator reads and writes checked-in SVG and manifest assets.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This offline catalog generator reads and writes checked-in SVG and manifest assets.
 import { dirname, resolve } from "node:path";
 
 import { catalogCommonWords, loadCommonEnglishWords } from "../src/common-words-generation";

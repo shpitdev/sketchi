@@ -1,3 +1,4 @@
+// @effect-diagnostics strictEffectProvide:off -- The HTTP and publish entry points own their request-bound D1 and moderation bindings, which cannot enter the shared module layer.
 import { D1Client } from "@effect/sql-d1";
 import { Array, ByteSize, Context, Effect, Layer, Schema, String } from "effect";
 import { HttpServerRequest, HttpServerResponse } from "effect/http";
@@ -83,7 +84,6 @@ const withStore = Effect.fn("CommunityHttp.withStore")(function* (
 	const { env } = yield* CommunityHttpRequest;
 	if (!env.COMMUNITY_ICONS) return storeUnavailable();
 	return yield* read.pipe(
-		// @effect-diagnostics-next-line strictEffectProvide:off -- This HTTP entry point owns the request-bound D1 layer; bindings cannot enter the shared module layer.
 		Effect.provide(communityIconStoreLayer(env.COMMUNITY_ICONS)),
 		Effect.catch((error) =>
 			Effect.logWarning("Community icon read failed", { error }).pipe(
@@ -156,7 +156,6 @@ const publish = Effect.fn("CommunityHttp.publish")(function* () {
 				{ status: created ? 201 : 200 },
 			).pipe(Effect.orDie),
 		),
-		// @effect-diagnostics-next-line strictEffectProvide:off -- This publish entry point scopes the actual request D1 and moderation bindings together.
 		Effect.provide(Layer.merge(communityIconStoreLayer(env.COMMUNITY_ICONS), moderation)),
 		Effect.catchTags({
 			CommunityIconInvalidRequestError: (error) =>

@@ -1,8 +1,4 @@
-// @effect-diagnostics strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
-
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The storage tests assert on actual filesystem entries, permissions and symlinks independently of the store adapter.
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The storage tests assert on actual filesystem entries, permissions and symlinks independently of the store adapter.
 import { join, resolve } from "node:path";
 
 import { assert, describe, it } from "@effect/vitest";
@@ -104,7 +100,6 @@ describe("diagram storage", () => {
 				yield* store.create(builtDiagram());
 				yield* store.edit("release-flow", builtDiagram({ title: "Release approval revised" }));
 				const edited = yield* store.show("release-flow");
-				// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 				const revision = JSON.parse(
 					yield* Effect.promise(() =>
 						readFile(join(root, "release-flow/revisions/000001/document.json"), "utf8"),
@@ -273,7 +268,6 @@ describe("diagram storage", () => {
 					}
 					await writeFile(
 						staleOwner,
-						// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 						`${JSON.stringify({ pid: 2_147_483_647, token: "stale" })}\n`,
 					);
 				});
@@ -298,7 +292,6 @@ describe("diagram storage", () => {
 									yield* localFileSystemLive.removeFile(staleOwner);
 									yield* localFileSystemLive.writeText(
 										replacementOwner,
-										// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 										`${JSON.stringify({ pid: process.pid, token: "replacement" })}\n`,
 									);
 								}),
@@ -394,7 +387,6 @@ describe("diagram storage", () => {
 				const exportSource = yield* Fiber.join(exportFiber);
 				assert.strictEqual(exportSource._tag, "StoredArtifact");
 				if (exportSource._tag !== "StoredArtifact") return;
-				// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 				const scene = JSON.parse(new TextDecoder().decode(exportSource.bytes));
 				assert.strictEqual(shown.manifest.revision, 2);
 				assert.strictEqual(shown.document.spec.title, "Release approval revised");
@@ -541,7 +533,6 @@ describe("diagram storage", () => {
 					}
 					await writeFile(
 						join(lockDirectory, "owner.hung.json"),
-						// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 						`${JSON.stringify({ pid: process.pid, token: "hung" })}\n`,
 					);
 				});

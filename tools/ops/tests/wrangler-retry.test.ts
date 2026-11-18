@@ -1,8 +1,6 @@
 // The deploy retry runs a real child process: only Cloudflare's assets-upload-session 10013
 // failure is retried, at most twice, and every attempt starts from an empty Wrangler output file.
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The retry test inspects the recorded attempts in the subprocess harness directory.
 import { readFileSync, writeFileSync } from "node:fs";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The retry test inspects the recorded attempts in the subprocess harness directory.
 import { join } from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -53,7 +51,6 @@ process.stdout.write("Uploaded\\n");
 `,
 	);
 	const run = runWithAssetsUploadRetry(process.execPath, [script], ["1 millis", "1 millis"]).pipe(
-		// @effect-diagnostics-next-line strictEffectProvide:off -- This command harness owns the isolated Node and fixture layers for the test invocation.
 		Effect.provide(
 			Layer.mergeAll(
 				NodeServices.layer,

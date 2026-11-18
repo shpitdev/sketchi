@@ -1,5 +1,4 @@
 import { CanvasSpec } from "@sketchi/drawing";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- These synchronous host-native path calculations feed the scoped CLI filesystem operations.
 import { join } from "node:path";
 
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";

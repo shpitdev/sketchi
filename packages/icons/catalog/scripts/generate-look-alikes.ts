@@ -1,7 +1,5 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This offline generator reads catalog geometry and emits the look-alike index.
 import { readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This offline generator reads catalog geometry and emits the look-alike index.
 import { resolve } from "node:path";
 
 import { initWasm, Resvg } from "@resvg/resvg-wasm";

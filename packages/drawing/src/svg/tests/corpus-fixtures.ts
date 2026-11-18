@@ -1,6 +1,4 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The renderer corpus harness enumerates real input fixtures on disk.
 import { readFileSync } from "node:fs";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The renderer corpus harness enumerates real input fixtures on disk.
 import { resolve } from "node:path";
 
 const corpusRoot = resolve(process.cwd(), "packages/icons/catalog/svg");

@@ -44,7 +44,6 @@ vi.mock("@sketchi/drawing", async (importOriginal) => {
 });
 
 /** A dense release flow: 24 nodes, 32 labeled edges, five decisions with returns. */
-// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 const denseRelease = Schema.decodeUnknownSync(FlowchartDiagram)({
 	...flowchartFixture,
 	id: "production-release-rollback",
@@ -139,7 +138,6 @@ describe("routing work", () => {
  * A dense incident response: 16 nodes, 19 edges, four decisions, one with three
  * severity branches, and two returns. From the Code Mode runtime's dense export.
  */
-// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 const denseIncident = Schema.decodeUnknownSync(FlowchartDiagram)({
 	...flowchartFixture,
 	id: "incident-escalation-ops",

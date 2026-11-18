@@ -1,8 +1,6 @@
 // Preview commands at their real boundaries: the effect/cli command line, GITHUB_OUTPUT, and
 // fixture Cloudflare and GitHub APIs standing in for the network.
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The preview command test reads fixture files and recorded subprocess calls from disk.
 import { readFileSync, writeFileSync } from "node:fs";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The preview command test reads fixture files and recorded subprocess calls from disk.
 import { join } from "node:path";
 
 import { it } from "@effect/vitest";
@@ -56,7 +54,6 @@ function cloudflare(
 		}
 		const host = url.hostname.match(/^(pr-\d+)-(sketchi-[a-z]+)\.dimethyl\.workers\.dev$/);
 		if (request.method === "GET" && host) {
-			// @effect-diagnostics-next-line newPromise:off -- This hanging preview fetch lets the test verify the client bounds the wait.
 			if (options.hang) return new Promise<Response>(() => {});
 			if (previews.get(host[2] ?? "")?.has(host[1] ?? "") || lingers-- > 0)
 				return new Response("app");
@@ -275,7 +272,6 @@ describe("preview comment", () => {
 					`https://api.github.com/repos/shpitdev/sketchi/issues/comments/${expected}`,
 				]);
 				expect(
-					// @effect-diagnostics-next-line globalJsonInEffect:off -- The harness reads or writes the fixture JSON independently of the command codec.
 					(JSON.parse(edit?.body ?? "{}") as { body: string }).body.startsWith(`${marker}\n`),
 				).toBe(true);
 				expect(api.requests).toHaveLength(2);
@@ -447,7 +443,6 @@ describe("deploy URLs", () => {
 			const url = (preview: Record<string, unknown>, worker = "sketchi-web") =>
 				Effect.gen(function* () {
 					const file = join(dir, "out.ndjson");
-					// @effect-diagnostics-next-line globalJsonInEffect:off -- The harness reads or writes the fixture JSON independently of the command codec.
 					writeFileSync(file, `${JSON.stringify(preview)}\n`);
 					const run = command();
 					const exit = yield* run.run([

@@ -1,3 +1,4 @@
+// @effect-diagnostics globalDate:off -- The draw adapter keeps its existing wall-clock ledger timestamp and duration fields.
 import { CloudflareAiGatewayBinding } from "@sketchi/cloudflare/ai-gateway";
 import { type IconRecipe } from "@sketchi/drawing";
 import {
@@ -168,9 +169,7 @@ export async function drawMark(
 ): Promise<MarkAttempt> {
 	const logIds: string[] = [];
 	let posts = 0;
-	// @effect-diagnostics-next-line globalDate:off -- The draw adapter keeps its existing wall-clock ledger timestamp and duration fields.
 	const startedAt = new Date().toISOString();
-	// @effect-diagnostics-next-line globalDate:off -- The draw adapter keeps its existing wall-clock ledger timestamp and duration fields.
 	const started = Date.now();
 	const layer = Layer.mergeAll(
 		NodeIconImaging,
@@ -252,7 +251,6 @@ export async function drawMark(
 			outputTokens: 0,
 			cacheReadTokens: 0,
 			cacheWriteTokens: 0,
-			// @effect-diagnostics-next-line globalDate:off -- The draw adapter keeps its existing wall-clock ledger timestamp and duration fields.
 			ms: Date.now() - started,
 			...(costUsd === undefined ? {} : { costUsd }),
 			// A failed draw reports no usage: until its logs are priced, count the most it could cost.

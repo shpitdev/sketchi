@@ -1,8 +1,6 @@
 // Runs `ops` commands in process through the real effect/cli parser, with an isolated environment
 // and every HTTP request answered by a fixture instead of the network.
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The command test adapter provides raw Node filesystem and path fixtures for subprocess checks.
 import { existsSync, readFileSync } from "node:fs";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The command test adapter provides raw Node filesystem and path fixtures for subprocess checks.
 import { join } from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -53,7 +51,6 @@ export function command(
 		run: (args: readonly string[], env: Record<string, string> = {}) =>
 			Command.runWith(ops, { version: "0.0.0" })(args).pipe(
 				Effect.provideService(FetchHttpClient.Fetch, fetch),
-				// @effect-diagnostics-next-line strictEffectProvide:off -- This command harness owns the isolated Node and fixture layers for the test invocation.
 				Effect.provide(
 					Layer.mergeAll(
 						NodeServices.layer,

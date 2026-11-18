@@ -1,5 +1,4 @@
 import { homedir } from "node:os";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- These synchronous host-native path calculations feed the scoped CLI filesystem operations.
 import { join } from "node:path";
 
 import { Context, Effect, Layer } from "effect";

@@ -1,3 +1,4 @@
+// @effect-diagnostics asyncFunction:off -- The ReadableStream pull and cloned Response body adapters consume native Web Promises at this Effect boundary.
 import {
 	String as Str,
 	Context,
@@ -274,7 +275,6 @@ function recordStreamedBody(
 	// Pulls one chunk per read, so the client's pace and its cancellation reach the source.
 	const body = new ReadableStream<Uint8Array>(
 		{
-			// @effect-diagnostics-next-line asyncFunction:off -- Web ReadableStream pull consumes exactly one native reader chunk and preserves backpressure.
 			async pull(controller) {
 				try {
 					const chunk = await reader.read();
@@ -321,7 +321,6 @@ function recordBody(message: Response, attribute: string): Effect.Effect<void> {
 	const copy = message.clone();
 	const text = isTextBody(message.headers.get("content-type") ?? "");
 	return Effect.tryPromise({
-		// @effect-diagnostics-next-line asyncFunction:off -- Adapt the cloned native Response body promise into this Effect boundary.
 		try: async (): Promise<string | Uint8Array> =>
 			text ? copy.text() : new Uint8Array(await copy.arrayBuffer()),
 		catch: (cause) =>

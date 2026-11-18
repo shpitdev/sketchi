@@ -237,7 +237,6 @@ describe("publishing a pack to Excalidraw", () => {
 		const refusal = await second;
 		const afterRefusal = await submissionRows(env);
 		const retry = await publish(env, { authorName: "C" });
-		// @effect-diagnostics-next-line globalConsole:off -- The test observes the real console sink without changing application logging.
 		console.info(
 			"replacement-claim receipt",
 			JSON.stringify({
@@ -297,7 +296,6 @@ describe("publishing a pack to Excalidraw", () => {
 			setFetch(async (_input, init) => {
 				submissions++;
 				sent.resolve();
-				// @effect-diagnostics-next-line newPromise:off -- The controlled fetch Promise exposes request interruption at the Worker boundary.
 				return new Promise<Response>((_resolve, reject) => {
 					init?.signal?.addEventListener(
 						"abort",
@@ -487,13 +485,11 @@ describe("publishing a pack to Excalidraw", () => {
 	it("never lets a claim lapse: a Worker that stopped mid-send may have opened a pull request", async () => {
 		const env = await environment();
 		const version = await packVersion(LIBRARY);
-		// @effect-diagnostics-next-line globalDate:off -- The boundary fixture constructs explicit timestamps or measures elapsed time against the native host.
 		const longAgo = Date.now() - 30 * 24 * 3_600_000;
 		expect(await claim(env.COMMUNITY_ICONS!, "palantir", version, "Someone", longAgo)).toBe(true);
 		const fetchMock = backend();
 		expect((await publish(env)).status).toBe(409);
 		expect(fetchMock).not.toHaveBeenCalled();
-		// @effect-diagnostics-next-line globalDate:off -- The boundary fixture constructs explicit timestamps or measures elapsed time against the native host.
 		expect(await claim(env.COMMUNITY_ICONS!, "palantir", version, "Jane", Date.now())).toBe(false);
 		expect(
 			packExcalidrawStates(

@@ -1,5 +1,3 @@
-// @effect-diagnostics nodeBuiltinImport:off -- The font test checks actual vendored bytes and package payloads using the host filesystem.
-
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";

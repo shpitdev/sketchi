@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-// @effect-diagnostics nodeBuiltinImport:off -- The standalone gate bootstrap installs dependencies before the Effect runner is available.
-
 // `pnpm ci:local` bootstrap. The gate (tools/ops/src/ci-local/gate.ts) is typed Effect and needs
 // the workspace's dependencies, so this installs the frozen lockfile and then replaces itself
 // with the gate. Run `pnpm ci:local --help` for the gate's options.

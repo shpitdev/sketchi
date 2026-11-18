@@ -1,6 +1,3 @@
-// @effect-diagnostics newPromise:off -- The release smoke harness bridges real server and process events without a product runtime.
-// @effect-diagnostics nodeBuiltinImport:off -- The release smoke harness launches the packaged CLI and owns its local HTTP fixture and subprocesses.
-
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";

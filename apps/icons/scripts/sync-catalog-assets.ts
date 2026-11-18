@@ -1,7 +1,5 @@
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This offline asset builder synchronizes catalog files into the Worker assets directory.
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- This offline asset builder synchronizes catalog files into the Worker assets directory.
 import { dirname, resolve } from "node:path";
 
 import { ICON_SOURCE_URL_PREFIX, iconManifest } from "@sketchi/icon-catalog/catalog";

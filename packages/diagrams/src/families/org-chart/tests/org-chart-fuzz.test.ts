@@ -138,7 +138,6 @@ function randomCharts(count: number, start: number): OrgChartDiagram[] {
 const aspect = (scene: CanvasSpec) => (scene.width - 40) / (scene.height - 40);
 
 /** CI draws a small fixed sample; `ORG_CHART_FUZZ=full` runs the local proof. */
-// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 const FULL = process.env["ORG_CHART_FUZZ"] === "full";
 const CHARTS = FULL ? 300 : 6;
 const SEEDS = FULL ? [11, 29, 47] : [11];

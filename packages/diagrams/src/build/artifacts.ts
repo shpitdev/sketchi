@@ -1,3 +1,5 @@
+// @effect-diagnostics globalDateInEffect:off -- Format a supplied Effect Clock value in the existing stored artifact date format.
+// @effect-diagnostics globalJsonInEffect:off -- The artifact store preserves persisted JSON and translates native codec failures to typed storage errors.
 import { Clock, Context, Effect, Layer, Schema, Result } from "effect";
 
 import {
@@ -190,7 +192,6 @@ function makeMemoryArtifactStorageState(): MemoryArtifactStorageState {
 							diagramId: input.diagramId,
 							formats: refs,
 							...(storedProvenance ? { provenance: storedProvenance } : {}),
-							// @effect-diagnostics-next-line globalDateInEffect:off -- Format a supplied Effect Clock value in the existing stored artifact date format.
 							createdAt: new Date(now).toISOString(),
 						};
 
@@ -287,7 +288,6 @@ function bodyForArtifact(
 ): Effect.Effect<ArtifactObjectBucketBody, ArtifactStorageError> {
 	if (artifact.format !== "png")
 		return Effect.try({
-			// @effect-diagnostics-next-line globalJsonInEffect:off -- The artifact store preserves persisted JSON and translates native codec failures to typed storage errors.
 			try: () => JSON.stringify(artifact.data),
 			catch: storageError("write"),
 		});
@@ -376,7 +376,6 @@ export function makeObjectBucketArtifactStorage(
 				catch: storageError("read"),
 			});
 			const data: unknown = yield* Effect.try({
-				// @effect-diagnostics-next-line globalJsonInEffect:off -- The artifact store preserves persisted JSON and translates native codec failures to typed storage errors.
 				try: () => JSON.parse(text),
 				catch: storageError("read"),
 			});
@@ -399,7 +398,6 @@ export function makeObjectBucketArtifactStorage(
 				catch: storageError("readManifest"),
 			});
 			const data: unknown = yield* Effect.try({
-				// @effect-diagnostics-next-line globalJsonInEffect:off -- The artifact store preserves persisted JSON and translates native codec failures to typed storage errors.
 				try: () => JSON.parse(text),
 				catch: storageError("readManifest"),
 			});
@@ -413,7 +411,6 @@ export function makeObjectBucketArtifactStorage(
 				diagramId: input.diagramId,
 				formats: refs,
 				...(input.provenance ? { provenance: input.provenance } : {}),
-				// @effect-diagnostics-next-line globalDateInEffect:off -- Format a supplied Effect Clock value in the existing stored artifact date format.
 				createdAt: new Date(now).toISOString(),
 			};
 
@@ -426,7 +423,6 @@ export function makeObjectBucketArtifactStorage(
 				yield* prepareArtifactObject(
 					MANIFEST_FORMAT,
 					"application/json",
-					// @effect-diagnostics-next-line globalJsonInEffect:off -- The artifact store preserves persisted JSON and translates native codec failures to typed storage errors.
 					Effect.try({ try: () => JSON.stringify(manifest), catch: storageError("write") }),
 				),
 			];

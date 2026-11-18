@@ -153,7 +153,6 @@ describe("IconLibrary", () => {
 		).toBe(true);
 	});
 
-	// @effect-diagnostics-next-line asyncFunction:off -- React act, hydration and Testing Library await native DOM callbacks at the test host.
 	it("downloads exactly the selection, including icons the filter hides", async () => {
 		let zipped: Blob | undefined;
 		vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {

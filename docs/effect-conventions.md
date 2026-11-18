@@ -105,12 +105,25 @@ synchronous JSON preferences remain advisory outside existing stricter files.
 Pure layout and geometry retain their collection and string style exemptions,
 not exemptions from correctness or I/O checks. API maturity is not a failure.
 
-Use `@effect-diagnostics-next-line rule:off -- <concrete reason>` for a necessary
-host call or deliberate synchronous boundary. A per-file, per-rule directive is
-appropriate when a standalone build script or test harness repeats the same host
-operation. The reason must name the contract or operation, not the package or
-syntax. Do not disable a rule across an app or substitute an exception for a
-needed correctness fix. Existing Nx dependency boundaries, Promise misuse checks,
+Three scopes are configured once, each with its reason beside it in
+`tsconfig.base.json` and `.oxlintrc.json`:
+
+- Tests (`**/tests/**`) may use Node, env, clock, randomness, JSON, console,
+  timers, fetch, promises and per-test layers. Correctness rules stay errors.
+- Build scripts and configs (`**/scripts/**`, `*.mjs`, `*.config.*`) may import
+  Node modules, fetch and construct promises.
+- Node programs (`apps/cli/src`, `tools/*/src`) may import pure Node helpers such
+  as `node:path`, `node:os`, `node:url` and `node:zlib`. Oxlint bans `node:fs`,
+  `node:fs/promises`, `node:child_process`, `node:http`, `node:https` and
+  `node:net` there. Worker code keeps every Node built-in import an error.
+
+Elsewhere, use `@effect-diagnostics-next-line rule:off -- <concrete reason>` for
+a necessary host call or deliberate synchronous boundary, and
+`oxlint-disable-next-line no-restricted-imports -- <reason>` for a real Node I/O
+module in a Node program. When one reason repeats in a file, state it once with a
+file-level `@effect-diagnostics rule:off -- <reason>`. The reason must name the
+contract or operation, not the package or syntax. Do not disable a rule across
+an app or substitute an exception for a needed correctness fix. Existing Nx dependency boundaries, Promise misuse checks,
 Zod restrictions and React synchronization restrictions remain enforced.
 
 Upstream diagnostics are not a census of Promise syntax. Assigned `Promise.resolve`

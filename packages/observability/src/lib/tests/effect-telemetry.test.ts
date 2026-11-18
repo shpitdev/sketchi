@@ -1,6 +1,3 @@
-// @effect-diagnostics strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
-
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- The telemetry boundary test reads the checked-in Pipeline contract independently of the exporter.
 import { readFileSync } from "node:fs";
 
 import { assert, describe, it } from "@effect/vitest";
@@ -197,7 +194,6 @@ describe("Workers Effect telemetry", () => {
 					assert.strictEqual(failed?.outcome, "failure");
 					assert.strictEqual(failed?.error_tag, "TestFailure");
 					assert.strictEqual(failed?.error_message, "Gateway failed");
-					// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 					assert.include(JSON.stringify(failed?.error), "upstream body");
 					assert.include(failed?.cause, "Gateway failed");
 				}),
@@ -296,7 +292,6 @@ describe("request span export", () => {
 			assert.strictEqual(child?.run_id, "run-test");
 			assert.strictEqual(root?.run_id, "run-test");
 			assert.strictEqual(rows.find((row) => row.name === "request.other_run")?.run_id, "run-other");
-			// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 			assert.strictEqual(JSON.parse(root?.events ?? "[]")[0]?.message, "inside");
 		}).pipe(Effect.provide(makeWorkersTelemetryLayer({ resource: { serviceName: "test" } })));
 	});
@@ -325,9 +320,7 @@ describe("request span export", () => {
 				errors.map(([message]) => message),
 				["Span export failed", "Span export failed"],
 			);
-			// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 			assert.include(JSON.stringify(errors), "binding threw");
-			// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 			assert.include(JSON.stringify(errors), "binding rejected");
 		}).pipe(Effect.provide(makeWorkersTelemetryLayer({ resource: { serviceName: "test" } })));
 	});
