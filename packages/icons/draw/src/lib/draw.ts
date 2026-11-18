@@ -4,6 +4,7 @@ import { rankLookAlikes } from "@sketchi/icon-catalog/look-alikes";
 import { Clock, Context, Effect, Result } from "effect";
 import { Prompt } from "effect/ai";
 
+import type { AuthorTurnOutcome, IconDrawSuccess, IconJudgeVerdict, ModelCall } from "../contract";
 import {
 	confusedRequestText,
 	decodeAuthorReply,
@@ -16,18 +17,11 @@ import {
 import { IconInputError, IconRecipeError, IconTimeoutError } from "./errors";
 import { IconImaging, type IconImageExport, type IconImagePrepare } from "./imaging";
 import { type IconDrawInput, type IconSource } from "./input";
-import {
-	decodeJudgeReply,
-	type IconJudgeVerdict,
-	JUDGE_LOOK_ALIKES,
-	type JudgeCandidate,
-	judgeLineup,
-} from "./judge";
-import { type IconAuthorModel, IconDrawModels, type ModelCall } from "./models";
+import { decodeJudgeReply, JUDGE_LOOK_ALIKES, type JudgeCandidate, judgeLineup } from "./judge";
+import { type IconAuthorModel, IconDrawModels } from "./models";
 import {
 	ICON_EXPORT_SCALE,
 	iconLibrary,
-	type IconLibrary,
 	LARGE_ICON_SIZE,
 	NODE_ICON_SIZE,
 	previewScene,
@@ -63,43 +57,7 @@ export interface IconDrawOptions {
 	readonly note?: string;
 }
 
-export interface IconDrawUsage {
-	/** Model calls, author and judge. */
-	readonly calls: number;
-	/** Every input token, cached or not. */
-	readonly inputTokens: number;
-	readonly cacheReadTokens: number;
-	readonly cacheWriteTokens: number;
-	readonly outputTokens: number;
-	readonly ms: number;
-	readonly byCall: readonly ModelCall[];
-}
-
-export interface AuthorTurnOutcome {
-	readonly outcome: "drawn" | "accepted" | "invalid";
-	/** Why the checker rejected the recipe, for an invalid turn. */
-	readonly issues?: readonly string[];
-}
-
-export interface IconDrawResult {
-	readonly name: string;
-	readonly recipe: IconRecipe;
-	/** Base64 PNGs at node size and four times node size, exported at twice their size. */
-	readonly previews: { readonly png28: string; readonly png112: string };
-	readonly excalidrawlib: IconLibrary;
-	readonly judge: IconJudgeVerdict;
-	/** The source colors the recipe may use, with the share of the mark each covers. */
-	readonly palette: readonly MarkColor[];
-	readonly author: {
-		readonly model: string;
-		readonly rounds: number;
-		/** True when the author accepted its own drawing, rather than running out of rounds. */
-		readonly accepted: boolean;
-		/** What each author turn did, in order. */
-		readonly turns: readonly AuthorTurnOutcome[];
-	};
-	readonly usage: IconDrawUsage;
-}
+export interface IconDrawResult extends Omit<IconDrawSuccess, "ok" | "status"> {}
 
 /** A measured color this far from every paint is something the paint reader missed, such as an embedded image. */
 const PAINT_MATCH_DISTANCE = 120;

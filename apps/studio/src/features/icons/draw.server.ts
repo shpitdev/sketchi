@@ -9,7 +9,6 @@ import {
 	type IconDrawError,
 	IconDrawGatewayConfig,
 	IconDrawModelsGateway,
-	type IconDrawResult,
 	IconImaging,
 	IconImagingError,
 	iconAuthorFor,
@@ -18,8 +17,17 @@ import {
 	type IconImagingJob,
 	prepareIconInput,
 } from "@sketchi/icon-draw";
+import {
+	IconDrawHttpApi,
+	iconDrawHttpFailure,
+	type IconDrawFailure,
+	type IconDrawIssue,
+	type IconDrawSuccess,
+} from "@sketchi/icon-draw/http-api";
 import { limitClient } from "@sketchi/community-icons";
-import { Clock, Effect, Layer, Result } from "effect";
+import { Clock, Context, Effect, Layer, Result } from "effect";
+import { HttpEffect, HttpRouter, HttpServer, HttpServerResponse } from "effect/http";
+import { HttpApiBuilder } from "effect/http-api";
 
 import { aiEnvironment } from "../../server/ai-env.server";
 import type { StudioEnv } from "../../server/studio-env.server";
@@ -45,62 +53,17 @@ import {
 	PlaygroundClock,
 	PlaygroundRequestMetadata,
 } from "../../server/context.server";
-import { readBoundedJson } from "../../server/request-body.server";
+import { readBoundedJson, type BoundedJson } from "../../server/request-body.server";
 
 const DEFAULT_JUDGE_MODEL = "openai/gpt-6-sol";
-
-type IconDrawFailureStatus =
-	| "invalid_input"
-	| "unsupported_model"
-	| "provider_failed"
-	| "render_failed"
-	| "invalid_recipe"
-	| "draw_timeout"
-	| "rate_limited"
-	| "unavailable"
-	| "not_configured";
-
-const FAILURE_STATUS: Record<IconDrawFailureStatus, number> = {
-	invalid_input: 400,
-	unsupported_model: 400,
-	invalid_recipe: 422,
-	render_failed: 502,
-	provider_failed: 502,
-	rate_limited: 429,
-	not_configured: 503,
-	unavailable: 503,
-	draw_timeout: 504,
-};
 
 /** Draw requests one client address may send a minute, counted by its `ICON_DRAW_CLIENT_LIMIT` object. */
 export const ICON_DRAWS_PER_CLIENT_MINUTE = 6;
 /** Draws a day across every client when `SKETCHI_ICON_DAILY_DRAWS` is unset: the bound on model spend. */
 export const DEFAULT_DAILY_ICON_DRAWS = 200;
 
-interface IconDrawIssue {
-	readonly code: string;
-	readonly message: string;
-	readonly hint: string;
-}
-
-export interface IconDrawFailure {
-	readonly ok: false;
-	readonly status: IconDrawFailureStatus;
-	readonly issues: readonly IconDrawIssue[];
-}
-
-export interface IconDrawSuccess extends Omit<IconDrawResult, "usage"> {
-	readonly ok: true;
-	readonly status: "drawn";
-	readonly usage: IconDrawResult["usage"];
-}
-
-function failure(status: IconDrawFailureStatus, issue: IconDrawIssue): IconDrawFailure {
+function failure(status: IconDrawFailure["status"], issue: IconDrawIssue): IconDrawFailure {
 	return { ok: false, status, issues: [issue] };
-}
-
-function statusCode(body: IconDrawSuccess | IconDrawFailure): number {
-	return body.ok ? 200 : FAILURE_STATUS[body.status];
 }
 
 /** What usage telemetry keeps of a request: never the uploaded file. */
@@ -405,21 +368,23 @@ export const drawIconFromBody = Effect.fn("playground.icons.draw")(function* (
 	return done({ ok: true, status: "drawn", ...outcome.success });
 });
 
-/**
- * `POST /api/v1/icons/draw`: a logo (SVG or raster) and its name in, Sketchi's
- * hand-drawn recipe out, with previews, an Excalidraw library and the judge's
- * verdict. No account; one synchronous request.
- */
-export const handleDrawIconRequest = Effect.fn("playground.http.drawIcon")(function* (
-	request: Request,
-) {
+class CurrentIconDrawRequest extends Context.Service<
+	CurrentIconDrawRequest,
+	{
+		readonly bounded: BoundedJson;
+		readonly startedAt: number;
+		readonly usageContext: CodeModeUsageContext;
+	}
+>()("@sketchi/studio/CurrentIconDrawRequest") {}
+
+const drawIconRequest = Effect.fnUntraced(function* () {
+	const { bounded, startedAt, usageContext } = yield* CurrentIconDrawRequest;
 	const clock = yield* PlaygroundClock;
 	const usage = yield* PlaygroundCodeModeUsage;
-	const usageContext: CodeModeUsageContext = yield* usage.createContext;
-	const startedAt = yield* clock.nowMillis;
-	let requestBody: Record<string, unknown> = {};
+	const requestBody = bounded._tag === "Body" ? requestSummary(bounded.body) : {};
 	const respond = (body: IconDrawSuccess | IconDrawFailure, retryAfterSeconds?: number) =>
 		Effect.gen(function* () {
+			const result = body.ok ? Result.succeed(body) : Result.fail(iconDrawHttpFailure(body));
 			const finishedAt = yield* clock.nowMillis;
 			yield* usage.capture({
 				context: usageContext,
@@ -427,18 +392,22 @@ export const handleDrawIconRequest = Effect.fn("playground.http.drawIcon")(funct
 				operation: "drawIcon",
 				requestBody,
 				responseBody: responseSummary(body),
-				statusCode: statusCode(body),
+				statusCode: Result.isFailure(result) ? result.failure.httpStatus : 200,
 				surface: "api",
 			});
-			const headers = new Headers(codeModeUsageResponseHeaders(usageContext));
-			headers.set("Cache-Control", "no-store");
-			if (retryAfterSeconds !== undefined) headers.set("Retry-After", String(retryAfterSeconds));
-			return Response.json(body, { status: statusCode(body), headers });
+			yield* HttpEffect.appendPreResponseHandler((_request, response) =>
+				Effect.succeed(
+					HttpServerResponse.setHeaders(response, {
+						...codeModeUsageResponseHeaders(usageContext),
+						"Cache-Control": "no-store",
+						...(retryAfterSeconds === undefined
+							? {}
+							: { "Retry-After": String(retryAfterSeconds) }),
+					}),
+				),
+			);
+			return yield* Effect.fromResult(result);
 		});
-
-	const bounded = yield* readBoundedJson(request, ICON_DRAW_REQUEST_MAX_BYTES, {
-		recordBody: false,
-	});
 	if (bounded._tag !== "Body") {
 		return yield* respond(
 			failure("invalid_input", {
@@ -451,9 +420,45 @@ export const handleDrawIconRequest = Effect.fn("playground.http.drawIcon")(funct
 			}),
 		);
 	}
-	requestBody = requestSummary(bounded.body);
 	const outcome = yield* drawIconFromBody(bounded.body, "api");
 	return yield* respond(outcome.body, outcome.retryAfterSeconds);
+});
+
+const IconDrawHandlers = HttpApiBuilder.group(IconDrawHttpApi, "icons", (handlers) =>
+	handlers.handleRaw("draw", drawIconRequest),
+);
+const iconDrawApp = HttpRouter.toWebHandler(
+	HttpApiBuilder.layer(IconDrawHttpApi).pipe(
+		Layer.provide(IconDrawHandlers),
+		Layer.provide(HttpServer.layerServices),
+	),
+	{ disableLogger: true },
+);
+
+/** Read once at the Studio boundary, where read errors and upload redaction are already owned. */
+export const handleDrawIconRequest = Effect.fn("playground.http.drawIcon")(function* (
+	request: Request,
+) {
+	const context = yield* Effect.context<
+		PlaygroundBindings | PlaygroundClock | PlaygroundCodeModeUsage | PlaygroundRequestMetadata
+	>();
+	const usage = Context.get(context, PlaygroundCodeModeUsage);
+	const clock = Context.get(context, PlaygroundClock);
+	const usageContext = yield* usage.createContext;
+	const startedAt = yield* clock.nowMillis;
+	const bounded = yield* readBoundedJson(request, ICON_DRAW_REQUEST_MAX_BYTES, {
+		recordBody: false,
+	});
+	return yield* Effect.promise(() =>
+		iconDrawApp.handler(
+			request,
+			Context.add(context, CurrentIconDrawRequest, {
+				bounded,
+				startedAt,
+				usageContext,
+			}),
+		),
+	);
 });
 
 /**

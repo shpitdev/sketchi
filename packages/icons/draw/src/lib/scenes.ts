@@ -1,6 +1,8 @@
 import { fnv1a32, type IconRecipe } from "@sketchi/drawing";
 import { type ExcalidrawElement, iconRecipeElements } from "@sketchi/drawing/excalidraw";
 
+import type { IconLibrary } from "../contract";
+
 /** The Excalidraw file a scene export reads. */
 export interface IconScene {
 	readonly type: "excalidraw";
@@ -144,19 +146,6 @@ export function previewScene(recipe: IconRecipe, size: number): IconScene {
 		slot("preview-slot", 0, 0, size),
 		...drawnIcon(recipe, { x: 0, y: 0, size }, "icon"),
 	]);
-}
-
-export interface IconLibrary {
-	readonly type: "excalidrawlib";
-	readonly version: 2;
-	readonly source: string;
-	readonly libraryItems: ReadonlyArray<{
-		readonly id: string;
-		readonly status: "published";
-		readonly created: number;
-		readonly name: string;
-		readonly elements: readonly ExcalidrawElement[];
-	}>;
 }
 
 /** An `.excalidrawlib` holding the icon as one library item. */

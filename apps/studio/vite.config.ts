@@ -79,6 +79,10 @@ export default defineConfig({
 				replacement: new URL("../../tools/scenarios/src/index.ts", import.meta.url).pathname,
 			},
 			{
+				find: "@sketchi/icon-draw/http-api",
+				replacement: new URL("../../packages/icons/draw/src/http-api.ts", import.meta.url).pathname,
+			},
+			{
 				find: "@sketchi/icon-draw",
 				replacement: new URL("../../packages/icons/draw/src/index.ts", import.meta.url).pathname,
 			},
