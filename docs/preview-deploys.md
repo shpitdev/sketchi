@@ -8,9 +8,9 @@ against its existing Worker. It no longer creates a separate Worker per PR.
 | Project      | Source         | Worker               | Stable Preview hostname                                |
 | ------------ | -------------- | -------------------- | ------------------------------------------------------ |
 | `web`        | `apps/web`     | `sketchi-web`        | `pr-<number>-sketchi-web.<account>.workers.dev`        |
-| `playground` | `apps/studio`  | `sketchi-studio`     | `pr-<number>-sketchi-studio.<account>.workers.dev`     |
+| `studio`     | `apps/studio`  | `sketchi-studio`     | `pr-<number>-sketchi-studio.<account>.workers.dev`     |
 | `icons`      | `apps/icons`   | `sketchi-icons`      | `pr-<number>-sketchi-icons.<account>.workers.dev`      |
-| `excalidraw` | `apps/editor`  | `sketchi-excalidraw` | `pr-<number>-sketchi-excalidraw.<account>.workers.dev` |
+| `editor`     | `apps/editor`  | `sketchi-excalidraw` | `pr-<number>-sketchi-excalidraw.<account>.workers.dev` |
 
 Cloudflare's [Worker Previews](https://developers.cloudflare.com/workers/previews/)
 provide branch-specific bindings, variables, secrets, and observability under an
@@ -59,15 +59,17 @@ Previews are opt-in. A same-repository pull request to `main` with the `preview`
 label deploys the apps it affects (`nx show projects --affected` between the PR's
 merge base and head) on every push; a change to the preview tooling itself
 (`app-preview.yml`, the shared setup action, `tools/ops/src/deploy/` and the ops command entry)
-deploys all five. Unlabelled PRs deploy nothing, and adding another label runs
-nothing. Forks are excluded. Closing a same-repository PR deletes all five
+deploys all four. Unlabelled PRs deploy nothing, and adding another label runs
+nothing. Forks are excluded. Closing a same-repository PR deletes all four
 Previews when one can exist: the PR carries the `preview` label or a preview
 comment, however the Preview was deployed (including before previews were
 opt-in). Closing a PR with neither runs no cleanup jobs.
 
 Manual dispatch takes an open same-repository PR number, including a stacked PR
 whose base is not `main`, and a `project` choice (`affected`, `all`, or one app).
-It resolves the PR head SHA before checkout; the same SHA appears in deploy
+Use a workflow ref with the same project names as the PR head. The dispatch
+choices come from the workflow ref; the build and selectors come from the PR head.
+The workflow resolves the PR head SHA before checkout; that SHA appears in deploy
 metadata and comments. It also adds the `preview` label before anything uploads,
 so closing the PR cleans up even if no Preview comment exists yet, and later
 pushes keep the PR's affected Previews current.
@@ -84,10 +86,10 @@ pushes keep the PR's affected Previews current.
   Playground links stay on the same PR when the same run deploys them; otherwise
   they point at production. These overrides affect only the Preview.
 
-`web`, `playground`, and `icons` are public product surfaces. `excalidraw`
-remains internal and are not linked from public navigation.
+`web`, `studio`, and `icons` are public product surfaces. `editor` remains
+internal and is not linked from public navigation.
 
-Pipeline-bound Playground uploads share
+Pipeline-bound Studio and Icons uploads share
 `cloudflare-pipeline-bound-upload` with production. `queue: max` queues pending
 jobs without cancelling active uploads; other apps retain their per-app/per-PR
 concurrency policies.
@@ -119,7 +121,7 @@ an `unconfigured` comment rather than a successful preview claim.
 ## Cleanup and legacy Workers
 
 Closing a PR runs `cleanup-preview`. `pnpm ops preview delete` deletes
-Preview `pr-<number>` from each of the five Workers through the Cloudflare Previews
+Preview `pr-<number>` from each of the four Workers through the Cloudflare Previews
 API; a missing Preview (HTTP 404) counts as already deleted. A successful delete
 can leave the Preview hostname serving the deleted code
 ([cloudflare/workers-sdk#15945](https://github.com/cloudflare/workers-sdk/issues/15945)),
@@ -217,7 +219,7 @@ config only when explicitly dispatched with `domain_action=attach`. Follow
 from a pull request or before the Cloudflare zone is active.
 
 When `domain_action=attach`, the production domain helper attaches
-`playground.sketchi.app` to the `playground` project while retaining the
+`playground.sketchi.app` to the `studio` project while retaining the
 `sketchi-studio` Worker service. Authenticated Studio is not exposed, even
 though the Playground host has `/projects` and persisted
 `/diagrams/:diagramId` route foundations.

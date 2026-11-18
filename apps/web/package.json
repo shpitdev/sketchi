@@ -4,7 +4,7 @@
 	"type": "module",
 	"dependencies": {
 		"@excalidraw/excalidraw": "0.18.1",
-		"@sketchi/editor": "workspace:*",
+		"@sketchi/editor-surface": "workspace:*",
 		"@sketchi/ui": "workspace:*",
 		"lucide-react": "1.65.0"
 	},

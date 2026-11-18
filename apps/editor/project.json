@@ -1,5 +1,5 @@
 {
-	"name": "excalidraw",
+	"name": "editor",
 	"$schema": "../../node_modules/nx/schemas/project-schema.json",
 	"sourceRoot": "apps/editor/src",
 	"projectType": "application",
@@ -20,9 +20,9 @@
 			}
 		},
 		"build-storybook": {
-			"outputs": ["{workspaceRoot}/storybook-static/excalidraw"],
+			"outputs": ["{workspaceRoot}/storybook-static/editor"],
 			"options": {
-				"output-dir": "../../storybook-static/excalidraw"
+				"output-dir": "../../storybook-static/editor"
 			}
 		},
 		"cf-typegen": {
@@ -41,7 +41,7 @@
 		"dev": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "PORTLESS_PORT=443 portless run --name excalidraw.sketchi vite dev --config apps/editor/vite.config.ts"
+				"command": "PORTLESS_PORT=443 portless run --name editor.sketchi vite dev --config apps/editor/vite.config.ts"
 			}
 		},
 		"preview": {
@@ -52,7 +52,7 @@
 		},
 		"static-storybook": {
 			"options": {
-				"staticFilePath": "storybook-static/excalidraw"
+				"staticFilePath": "storybook-static/editor"
 			}
 		},
 		"storybook": {

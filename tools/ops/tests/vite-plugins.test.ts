@@ -21,7 +21,7 @@ const hook = (value: unknown) => value as Hook;
 
 /** Runs the boundary plugin over one client chunk holding these module ids; returns its error. */
 function clientBuildError(moduleIds: string[]) {
-	const plugin = clientServerBoundary("playground");
+	const plugin = clientServerBoundary("studio");
 	const bundle = {
 		"client.js": { type: "chunk", modules: Object.fromEntries(moduleIds.map((id) => [id, {}])) },
 	};
@@ -102,7 +102,7 @@ describe("Excalidraw fonts", () => {
 				Object.keys(manifest.dependencies ?? {}),
 			]),
 		);
-		const renderers = new Set(["@excalidraw/excalidraw", "@sketchi/editor"]);
+		const renderers = new Set(["@excalidraw/excalidraw", "@sketchi/editor-surface"]);
 		const surfaces = workerProjectIds.filter((id) => {
 			const root = workerProjectConfig(id).projectRoot;
 			const manifest =
@@ -112,7 +112,7 @@ describe("Excalidraw fonts", () => {
 					renderers.has(name) || (runtime.get(name) ?? []).some((nested) => renderers.has(nested)),
 			);
 		});
-		expect(surfaces.sort()).toEqual(["excalidraw", "playground", "web"]);
+		expect(surfaces.sort()).toEqual(["editor", "studio", "web"]);
 		for (const id of surfaces) {
 			const headers = readFileSync(
 				join(repoRoot, workerProjectConfig(id).projectRoot, "public/_headers"),

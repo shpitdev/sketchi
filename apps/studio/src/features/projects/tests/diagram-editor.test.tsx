@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const canvas = vi.hoisted(
 	(): { change?: (scene: ExcalidrawScene) => void; initial?: ExcalidrawScene } => ({}),
 );
-vi.mock("@sketchi/editor", () => ({
+vi.mock("@sketchi/editor-surface", () => ({
 	downloadBlob: vi.fn(),
 	DrawingEditor: ({
 		onSceneChange,

@@ -1,8 +1,7 @@
-# playground
+# studio
 
-Current hosted Sketchi Playground worker boundary for ephemeral generation, Code
-Mode APIs, MCP, artifacts, diagram review, artifact editor routes, and the
-persisted Studio project foundation.
+Studio serves the public Playground at `playground.sketchi.app`, plus the HTTP
+and MCP APIs. It deploys as `sketchi-studio`.
 
 ```mermaid
 flowchart LR
@@ -24,12 +23,11 @@ flowchart LR
 ## Commands
 
 ```sh
-pnpm nx dev playground
-pnpm nx test playground
-pnpm nx typecheck playground
-pnpm nx build playground
-pnpm nx deploy playground
-pnpm nx cf-typegen playground
+pnpm nx dev studio          # https://studio.sketchi.localhost
+pnpm nx test studio
+pnpm nx typecheck studio
+pnpm nx build studio
+pnpm nx cf-typegen studio
 ```
 
 ## Usage

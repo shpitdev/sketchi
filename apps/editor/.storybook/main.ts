@@ -26,11 +26,12 @@ const config: StorybookConfig = {
 				"../../../packages/drawing/src/excalidraw/index.ts",
 				import.meta.url,
 			).pathname,
-			"@sketchi/editor/styles.css": new URL(
+			"@sketchi/editor-surface/styles.css": new URL(
 				"../../../packages/editor/src/styles.css",
 				import.meta.url,
 			).pathname,
-			"@sketchi/editor": new URL("../../../packages/editor/src/index.ts", import.meta.url).pathname,
+			"@sketchi/editor-surface": new URL("../../../packages/editor/src/index.ts", import.meta.url)
+				.pathname,
 		};
 
 		return config;

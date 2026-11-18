@@ -1,5 +1,5 @@
-import "@sketchi/playground/styles.css";
-import "@sketchi/editor/styles.css";
+import "@sketchi/studio/styles.css";
+import "@sketchi/editor-surface/styles.css";
 
 import { type Preview } from "@storybook/react-vite";
 

@@ -350,61 +350,61 @@ describe("preview settings", () => {
 
 	it.effect("rejects production targets, missing bindings and unreviewed resources", () =>
 		Effect.gen(function* () {
-			const playground = yield* readConfig("playground");
+			const studio = yield* readConfig("studio");
 			const icons = yield* readConfig("icons");
 			const mutations: Array<[string, Fixture, (config: Fixture) => void]> = [
-				["no previews", playground, (c) => delete c["previews"]],
-				["another Worker", playground, (c) => (c["name"] = "sketchi-playground")],
-				["production buckets", playground, (c) => (c["previews"].r2_buckets = c["r2_buckets"])],
-				["production pipelines", playground, (c) => (c["previews"].pipelines = c["pipelines"])],
-				["missing pipeline", playground, (c) => c["previews"].pipelines.pop()],
+				["no previews", studio, (c) => delete c["previews"]],
+				["another Worker", studio, (c) => (c["name"] = "sketchi-playground")],
+				["production buckets", studio, (c) => (c["previews"].r2_buckets = c["r2_buckets"])],
+				["production pipelines", studio, (c) => (c["previews"].pipelines = c["pipelines"])],
+				["missing pipeline", studio, (c) => c["previews"].pipelines.pop()],
 				[
 					"duplicate pipeline",
-					playground,
+					studio,
 					(c) => (c["previews"].pipelines[1] = c["previews"].pipelines[0]),
 				],
 				[
 					"undeclared bucket",
-					playground,
+					studio,
 					(c) => (c["previews"].r2_buckets[0].bucket_name = "unreviewed-bucket"),
 				],
 				[
 					"declared production bucket",
-					playground,
+					studio,
 					(c) => (c["previews"].r2_buckets[0].preview_bucket_name = c["r2_buckets"][0].bucket_name),
 				],
 				[
 					"production stream",
-					playground,
+					studio,
 					(c) => (c["previews"].pipelines[0].stream = c["pipelines"][0].stream),
 				],
 				[
 					"legacy pipeline key",
-					playground,
+					studio,
 					(c) =>
 						(c["previews"].pipelines[0] = {
 							binding: c["previews"].pipelines[0].binding,
 							pipeline: c["previews"].pipelines[0].stream,
 						}),
 				],
-				["no ai", playground, (c) => delete c["previews"].ai],
-				["no durable objects", playground, (c) => delete c["previews"].durable_objects],
+				["no ai", studio, (c) => delete c["previews"].ai],
+				["no durable objects", studio, (c) => delete c["previews"].durable_objects],
 				[
 					"services",
-					playground,
+					studio,
 					(c) => (c["previews"].services = [{ binding: "AUTH", service: "production-auth" }]),
 				],
 				[
 					"production database",
-					playground,
+					studio,
 					(c) => (c["previews"].d1_databases[0].database_id = c["d1_databases"][0].database_id),
 				],
 				[
 					"undeclared database",
-					playground,
+					studio,
 					(c) => (c["previews"].d1_databases[0].database_id = "unreviewed-database"),
 				],
-				["no databases", playground, (c) => delete c["previews"].d1_databases],
+				["no databases", studio, (c) => delete c["previews"].d1_databases],
 				["icons publish limiter", icons, (c) => delete c["previews"].durable_objects],
 				[
 					"icons production database",
@@ -415,7 +415,7 @@ describe("preview settings", () => {
 			for (const [label, original, mutate] of mutations) {
 				const config = structuredClone(original);
 				mutate(config);
-				const projectId = original === icons ? "icons" : "playground";
+				const projectId = original === icons ? "icons" : "studio";
 				const { exit, outputs } = yield* settings(projectId, config);
 				expect(Exit.isFailure(exit), label).toBe(true);
 				expect(outputs, label).toEqual({});

@@ -99,13 +99,13 @@ the registration away from Vercel or the underlying registrar is unnecessary.
    gh workflow run app-production-deploy.yml \
      --repo shpitdev/sketchi \
      --ref main \
-     -f project=playground \
+     -f project=studio \
      -f domain_action=attach
    ```
 
-   The `playground` project dispatch retains the `sketchi-studio` Worker and
+   The `studio` project dispatch retains the `sketchi-studio` Worker and
    attaches only `playground.sketchi.app`; it does not
-   expose `studio.sketchi.app`. Never dispatch attach for `excalidraw`. Verify `icons.sketchi.app` and `playground.sketchi.app` while
+   expose `studio.sketchi.app`. Never dispatch attach for `editor`. Verify `icons.sketchi.app` and `playground.sketchi.app` while
    the wildcard DNS-only CNAME remains staged. That wildcard is not a working
    fallback for these two hosts: Vercel currently returns
    `DEPLOYMENT_NOT_FOUND` for both of them.
@@ -239,7 +239,7 @@ a successful fallback check.
 
 If that reduced route map is explicitly approved, first complete the watched
 Web detach, absence check, apex CNAME restoration, and apex/`www` verification
-above. Then dispatch project-specific detaches for `playground` and `icons`, identify
+above. Then dispatch project-specific detaches for `studio` and `icons`, identify
 and wait for each corresponding workflow run, and change the authoritative
 nameservers in **Vercel Domains** only after those runs succeed. The
 `workers.dev` URLs remain available, but the public Icons and Playground hosts

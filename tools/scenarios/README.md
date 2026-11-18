@@ -459,6 +459,6 @@ these checks do not establish current deployed behavior.
 
 ## Usage
 
-Generation packages, playground routes, and harness evals use these scenarios as
+Generation packages, Studio routes, and harness evals use these scenarios as
 the stable product-quality substrate. Add new scenarios here when a diagram
 failure should become repeatable before it grows into heavier eval tooling.

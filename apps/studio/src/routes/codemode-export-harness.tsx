@@ -1,4 +1,4 @@
-import { loadExcalidraw } from "@sketchi/editor";
+import { loadExcalidraw } from "@sketchi/editor-surface";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 

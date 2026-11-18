@@ -9,7 +9,7 @@ import { excalidrawFonts } from "../../tools/ops/src/vite/excalidraw-fonts";
 import { clientServerBoundary } from "../../tools/ops/src/vite/client-server-boundary";
 import { workerProjectConfig } from "../../tools/ops/src/workers";
 
-const workerProject = workerProjectConfig("playground");
+const workerProject = workerProjectConfig("studio");
 
 export default defineConfig({
 	root: new URL(".", import.meta.url).pathname,
@@ -26,7 +26,7 @@ export default defineConfig({
 			},
 		},
 	},
-	cacheDir: localViteCacheDir("playground"),
+	cacheDir: localViteCacheDir("studio"),
 	publicDir: new URL("./public", import.meta.url).pathname,
 	plugins: [
 		excalidrawFonts(),
@@ -83,11 +83,11 @@ export default defineConfig({
 				replacement: new URL("../../packages/icons/draw/src/index.ts", import.meta.url).pathname,
 			},
 			{
-				find: "@sketchi/editor/styles.css",
+				find: "@sketchi/editor-surface/styles.css",
 				replacement: new URL("../../packages/editor/src/styles.css", import.meta.url).pathname,
 			},
 			{
-				find: "@sketchi/editor",
+				find: "@sketchi/editor-surface",
 				replacement: new URL("../../packages/editor/src/index.ts", import.meta.url).pathname,
 			},
 		],

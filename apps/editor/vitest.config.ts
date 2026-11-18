@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 
 const aliases = [
 	{
-		find: "@sketchi/editor/styles.css",
+		find: "@sketchi/editor-surface/styles.css",
 		replacement: new URL("../../packages/editor/src/styles.css", import.meta.url).pathname,
 	},
 
@@ -13,7 +13,7 @@ const aliases = [
 			.pathname,
 	},
 	{
-		find: "@sketchi/editor",
+		find: "@sketchi/editor-surface",
 		replacement: new URL("../../packages/editor/src/index.ts", import.meta.url).pathname,
 	},
 ];

@@ -8,7 +8,7 @@ import {
 	type ExcalidrawScene,
 } from "@sketchi/drawing/excalidraw";
 
-import { DrawingEditor } from "@sketchi/editor";
+import { DrawingEditor } from "@sketchi/editor-surface";
 import { useCallback, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { IconActionBar, IconButton, IconLink } from "@/components/sketch-icons";
 import { StudioHeader } from "@/components/studio-header";

@@ -1,11 +1,12 @@
-# excalidraw
+# editor
 
-Internal Excalidraw workspace shell for inspecting real Sketchi diagram
-artifacts.
+Internal Excalidraw workspace for inspecting Sketchi diagram artifacts. It
+deploys as `sketchi-excalidraw` and uses the shared `@sketchi/editor-surface`
+package.
 
 ```mermaid
 flowchart LR
-  Fixtures["diagram fixtures"] --> Packages["core, renderer, excalidraw"]
+  Fixtures["diagram fixtures"] --> Packages["diagrams, drawing, editor-surface"]
   Packages --> Workspace["Excalidraw workspace"]
   Workspace --> Inspector["diagram inspector"]
   Workspace --> Switcher["diagram switcher"]
@@ -23,13 +24,12 @@ flowchart LR
 ## Commands
 
 ```sh
-pnpm nx dev excalidraw
-pnpm nx test excalidraw
-pnpm nx typecheck excalidraw
-pnpm nx build excalidraw
-pnpm nx storybook excalidraw
-pnpm nx build-storybook excalidraw
-pnpm nx deploy excalidraw
+pnpm nx dev editor          # https://editor.sketchi.localhost
+pnpm nx test editor
+pnpm nx typecheck editor
+pnpm nx build editor
+pnpm nx storybook editor
+pnpm nx build-storybook editor
 ```
 
 ## Usage

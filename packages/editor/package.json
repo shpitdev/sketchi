@@ -1,5 +1,5 @@
 {
-	"name": "@sketchi/editor",
+	"name": "@sketchi/editor-surface",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.js",

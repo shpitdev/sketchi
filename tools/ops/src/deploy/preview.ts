@@ -30,7 +30,7 @@ const previewProjects: Record<
 	WorkerProjectId,
 	{ commentMarker: string; publicSurface: boolean; routePolicy: string; title: string }
 > = {
-	excalidraw: {
+	editor: {
 		commentMarker: "<!-- sketchi-excalidraw-preview -->",
 		publicSurface: false,
 		routePolicy: "internal canvas workspace; no public product domain",
@@ -42,7 +42,7 @@ const previewProjects: Record<
 		routePolicy: "icons.sketchi.app product surface",
 		title: "Sketchi Icons",
 	},
-	playground: {
+	studio: {
 		commentMarker: "<!-- sketchi-studio-preview -->",
 		publicSurface: true,
 		routePolicy: "playground.sketchi.app product surface; authenticated Studio remains unexposed",
@@ -212,7 +212,7 @@ export function webPreviewUrls(prNumber: string | number | undefined, subdomain:
 	const name = previewName(prNumber);
 	const url = (projectId: WorkerProjectId) =>
 		`https://${name}-${previewProjectConfig(projectId).workerName}.${subdomain}.workers.dev`;
-	return { icons_preview_url: url("icons"), playground_preview_url: url("playground") };
+	return { icons_preview_url: url("icons"), studio_preview_url: url("studio") };
 }
 
 /**

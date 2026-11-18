@@ -2,7 +2,7 @@ import {
 	type ExcalidrawInitialDataState,
 	type ExcalidrawProps,
 } from "@excalidraw/excalidraw/types";
-import type { createFoldedRouteRelease } from "@sketchi/editor";
+import type { createFoldedRouteRelease } from "@sketchi/editor-surface";
 import { Button } from "@sketchi/ui/components/button";
 import { Spinner } from "@sketchi/ui/components/spinner";
 import { Pencil, RotateCcw } from "lucide-react";
@@ -28,8 +28,8 @@ let editorLoad: Promise<LoadedEditor> | undefined;
  */
 function loadEditor(): Promise<LoadedEditor> {
 	editorLoad ??= Promise.all([
-		import("@sketchi/editor").then(({ loadExcalidraw }) => loadExcalidraw()),
-		import("@sketchi/editor"),
+		import("@sketchi/editor-surface").then(({ loadExcalidraw }) => loadExcalidraw()),
+		import("@sketchi/editor-surface"),
 		import("@excalidraw/excalidraw/index.css"),
 		fetch(HOME_DIAGRAM.scene).then((response) => {
 			if (!response.ok) throw new Error(`${HOME_DIAGRAM.scene} returned ${response.status}`);

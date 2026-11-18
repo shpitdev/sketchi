@@ -1,5 +1,5 @@
 {
-	"name": "@sketchi/playground",
+	"name": "@sketchi/studio",
 	"private": true,
 	"type": "module",
 	"dependencies": {
@@ -13,7 +13,7 @@
 		"@sketchi/community-icons": "workspace:*",
 		"@sketchi/diagrams": "workspace:*",
 		"@sketchi/drawing": "workspace:*",
-		"@sketchi/editor": "workspace:*",
+		"@sketchi/editor-surface": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/icon-draw": "workspace:*",
 		"@sketchi/observability": "workspace:*",

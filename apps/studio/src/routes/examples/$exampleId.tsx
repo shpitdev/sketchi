@@ -6,7 +6,7 @@ import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
 import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { renderMindmap } from "@sketchi/diagrams/families/mindmap/index";
 
-import { DrawingEditor } from "@sketchi/editor";
+import { DrawingEditor } from "@sketchi/editor-surface";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 

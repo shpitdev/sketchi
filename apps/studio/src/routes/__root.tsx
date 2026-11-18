@@ -1,7 +1,7 @@
 import { RegistryProvider } from "@effect/atom-react";
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 
-import "@sketchi/editor/styles.css";
+import "@sketchi/editor-surface/styles.css";
 import appStyles from "../styles/app.css?url";
 
 const DESCRIPTION =

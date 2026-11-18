@@ -22,10 +22,13 @@ flowchart LR
   Effect --> Telemetry["Spans: Pipelines → R2 Data Catalog → DuckDB"]
 ```
 
-The four Worker projects are `web`, `playground` (`apps/studio`), `excalidraw` (`apps/editor`), and `icons`. `playground` deploys as the durable `sketchi-studio` Worker and
-owns chat, HTTP build/artifact APIs, MCP, Browser Rendering, and Studio
-persistence. Preview identities and production routes come only
-from `tools/ops/src/workers.ts`. Operator commands (`pnpm ops`, `pnpm ci:local`,
+The four Worker projects are `web`, `studio`, `editor`, and `icons`. `studio`
+deploys as `sketchi-studio` and owns chat, the HTTP build and artifact APIs, MCP,
+Browser Rendering, and Studio persistence. The internal `editor` app deploys as
+`sketchi-excalidraw`; the reusable drawing surface in `packages/editor` is the
+separate `editor-surface` project. The Worker map in `tools/ops/src/workers.ts`
+resolves project IDs to deployed identities; `tools/ops/src/deploy/` owns
+Preview and production route policy. Operator commands (`pnpm ops`, `pnpm ci:local`,
 `pnpm db`, `pnpm sanity`) are typed Effect in `tools/ops`.
 
 ## Package ownership
@@ -224,10 +227,9 @@ packaged CLI smoke, and applicable preview runtime probes.
 ## Deployment map
 
 - `sketchi.app` and `www.sketchi.app` → `web`
-- `playground.sketchi.app` → `playground` / `sketchi-studio`
+- `playground.sketchi.app` → `studio` / `sketchi-studio`
 - `icons.sketchi.app` → `icons`
-- Excalidraw workspace → internal Worker
+- `editor` → `sketchi-excalidraw`, no public domain
 
-Preview deploys remove production routes and use the canonical per-PR Worker
-names. Production or preview claims require exact-head runtime evidence; a
+Previews use a stable `pr-<number>` name on each existing Worker. Production or preview claims require exact-head runtime evidence; a
 successful build alone is not deployment proof.

@@ -50,7 +50,7 @@ export interface PlaygroundRequestBoundary {
 class PlaygroundCallbackFibers extends Context.Service<
 	PlaygroundCallbackFibers,
 	FiberSet.FiberSet<unknown, unknown>
->()("@sketchi/playground/PlaygroundCallbackFibers") {}
+>()("@sketchi/studio/PlaygroundCallbackFibers") {}
 const PlaygroundTelemetryLive = makeWorkersTelemetryLayer({
 	resource: { serviceName: "sketchi-studio" },
 });
@@ -87,7 +87,7 @@ export interface PlaygroundRequestCallbacksShape {
 export class PlaygroundRequestCallbacks extends Context.Service<
 	PlaygroundRequestCallbacks,
 	PlaygroundRequestCallbacksShape
->()("@sketchi/playground/PlaygroundRequestCallbacks") {}
+>()("@sketchi/studio/PlaygroundRequestCallbacks") {}
 type PlaygroundHttpError = RequestBodyReadError;
 type PlaygroundRequestResult<A, E> =
 	| A

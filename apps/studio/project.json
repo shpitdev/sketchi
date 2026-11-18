@@ -1,5 +1,5 @@
 {
-	"name": "playground",
+	"name": "studio",
 	"$schema": "../../node_modules/nx/schemas/project-schema.json",
 	"sourceRoot": "apps/studio/src",
 	"projectType": "application",
@@ -24,7 +24,7 @@
 		"dev": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "PORTLESS_PORT=443 portless run --name playground.sketchi vite dev --config apps/studio/vite.config.ts"
+				"command": "PORTLESS_PORT=443 portless run --name studio.sketchi vite dev --config apps/studio/vite.config.ts"
 			},
 			"dependsOn": ["sync-node-logos"]
 		},

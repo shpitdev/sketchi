@@ -17,13 +17,13 @@ export interface PlaygroundRequestMetadataShape {
 }
 
 export class PlaygroundBindings extends Context.Service<PlaygroundBindings, StudioEnv>()(
-	"@sketchi/playground/PlaygroundBindings",
+	"@sketchi/studio/PlaygroundBindings",
 ) {}
 
 export class PlaygroundRequestMetadata extends Context.Service<
 	PlaygroundRequestMetadata,
 	PlaygroundRequestMetadataShape
->()("@sketchi/playground/PlaygroundRequestMetadata") {}
+>()("@sketchi/studio/PlaygroundRequestMetadata") {}
 
 export interface PlaygroundPlatformCallbacksShape {
 	readonly waitUntil: (effect: Effect.Effect<void, never, PlaygroundRequestServices>) => void;
@@ -37,14 +37,14 @@ export interface PlaygroundPlatformBoundaryShape {
 export class PlaygroundPlatformCallbacks extends Context.Service<
 	PlaygroundPlatformCallbacks,
 	PlaygroundPlatformCallbacksShape
->()("@sketchi/playground/PlaygroundPlatformCallbacks") {}
+>()("@sketchi/studio/PlaygroundPlatformCallbacks") {}
 
 export interface PlaygroundIdsShape {
 	readonly create: (prefix: string) => string;
 }
 
 export class PlaygroundIds extends Context.Service<PlaygroundIds, PlaygroundIdsShape>()(
-	"@sketchi/playground/PlaygroundIds",
+	"@sketchi/studio/PlaygroundIds",
 ) {}
 
 export const PlaygroundIdsLive = Layer.succeed(PlaygroundIds, {
@@ -57,7 +57,7 @@ export interface PlaygroundClockShape {
 }
 
 export class PlaygroundClock extends Context.Service<PlaygroundClock, PlaygroundClockShape>()(
-	"@sketchi/playground/PlaygroundClock",
+	"@sketchi/studio/PlaygroundClock",
 ) {}
 
 export const PlaygroundClockLive = Layer.succeed(PlaygroundClock, {

@@ -105,7 +105,7 @@ export interface PlaygroundCodeModeUsageShape {
 export class PlaygroundCodeModeUsage extends Context.Service<
 	PlaygroundCodeModeUsage,
 	PlaygroundCodeModeUsageShape
->()("@sketchi/playground/PlaygroundCodeModeUsage") {}
+>()("@sketchi/studio/PlaygroundCodeModeUsage") {}
 
 /** The request's run and attempt, and a new event for this call. */
 const createCodeModeUsageContext = Effect.fn("playground.codeModeUsage.createContext")(
@@ -124,7 +124,7 @@ const createCodeModeUsageContext = Effect.fn("playground.codeModeUsage.createCon
 export class CurrentCodeModeUsage extends Context.Service<
 	CurrentCodeModeUsage,
 	CodeModeUsageContext & { readonly startedAt: number }
->()("@sketchi/playground/CurrentCodeModeUsage") {}
+>()("@sketchi/studio/CurrentCodeModeUsage") {}
 
 export function codeModeUsageResponseHeaders(
 	context: CodeModeUsageContext,

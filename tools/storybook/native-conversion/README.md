@@ -8,9 +8,8 @@ family stories in `tools/storybook/families`. It publishes:
 - the shared native editable-element canvas story;
 - one story per diagram family.
 
-The Nx project has explicit dependencies on `editor`, `excalidraw` (`apps/editor`),
-`icons`, and `playground` (`apps/studio`), so changes to any product surface mark
-this Storybook as affected and trigger the single Chromatic publication.
+The Nx project depends on `editor`, `editor-surface`, `icons`, and `studio`, so
+changes to those projects mark this Storybook as affected.
 
 ```sh
 pnpm nx build-storybook native-conversion-storybook

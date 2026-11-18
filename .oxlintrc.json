@@ -198,7 +198,7 @@
 						// import is still checked, including imports from config files.
 						"allow": [
 							// Storybook composes the Studio-owned workspace and its stylesheet.
-							"^@sketchi/playground/styles\\.css$",
+							"^@sketchi/studio/styles\\.css$",
 							"^\\.\\./\\.\\./tools/ops/src/vite/client-server-boundary$",
 							"^\\.\\./\\.\\./tools/ops/src/workers$",
 							"^(\\.\\./){2,4}tools/ops/src/vite/excalidraw-fonts$",

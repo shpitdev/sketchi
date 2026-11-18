@@ -71,7 +71,7 @@ The exact integrated Class gate `95a611a9` against `533b76e1` passes in 245.77 s
 
 ```text
 apps/
-  studio/                 # Studio (Nx `playground`): chat, projects, tool hosting, Worker assembly
+  studio/                 # Studio (Nx `studio`): chat, projects, tool hosting, Worker assembly
   icons/                  # catalog/community pages and their Worker assembly
   editor/                 # Nx `excalidraw`: the standalone editing application
   web/                    # marketing site
@@ -125,7 +125,7 @@ The currently shared icon recipe/shape data moves to its proper owner with consu
 - diagram-excalidraw and svg-excalidraw join drawing/excalidraw and drawing/svg.
 - diagram-ui becomes editor; app-specific panels and page controllers return to their owning app. Remove forwarding components and restated scene types.
 - icon-catalog, community-icons and icon-draw become the corresponding icons features. Actual browser/server exports stay distinct.
-- studio-projects moves into studio/features/projects. The playground/excalidraw app directories are now `apps/studio` and `apps/editor`; their Nx project ids (`playground`, `excalidraw`), package names and Worker names are the deploy identities and stay.
+- Studio projects moved into `apps/studio/src/features/projects`. The apps live in `apps/studio` and `apps/editor` and use Nx IDs `studio` and `editor`; `packages/editor` uses `editor-surface`. The deployed Worker names stay `sketchi-studio` and `sketchi-excalidraw`.
 - diagram-scenarios and native-conversion-storybook become tools. The native-conversion Storybook is `tools/storybook/native-conversion` beside the family stories (Nx name unchanged). Keep the Nx name `diagram-scenarios` during relocation and pair the real Frontierclimb path/fingerprint update. Frontierclimb runs the graded catalogs but currently calls Sketchi for deterministic case discovery and grading; those implementations cannot be deleted on the assumption that Frontierclimb already owns them. Family expected diagrams belong with their family; editor regression support retains an explicit local owner.
 - CLI remains an application with feature-owned commands/store/render/share/terminal folders; its custom I/O and lifetime mechanisms are addressed below. Web, icon-batch, observability, ui and social-card change only for actual ownership or Effect gaps.
 

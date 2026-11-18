@@ -441,7 +441,7 @@ importers:
       '@sketchi/drawing':
         specifier: workspace:*
         version: link:../../packages/drawing
-      '@sketchi/editor':
+      '@sketchi/editor-surface':
         specifier: workspace:*
         version: link:../../packages/editor
       effect:
@@ -550,7 +550,7 @@ importers:
       '@sketchi/drawing':
         specifier: workspace:*
         version: link:../../packages/drawing
-      '@sketchi/editor':
+      '@sketchi/editor-surface':
         specifier: workspace:*
         version: link:../../packages/editor
       '@sketchi/icon-catalog':
@@ -611,7 +611,7 @@ importers:
       '@excalidraw/excalidraw':
         specifier: 0.18.1
         version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@sketchi/editor':
+      '@sketchi/editor-surface':
         specifier: workspace:*
         version: link:../../packages/editor
       '@sketchi/ui':

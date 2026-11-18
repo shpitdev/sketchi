@@ -91,7 +91,7 @@ Reuse unchanged proof by identity instead of repeating expensive checks.
 install and `nx sync:check`, native Nx affected targets own lint/format, tools
 (including custom-rule, domain and font tests), deployment/process behavior,
 scenario CLI smoke, typecheck/build/test, root TypeScript references and the
-editor Storybook build. Checks reuse the native local task cache. Workflow
+`editor-surface` Storybook build. Checks reuse the native local task cache. Workflow
 changes select the native actionlint target. Full gates also run sampled routing.
 
 - Before publishing an accepted unit, run `pnpm ci:local --no-signoff`.
@@ -147,7 +147,7 @@ These larger suites remain local proof when their inputs change:
 Worker Previews are opt-in. Add the `preview` label to a PR to deploy the Worker
 apps it affects on every push (closing the PR deletes them), or dispatch
 `app-preview` with a PR number and `project` (`affected`, `all`, or one app) for a
-stacked PR or a specific app such as `playground` (Studio); a dispatch also adds
+stacked PR or a specific app such as `studio`; a dispatch also adds
 the label.
 
 Production Worker deployment requires an explicit `app-production-deploy`
