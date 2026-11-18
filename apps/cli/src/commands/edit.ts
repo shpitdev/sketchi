@@ -1,4 +1,4 @@
-import type { CodeModeIssue } from "@sketchi/diagrams/build/contract";
+import type { BuildIssue } from "@sketchi/diagrams/build/contract";
 import { applyFlowchartEdits } from "@sketchi/diagrams/families/flowchart/edits";
 import { Effect } from "effect";
 
@@ -54,7 +54,7 @@ export const editCommand = Command.make(
 								...saved,
 								warnings: [
 									...(saved.warnings ?? []),
-									...edited.notes.map((message): CodeModeIssue => ({
+									...edited.notes.map((message): BuildIssue => ({
 										code: "reference_resolved",
 										severity: "info",
 										stage: "input",

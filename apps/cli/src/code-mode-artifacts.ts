@@ -1,5 +1,5 @@
 import { CanvasSpec } from "@sketchi/drawing";
-import { formatContractSchemaError, type CodeModeIssue } from "@sketchi/diagrams/build/contract";
+import { formatContractSchemaError, type BuildIssue } from "@sketchi/diagrams/build/contract";
 
 import { ArtifactStorage, BuildRuntimeEnvironment } from "@sketchi/diagrams/build";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
@@ -31,7 +31,7 @@ export const withCodeMode = Effect.fn("sketchi.cli.codeMode.with")(function* <A,
 export function codeModeFailure(
 	result: {
 		readonly status: string;
-		readonly issues: ReadonlyArray<CodeModeIssue>;
+		readonly issues: ReadonlyArray<BuildIssue>;
 	},
 	operation: "build" | "patch",
 ): CliBuildError | CliStorageError | CliValidationError {

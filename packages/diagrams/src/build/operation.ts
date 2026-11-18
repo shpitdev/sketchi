@@ -9,12 +9,12 @@ import { ArtifactBundleSchema, PartialArtifactBundleSchema } from "@sketchi/draw
 import {
 	BuildOptions,
 	PublishedBuildIssue,
-	CodeModeIssue,
-	CodeModeIssueCodeSchema,
+	BuildIssue,
+	BuildIssueCodeSchema,
 	QualityReportSchema,
 	type ArtifactBuildCapabilities,
 	type QualityReport,
-	type CodeModeIssueCode,
+	type BuildIssueCode,
 	type DiagramCounts,
 } from "./result";
 
@@ -44,7 +44,7 @@ export function defineBuild<
 	T extends Schema.Top,
 	R = never,
 	C = N,
-	P extends Schema.Codec<CodeModeIssue> = typeof PublishedBuildIssue,
+	P extends Schema.Codec<BuildIssue> = typeof PublishedBuildIssue,
 	const Name extends string = string,
 >(policy: {
 	readonly name: Name;
@@ -60,8 +60,8 @@ export function defineBuild<
 	readonly prepare?: (input: unknown) => Result.Result<unknown, E>;
 	readonly normalize: (document: D) => N | Result.Result<N, E>;
 	readonly check: (document: N) => Result.Result<C, E>;
-	readonly issues: (error: E) => CodeModeIssue[];
-	readonly inputIssues?: (error: Schema.SchemaError) => CodeModeIssue[];
+	readonly issues: (error: E) => BuildIssue[];
+	readonly inputIssues?: (error: Schema.SchemaError) => BuildIssue[];
 	readonly counts: (document: C) => DiagramCounts;
 	readonly warnings?: (
 		document: C,
@@ -71,8 +71,8 @@ export function defineBuild<
 	) => P["Type"][];
 	readonly assess?: (document: C, threshold: number) => QualityReport;
 	readonly assessScene?: (document: C, scene: CanvasSpec, quality: QualityReport) => QualityReport;
-	readonly qualityIssue?: { readonly code: CodeModeIssueCode; readonly hint: string };
-	readonly qualityIssues?: (quality: QualityReport) => CodeModeIssue[];
+	readonly qualityIssue?: { readonly code: BuildIssueCode; readonly hint: string };
+	readonly qualityIssues?: (quality: QualityReport) => BuildIssue[];
 	readonly render: (document: C) => CanvasSpec | Result.Result<CanvasSpec, E>;
 	readonly resolve?: (document: D) => Effect.Effect<
 		{
@@ -122,9 +122,9 @@ export function defineBuild<
 		status: Status,
 		...Context.fields,
 		issues: Schema.Array(
-			CodeModeIssue.mapFields((fields) => ({
+			BuildIssue.mapFields((fields) => ({
 				...fields,
-				code: Schema.Union([CodeModeIssueCodeSchema, policy.issueCodes]),
+				code: Schema.Union([BuildIssueCodeSchema, policy.issueCodes]),
 			})),
 		).pipe(Schema.mutable),
 	});
@@ -171,7 +171,7 @@ export function defineBuild<
 		}
 		toResult(): typeof Rejected.Type {
 			const reason = this.reason;
-			let issues: CodeModeIssue[];
+			let issues: BuildIssue[];
 			switch (reason._tag) {
 				case "Input":
 					issues =

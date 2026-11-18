@@ -1,6 +1,6 @@
 /** Preserves actionable request diagnostics from native schema issues at the build boundary. */
 import { Schema, SchemaAST, SchemaIssue } from "effect";
-import { type CodeModeIssue, type CodeModeIssueCode } from "./result";
+import { type BuildIssue, type BuildIssueCode } from "./result";
 
 export const contractDiscriminatorAnnotation = "codeModeDiscriminator";
 export const contractMissingKeyCodeAnnotation = "codeModeMissingKeyCode";
@@ -144,9 +144,7 @@ function pathForContractIssue(path: readonly PropertyKey[]): string {
 	return path.map((part) => (typeof part === "number" ? `[${part}]` : String(part))).join(".");
 }
 
-function codeForContractIssue(
-	contractIssue: typeof ContractSchemaIssue.Encoded,
-): CodeModeIssueCode {
+function codeForContractIssue(contractIssue: typeof ContractSchemaIssue.Encoded): BuildIssueCode {
 	const path = pathForContractIssue(contractIssue.path);
 	if (
 		contractIssue.issueTag === "InvalidType" ||
@@ -163,9 +161,9 @@ export function inputIssues(
 	error: ContractSchemaError,
 	hintFor: (path: string) => string = (path) =>
 		`Fix ${path} so it matches the Code Mode API contract.`,
-	codeFor?: (path: string) => CodeModeIssueCode | undefined,
-): CodeModeIssue[] {
-	const issues = error.issues.slice(0, MAX_INPUT_ISSUES).map((contractIssue): CodeModeIssue => {
+	codeFor?: (path: string) => BuildIssueCode | undefined,
+): BuildIssue[] {
+	const issues = error.issues.slice(0, MAX_INPUT_ISSUES).map((contractIssue): BuildIssue => {
 		const path = pathForContractIssue(contractIssue.path);
 		return {
 			severity: "error",

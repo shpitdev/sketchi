@@ -1,5 +1,5 @@
 import "@tanstack/react-start/server-only";
-import type { CodeModeIssue } from "@sketchi/diagrams/build/contract";
+import type { BuildIssue } from "@sketchi/diagrams/build/contract";
 import { Effect, Stream } from "effect";
 import { Response } from "effect/ai";
 import type { StudioTurnOutcome } from "./studio-build-tool.server";
@@ -8,7 +8,7 @@ export const STUDIO_RAN_OUT_REPLY =
 	"I ran out of room before I could finish this diagram. Try again, or ask for a smaller diagram.";
 
 /** The reply when every build this turn was rejected: what the last rejection says. */
-export function studioRejectedReply(issues: readonly CodeModeIssue[]): string {
+export function studioRejectedReply(issues: readonly BuildIssue[]): string {
 	const reasons = [...new Set(issues.map((issue) => issue.message.trim()).filter(Boolean))];
 	const shown = reasons.slice(0, 3).join(" ");
 	return `I couldn't save a diagram for this request.${shown ? ` The last attempt was rejected: ${shown}` : ""}${reasons.length > 3 ? ` (${reasons.length - 3} more issues.)` : ""} Try simplifying or rephrasing the request.`;

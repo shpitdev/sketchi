@@ -1,7 +1,7 @@
 import { Array as Arr } from "effect";
 import { type CanvasValidationIssue } from "@sketchi/drawing";
-import { type CodeModeIssue, type CodeModeIssueCode } from "./result";
-function canvasIssueCode(validationIssue: CanvasValidationIssue): CodeModeIssueCode {
+import { type BuildIssue, type BuildIssueCode } from "./result";
+function canvasIssueCode(validationIssue: CanvasValidationIssue): BuildIssueCode {
 	switch (validationIssue.code) {
 		case "duplicate_element_id":
 			return "duplicate_element_id";
@@ -41,7 +41,7 @@ export function canvasFailureStatus(
 }
 export function canvasValidationIssues(
 	validationIssues: readonly CanvasValidationIssue[],
-): CodeModeIssue[] {
+): BuildIssue[] {
 	return Arr.map(Arr.take(validationIssues, 20), (validationIssue) => ({
 		severity: "error" as const,
 		code: canvasIssueCode(validationIssue),

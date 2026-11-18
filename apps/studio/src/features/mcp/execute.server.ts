@@ -24,7 +24,7 @@ import {
 	ArtifactStorage,
 	buildResponse,
 } from "@sketchi/diagrams/build";
-import { type EditFlowchartResult, CodeModeIssue } from "@sketchi/diagrams/build/contract";
+import { type EditFlowchartResult, BuildIssue } from "@sketchi/diagrams/build/contract";
 import { getArtifact } from "@sketchi/diagrams/canvas/artifact";
 import { createCanvas } from "@sketchi/diagrams/canvas/create";
 import { type CreateCanvasResult } from "@sketchi/diagrams/canvas/create-contract";
@@ -97,7 +97,7 @@ const ExecuteBuildContract = Schema.Struct({
 	partial: Schema.optionalKey(ExecuteBuildArtifactContract),
 	/** The edits an editFlowchart applied. */
 	edits: Schema.optionalKey(Schema.Unknown),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	issues: Schema.Array(BuildIssue).pipe(Schema.mutable),
 });
 type ExecuteBuild = typeof ExecuteBuildContract.Type;
 type BuildOperation = ExecuteBuild["operation"];

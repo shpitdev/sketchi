@@ -1,7 +1,7 @@
 import { type CanvasSpec } from "@sketchi/drawing";
 import { DIAGRAM_TYPES } from "@sketchi/diagrams/family";
 
-import { type CodeModeIssue } from "@sketchi/diagrams/build/contract";
+import { type BuildIssue } from "@sketchi/diagrams/build/contract";
 import { type ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Schema } from "effect";
 
@@ -51,7 +51,7 @@ export function recordProvenance(manifest: DiagramRecordManifest): {
 }
 
 export interface BuiltDiagram {
-	readonly warnings?: ReadonlyArray<CodeModeIssue>;
+	readonly warnings?: ReadonlyArray<BuildIssue>;
 	readonly id: string;
 	readonly type: DiagramDocument["type"];
 	readonly title: string;
@@ -75,7 +75,7 @@ export interface PatchedDiagramArtifacts {
 
 export interface StoredDiagram {
 	/** Warnings for this invocation; not persisted as record state. */
-	readonly warnings?: ReadonlyArray<CodeModeIssue>;
+	readonly warnings?: ReadonlyArray<BuildIssue>;
 	readonly manifest: DiagramRecordManifest;
 	readonly document: DiagramDocument;
 	readonly revisions: ReadonlyArray<string>;

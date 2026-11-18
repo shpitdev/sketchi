@@ -1,4 +1,4 @@
-import { BuildOptions, CodeModeIssue } from "../build/result";
+import { BuildOptions, BuildIssue } from "../build/result";
 
 import { CanvasSpec } from "@sketchi/drawing";
 import { ArtifactBundleSchema, PartialArtifactBundleSchema } from "@sketchi/drawing/artifacts";
@@ -29,7 +29,7 @@ export const CreateCanvasAccepted = Schema.Struct({
 	requestId: optionalContract(Schema.String),
 	normalizedSpec: CanvasSpec,
 	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	issues: Schema.Array(BuildIssue).pipe(Schema.mutable),
 }).annotate({ identifier: undefined });
 
 export interface CreateCanvasAccepted extends Schema.Schema.Type<typeof CreateCanvasAccepted> {}
@@ -48,7 +48,7 @@ export const CreateCanvasRejected = Schema.Struct({
 	requestId: optionalContract(Schema.String),
 	normalizedSpec: optionalContract(CanvasSpec),
 	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	issues: Schema.Array(BuildIssue).pipe(Schema.mutable),
 }).annotate({ identifier: undefined });
 
 export interface CreateCanvasRejected extends Schema.Schema.Type<typeof CreateCanvasRejected> {}

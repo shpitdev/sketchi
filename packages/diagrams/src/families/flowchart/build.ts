@@ -2,7 +2,7 @@ import { inputIssues, formatContractSchemaError } from "../../build/input";
 /** Owns Flowchart build policy; decoding, quality gates and artifact delivery use the common operation. */
 import { Array, Effect, Record, Result, Schema } from "effect";
 import { defineBuild } from "../../build/operation";
-import { CodeModeIssue, qualityIssues } from "../../build/result";
+import { BuildIssue, qualityIssues } from "../../build/result";
 import {
 	BuildIconSource,
 	resolveFlowchartLogos,
@@ -64,7 +64,7 @@ export const flowchartBuild = defineBuild({
 	error: Schema.Union([FlowchartValidationError, Schema.declare(Schema.isSchemaError)]),
 	issueCodes: FlowchartValidationIssueCodeSchema,
 	// Coverage diagnostics were already an open code string in the released Flowchart result.
-	publishedIssues: CodeModeIssue,
+	publishedIssues: BuildIssue,
 	invalidStatus: "invalid_flowchart",
 	inputIssues: (error) => inputIssues(formatContractSchemaError(error)),
 	documentStatus: (error) =>
@@ -90,7 +90,7 @@ export const flowchartBuild = defineBuild({
 	normalize,
 	check,
 	counts,
-	issues: (error): CodeModeIssue[] =>
+	issues: (error): BuildIssue[] =>
 		Schema.isSchemaError(error)
 			? Array.map(
 					inputIssues(
@@ -183,7 +183,7 @@ export const flowchartBuild = defineBuild({
 			checked,
 			storedDocument: { type: "flowchart", spec: authoredSpec },
 			issues: [
-				...Array.map(normalized.notes, (message): CodeModeIssue => ({
+				...Array.map(normalized.notes, (message): BuildIssue => ({
 					code: "reference_resolved",
 					hint: "Use the resolved declared id in future references.",
 					severity: "info",
@@ -200,8 +200,8 @@ export const flowchartBuild = defineBuild({
 	assess: assessFlowchartQuality,
 	qualityIssues,
 	render: renderFlowchartDiagram,
-	warnings: (diagram, request, scene): CodeModeIssue[] => [
-		...Array.map(longNodeDescriptions(scene), (id): CodeModeIssue => ({
+	warnings: (diagram, request, scene): BuildIssue[] => [
+		...Array.map(longNodeDescriptions(scene), (id): BuildIssue => ({
 			code: "label_too_long",
 			severity: "warning",
 			stage: "render",
@@ -211,7 +211,7 @@ export const flowchartBuild = defineBuild({
 		})),
 		...(request === undefined
 			? []
-			: Array.flatMap(checkRequestCoverage(request, diagram), (entry): CodeModeIssue[] =>
+			: Array.flatMap(checkRequestCoverage(request, diagram), (entry): BuildIssue[] =>
 					isFlowchartCoverageCode(entry.code)
 						? [
 								{

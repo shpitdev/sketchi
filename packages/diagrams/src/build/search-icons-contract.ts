@@ -1,4 +1,4 @@
-import { CodeModeIssue } from "./result";
+import { BuildIssue } from "./result";
 
 import { Schema } from "effect";
 
@@ -57,7 +57,7 @@ export const SearchIconsAccepted = Schema.Struct({
 	status: stringLiteral("accepted"),
 	query: Schema.String,
 	icons: Schema.Array(SearchIconsMatch).pipe(Schema.mutable),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	issues: Schema.Array(BuildIssue).pipe(Schema.mutable),
 }).annotate({ identifier: undefined });
 
 export interface SearchIconsAccepted extends Schema.Schema.Type<typeof SearchIconsAccepted> {}
@@ -65,7 +65,7 @@ export interface SearchIconsAccepted extends Schema.Schema.Type<typeof SearchIco
 export const SearchIconsRejected = Schema.Struct({
 	ok: booleanLiteral(false),
 	status: literals(["invalid_input"]),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	issues: Schema.Array(BuildIssue).pipe(Schema.mutable),
 }).annotate({ identifier: undefined });
 
 export interface SearchIconsRejected extends Schema.Schema.Type<typeof SearchIconsRejected> {}

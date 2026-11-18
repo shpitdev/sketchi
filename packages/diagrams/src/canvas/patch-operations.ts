@@ -1,4 +1,4 @@
-import { type CodeModeIssue } from "../build/result";
+import { type BuildIssue } from "../build/result";
 
 import { curvedConnectorBetween, wrappedLabelWidth, wrapTextToWidth } from "@sketchi/drawing";
 
@@ -138,7 +138,7 @@ function resolveTargets(
 	return { arrows, icons, nodes, texts };
 }
 
-function targetIssue(operation: DiagramPatchOperation): CodeModeIssue {
+function targetIssue(operation: DiagramPatchOperation): BuildIssue {
 	return issue({
 		code: "unknown_patch_target",
 		stage: "flowchart",
@@ -204,7 +204,7 @@ function translatePoint(point: PatchablePoint, dx: number, dy: number): Patchabl
 function applyStyle(
 	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "setDefaultStyle" | "setStyle" }>,
-): CodeModeIssue[] {
+): BuildIssue[] {
 	if (operation.style.backgroundColor) {
 		scene.backgroundColor = operation.style.backgroundColor;
 	}
@@ -293,7 +293,7 @@ function rerouteConnectedArrows(scene: CanvasInput, nodeIds: readonly string[]):
 function applyShape(
 	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "setShape" }>,
-): CodeModeIssue[] {
+): BuildIssue[] {
 	const targets = resolveTargets(scene, operation.selector);
 	if (targets.nodes.length === 0) {
 		return [targetIssue(operation)];
@@ -329,7 +329,7 @@ function applyShape(
 function applyTranslate(
 	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "translate" }>,
-): CodeModeIssue[] {
+): BuildIssue[] {
 	const targets = resolveTargets(scene, operation.selector);
 	if (
 		targets.nodes.length === 0 &&
@@ -385,7 +385,7 @@ function applyTranslate(
 function applyReplaceText(
 	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "replaceText" }>,
-): CodeModeIssue[] {
+): BuildIssue[] {
 	const targets = resolveTargets(scene, operation.selector);
 	if (targets.nodes.length === 0 && targets.arrows.length === 0 && targets.texts.length === 0) {
 		return [targetIssue(operation)];
@@ -450,7 +450,7 @@ function edgePoint(
 	return { x: sourceCenter.x, y: source.y };
 }
 
-function rerouteArrow(scene: CanvasInput, arrow: PatchableArrow): CodeModeIssue[] {
+function rerouteArrow(scene: CanvasInput, arrow: PatchableArrow): BuildIssue[] {
 	const nodesById = new Map(nodeElements(scene).map((node) => [node.nodeId, node]));
 	const source = nodesById.get(arrow.sourceNodeId);
 	const target = nodesById.get(arrow.targetNodeId);
@@ -489,7 +489,7 @@ function rerouteArrow(scene: CanvasInput, arrow: PatchableArrow): CodeModeIssue[
 function applyRerouteEdges(
 	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "rerouteEdges" }>,
-): CodeModeIssue[] {
+): BuildIssue[] {
 	const targets = resolveTargets(scene, operation.selector);
 	if (targets.arrows.length === 0) {
 		return [targetIssue(operation)];
@@ -549,10 +549,7 @@ function anchoredIndex(
 	return order.length;
 }
 
-function structuralOperationIssue(
-	operation: DiagramPatchOperation,
-	message: string,
-): CodeModeIssue[] {
+function structuralOperationIssue(operation: DiagramPatchOperation, message: string): BuildIssue[] {
 	return [
 		issue({
 			code: "patch_output_invalid",
@@ -567,7 +564,7 @@ function structuralOperationIssue(
 function applyInsert(
 	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "insert" }>,
-): CodeModeIssue[] {
+): BuildIssue[] {
 	const existingIds = new Set(scene.elements.map((element) => element.id));
 	const insertedIds = operation.elements.map((element) => element.id);
 	if (
@@ -594,7 +591,7 @@ function applyInsert(
 function applyRemove(
 	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "remove" }>,
-): CodeModeIssue[] {
+): BuildIssue[] {
 	const removedIds = patchTargetIds(scene, operation.selector);
 	if (removedIds.size === 0) return [targetIssue(operation)];
 	const removedNodeIds = new Set(
@@ -649,7 +646,7 @@ function applyRemove(
 function applyReplace(
 	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "replace" }>,
-): CodeModeIssue[] {
+): BuildIssue[] {
 	const index = scene.elements.findIndex((element) => element.id === operation.id);
 	if (index < 0) return [targetIssue(operation)];
 	if (operation.element.id !== operation.id) {
@@ -666,7 +663,7 @@ function applyReplace(
 function applyReorder(
 	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "reorder" }>,
-): CodeModeIssue[] {
+): BuildIssue[] {
 	const selected = new Set(operation.ids);
 	if (
 		selected.size !== operation.ids.length ||
@@ -693,7 +690,7 @@ function applyReorder(
 function applyGroup(
 	scene: CanvasInput,
 	operation: Extract<DiagramPatchOperation, { op: "group" | "ungroup" }>,
-): CodeModeIssue[] {
+): BuildIssue[] {
 	const ids = new Set(operation.ids);
 	if (operation.ids.some((id) => !scene.elements.some((element) => element.id === id))) {
 		return [targetIssue(operation)];
@@ -720,7 +717,7 @@ function applyGroup(
 export function applyPatchOperation(
 	scene: CanvasInput,
 	operation: DiagramPatchOperation,
-): CodeModeIssue[] {
+): BuildIssue[] {
 	switch (operation.op) {
 		case "setDefaultStyle":
 		case "setStyle":

@@ -151,7 +151,7 @@ function family<
 	E,
 	const S extends string,
 	T extends Schema.Top,
-	P extends Schema.Codec<import("./build/result").CodeModeIssue>,
+	P extends Schema.Codec<import("./build/result").BuildIssue>,
 	R extends import("./build/icons").BuildIconSource,
 	const F extends {
 		readonly operation: O;
