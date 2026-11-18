@@ -79,14 +79,11 @@ See [Effect conventions](effect-conventions.md) and
 
 Worker generation uses the Cloudflare AI Gateway binding with `collectLog` and
 bounded request metadata. The binding runs server-side and supplies its stored
-BYOK provider key. The public `POST /api/v1/generate` endpoint on the Playground
+BYOK provider key. The public `POST /api/v1/generate` endpoint on the Studio
 Worker exposes this vertical unauthenticated, with the same typed error contract
-and usage telemetry as the sibling `/api/v1` build endpoints. The public CLI has
-nine commands. `create`, `show`, `edit`, `list`, `restore`, and `export` remain
-offline. The credential-free network commands are `generate`, `share`, and
-`pull`: each makes one unauthenticated HTTPS request to its documented endpoint
-and needs no token, key, account, or login. `share` uses randomized client-side
-encryption, and `pull` depends on Excalidraw share availability.
+and usage telemetry as the sibling `/api/v1` build endpoints. The public CLI's
+commands are registered in [`apps/cli/src/cli.ts`](../apps/cli/src/cli.ts);
+`sketchi --help` lists them.
 
 `POST /api/v1/icons/draw` on the same Worker draws a logo by hand: an SVG or a
 PNG, JPEG or WebP and a name in, a checked recipe, PNG previews, an
@@ -110,14 +107,15 @@ public CLI commands.
 R2 stores accepted artifacts and Studio project records. Browser Rendering
 produces PNG artifacts within a scoped lifecycle.
 
-Every finished Effect span is stored, with its full content, as a row in an
-Iceberg table. `packages/observability` supplies the tracer and logger. A
+Every finished Effect span inside a request is sent, with its full content, as a
+row in an Iceberg table. `packages/observability` supplies the tracer and logger. A
 request's root span (`playground.request`, `studio.mcp`, `icons.http`,
 `icons.mcp`, or a PNG renderer call) owns every span beneath it, including work
 the request leaves running, such as a streamed response or a callback. The host
 closes the request's scope under `waitUntil` once that work ends; closing it
 sends the request's spans together to the `TELEMETRY_SPANS` Pipeline stream and
-waits for the send. A span outside every request is not stored. A row holds the trace, span and parent
+waits for the send. A span outside every request, a failed send or a lost isolate
+leaves no row. A row holds the trace, span and parent
 IDs, name, kind, service, start, end and duration, the outcome with the typed
 error, its message and the full cause, every attribute as JSON, and the span's
 events: its Effect logs, metric updates and span events. Every row of a request
@@ -140,7 +138,7 @@ Content is recorded in full, under these attribute names:
   (`diagramGeneration.executeModelCall`) and the whole generation
   (`diagramGeneration.runWithPolicy`) record `sketchi.input` and `sketchi.output`.
   Retries are sibling attempt spans with an `attempt` number.
-- Every Code Mode operation (`playground.codeMode.*`) records its input and output
+- Every Code Mode operation (`codeMode.<operation>`) records its input and output
   the same way.
 - Each Code Mode call (an API build, patch, canvas or generate, or an MCP
   `execute`) has a `playground.codeModeUsage.capture` span. It records the usage
@@ -151,8 +149,8 @@ Content is recorded in full, under these attribute names:
   status and the response body. Cookie and authorization headers are left out
   because they are credentials. The span that reads a body records it as
   `http.request.body`: `playground.http.readJsonBody` (diagrams API) or
-  `playground.http.readBoundedJson` (chat and icon draw) within its byte limit,
-  `playground.http.mcp`, and `studioPersistence.http.readJson`. An event-stream
+  `playground.http.readBoundedJson` (chat and icon draw) within its byte limit.
+  Project handlers record their decoded payload on the current span. An event-stream
   response passes through unchanged, keeping its backpressure and cancellation.
   `playground.response.stream` records it once it ends, and marks a stream the
   client left with `http.response.body.complete: false`.
@@ -213,20 +211,16 @@ to the Cloudflare execution context where required.
 Nx and type-aware Oxlint enforce dependency direction, including imports from
 configuration and Storybook files. Existing schema, Promise misuse and React
 synchronization restrictions remain. Effect diagnostics and their exceptions are
-described in [Diagnostics](effect-conventions.md#diagnostics). Wrangler dry-runs
-cover every mapped Worker.
-
-Meaningful changes run the full Nx typecheck/test/build graph, repository-wide
-type-aware Oxlint, the composite TypeScript build, Storybook,
-tool/deploy/onboarding tests, corpus rendering, Worker dry-runs, bundle reports,
-packaged CLI smoke, and applicable preview runtime probes.
+described in the Diagnostics section of [Effect conventions](effect-conventions.md).
+The local gate and the checks each change needs are in
+[AGENTS.md](../AGENTS.md#proof).
 
 ## Deployment map
 
 - `sketchi.app` and `www.sketchi.app` → `web`
 - `playground.sketchi.app` → `studio` / `sketchi-studio`
 - `icons.sketchi.app` → `icons`
-- `editor` → `sketchi-excalidraw`, no public domain
+- `editor` → `sketchi-excalidraw`, workers.dev only, no custom domain
 
 Previews use a stable `pr-<number>` name on each existing Worker. Production or preview claims require exact-head runtime evidence; a
 successful build alone is not deployment proof.

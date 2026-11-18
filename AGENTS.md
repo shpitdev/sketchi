@@ -37,7 +37,7 @@ Do not add:
 
 - Tests that restate a schema, pin wording (prompts, docs, help, error prose) or pin incidental output (coordinates, element counts, ordering nobody relies on).
 - Inner-layer tests of helpers, normalisers or intermediate shapes a kept test already exercises.
-- Per-family copies of a generic check, tests that are mostly mocks, component tests of static labels, or tests of test helpers.
+- Per-family copies of a generic check, tests that are mostly mocks, component tests of static labels, tests of test helpers, or tests of the gate script beyond its sign-off and lock behaviour.
 
 When unsure, leave it out; git history can bring a test back. A family has at
 most `<name>.test.ts`, `<name>-fuzz.test.ts` and `regressions.test.ts`, in a
@@ -50,25 +50,31 @@ most `<name>.test.ts`, `<name>-fuzz.test.ts` and `regressions.test.ts`, in a
   squash. It does not implement, and no agent spawns another Fable.
 - One primary coordinates and integrates. It routes work and reviews and reports
   to Fable; it does not implement product or test changes.
-- Authors: one fresh author and isolated Herdr worktree per PR. The author gates
-  the pushed head, opens the PR to `main` and does not merge.
+- Authors: one fresh author and isolated Herdr worktree per PR. The author
+  pushes, opens the PR to `main`, then signs off that head with `pnpm ci:local`.
+  Authors do not merge.
 - Reviewers: a separate, fresh, read-only session on a model the author did not
   use, against the PR's base. Review tries to break the changed behaviour and sees
   the tests fail. Findings go back to the author once; the primary decides after
   recheck. Browser and render verification uses the actual product entrypoint.
 - Models: primary and authors use Claude Opus 5.5 (`cliproxy/claude-opus-5-5`)
   high. Reviewers use `cliproxy/gpt-6.2-sol` or `cliproxy/gpt-6.2-astra` high,
-  whichever answers; if neither answers within five minutes, use a fresh Opus
-  session and say so. Launch with `pi --model <id> --thinking high '<task>'`.
+  whichever answers. Only if neither answers within five minutes may a fresh Opus
+  session review an Opus author's PR; say so. Launch with
+  `/Users/anandpant/Library/pnpm/bin/pi --model <id> --thinking high '<task>'`.
   Preserve explicit assignments.
 - Messages between agents are at most five lines plus a file path.
-- Only the user or Fable starts a production deploy or a package publish.
+- Anything touching production, and any failed pre-deploy check, goes to Fable
+  first. Only the user or Fable starts a production deploy or merges a change
+  that publishes a package (`release.yml` publishes on a push that changes
+  `apps/cli/package.json`).
 
 ## Proof
 
-Prove changes locally. Remote CI on a PR is one Nx-affected typecheck, a thin
-double check that also catches a bad merge with the base. It is not the place for
-heavy suites or timing-sensitive tests. If you find yourself fighting CI, verify
+Prove changes locally. Remote CI on a PR is one Nx-affected typecheck of the PR
+head, covering changes since its merge-base with `main`; it does not check the
+merge with the latest base. It is not the place for heavy suites or
+timing-sensitive tests. If you find yourself fighting CI, verify
 the change locally and slim CI instead of adding to it.
 
 Choose each check for a concrete failure it could catch. Changes that do not touch
@@ -97,7 +103,8 @@ changes select the native actionlint target. Full gates also run sampled routing
   `local-ci` (the `local-ci carry` workflow re-posts it). A changed patch needs
   new relevant verification and a full gate before signoff.
 - Logs are in `.memory/ci-local/`. `--all` runs every project instead of the
-  affected graph. At most two gates run at once per machine (`CI_LOCAL_SLOTS`).
+  affected graph. At most `CI_LOCAL_SLOTS` gates (default two) run at once per
+  machine.
 
 `diagrams:test` owns shared build/generation tests. `diagrams:test-<family>`,
 `diagrams:test-graph` and `diagrams:test-text-fit` own family, graph and cross-family
@@ -143,15 +150,12 @@ the label.
 Production Worker deployment requires an explicit `app-production-deploy`
 workflow dispatch. Merging or pushing to main does not deploy production.
 
-Keep the `preview` label off between proof runs. When a changed entrypoint needs
-a deployed preview, dispatch `app-preview` for the required project and remove the
-label it re-adds; existing previews remain available. Routing/rendering proof uses
-the preview MCP (`pr-<N>-sketchi-studio`), relevant scenario replay and a small
+Keep the label off between proof runs: dispatch the project you need, then remove
+the label the dispatch adds. Routing/rendering proof uses the preview MCP (`pr-<N>-sketchi-studio`), relevant scenario replay and a small
 bounded set of inspected PNGs.
 
-For UI-affecting changes, verify the changed flow against the real page.
-
-For real-page checks, use `agent-browser` against the PR preview or production, headless (its default). Never open a visible browser window on the owner's machine (`--headed` or any automation that pops up).
+For UI-affecting changes, verify the changed flow against the real page with
+`agent-browser` on the PR preview or production, headless (its default). Never open a visible browser window on the owner's machine (`--headed` or any automation that pops up).
 
 ## Temporary Artifacts
 
