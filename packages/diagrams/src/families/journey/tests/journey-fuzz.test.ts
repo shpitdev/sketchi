@@ -128,6 +128,7 @@ function randomJourneys(count: number, start: number): JourneyDiagram[] {
 const aspect = (scene: CanvasSpec) => (scene.width - 80) / (scene.height - 80);
 
 /** CI draws a small fixed sample; `JOURNEY_FUZZ=full` runs the local proof. */
+// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 const FULL = process.env["JOURNEY_FUZZ"] === "full";
 const JOURNEYS = FULL ? 300 : 8;
 const SEEDS = FULL ? [7, 31, 53] : [7];

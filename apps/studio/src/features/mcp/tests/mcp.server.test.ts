@@ -121,6 +121,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 				const tools = yield* client.listTools();
 				expect(tools.map((tool) => tool.name).sort()).toEqual(["docs", "execute", "search"]);
 				// Every client pays for discovery up front; per-family types come from docs on demand.
+				// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 				expect(new TextEncoder().encode(JSON.stringify(tools)).byteLength).toBeLessThan(30_000);
 				const docs = tools.find((tool) => tool.name === "docs")!;
 				for (const [topic, types] of onDemandTypes) {
@@ -130,6 +131,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 					for (const name of types) expect(text, `${topic} ${name}`).toContain(declaration(name));
 				}
 				expect(sessionHeaders).toEqual([]);
+				// @effect-diagnostics-next-line strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
 			}).pipe(Effect.provide(workerClient)),
 	);
 });

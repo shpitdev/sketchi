@@ -112,6 +112,7 @@ function runtime(
 		program: Effect.Effect<A, never, ArtifactStorage | BuildRuntimeEnvironment>,
 	) =>
 		Effect.runPromise(
+			// @effect-diagnostics-next-line strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
 			program.pipe(Effect.provide(environment), Effect.provideService(ArtifactStorage, storage)),
 		);
 	return {
@@ -156,6 +157,7 @@ function inlineScene(result: {
 	};
 }) {
 	const inline = result.artifact?.formats.find(({ format }) => format === "scene")?.inline;
+	// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 	return Schema.decodeUnknownSync(CanvasSpec)(inline);
 }
 

@@ -31,6 +31,7 @@ function loadEditor(): Promise<LoadedEditor> {
 		import("@sketchi/editor-surface").then(({ loadExcalidraw }) => loadExcalidraw()),
 		import("@sketchi/editor-surface"),
 		import("@excalidraw/excalidraw/index.css"),
+		// @effect-diagnostics-next-line globalFetch:off -- The browser loads a public static scene alongside the lazy editor import and shares the in-flight preload.
 		fetch(HOME_DIAGRAM.scene).then((response) => {
 			if (!response.ok) throw new Error(`${HOME_DIAGRAM.scene} returned ${response.status}`);
 			return response.json() as Promise<ExcalidrawInitialDataState>;

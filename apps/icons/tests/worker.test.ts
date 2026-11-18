@@ -1,3 +1,7 @@
+// @effect-diagnostics globalFetch:off -- The integration harness sends public HTTP requests to the local Worker it launched.
+// @effect-diagnostics newPromise:off -- The integration harness bridges real Node process, socket and timer callbacks.
+// @effect-diagnostics nodeBuiltinImport:off -- The Worker integration test owns real local processes, sockets and a temporary receipt directory.
+
 // @vitest-environment node
 
 import { Effect, Layer } from "effect";
@@ -34,7 +38,9 @@ async function availablePort(): Promise<number> {
 }
 
 async function waitForWorker(url: string): Promise<void> {
+	// @effect-diagnostics-next-line globalDate:off -- The boundary fixture constructs explicit timestamps or measures elapsed time against the native host.
 	const deadline = Date.now() + 30_000;
+	// @effect-diagnostics-next-line globalDate:off -- The boundary fixture constructs explicit timestamps or measures elapsed time against the native host.
 	while (Date.now() < deadline) {
 		if (worker?.exitCode !== null) {
 			throw new Error(`Local Worker exited early.\n${workerOutput}`);
@@ -45,6 +51,7 @@ async function waitForWorker(url: string): Promise<void> {
 		} catch {
 			// Wrangler is still starting.
 		}
+		// @effect-diagnostics-next-line globalTimers:off -- The harness bounds the real spawned Worker startup and shutdown using wall time.
 		await new Promise((resolveWait) => setTimeout(resolveWait, 100));
 	}
 	throw new Error(`Timed out waiting for local Worker.\n${workerOutput}`);
@@ -86,6 +93,7 @@ async function stopWorker(): Promise<void> {
 	if (!worker || worker.exitCode !== null) return;
 	const exited = new Promise<void>((resolveExit) => worker?.once("exit", () => resolveExit()));
 	process.kill(-worker.pid!, "SIGTERM");
+	// @effect-diagnostics-next-line globalTimers:off -- The harness bounds the real spawned Worker startup and shutdown using wall time.
 	await Promise.race([exited, new Promise<void>((resolveWait) => setTimeout(resolveWait, 5_000))]);
 	if (worker.exitCode === null) {
 		process.kill(-worker.pid!, "SIGKILL");

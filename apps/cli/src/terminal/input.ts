@@ -119,6 +119,7 @@ export function makeInputReaderLayer(
 					},
 				).pipe(
 					Effect.mapError((error) =>
+						// @effect-diagnostics-next-line instanceOfSchema:off -- Dispatch on the concrete error from this local boundary; this is not decoding unknown input.
 						error instanceof CliInputError
 							? error
 							: CliInputError.make({
@@ -157,6 +158,7 @@ export const readEditInput = Effect.fn("sketchi.cli.input.readEdit")(function* (
 	const reader = yield* InputReader;
 	const text = yield* reader.read(source);
 	const input: unknown = yield* Effect.try({
+		// @effect-diagnostics-next-line globalJsonInEffect:off -- The CLI input/storage codec maps native JSON parse failure to its existing typed error.
 		try: () => JSON.parse(text),
 		catch: () =>
 			CliInputError.make({

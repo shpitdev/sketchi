@@ -101,7 +101,9 @@ describe("group row fuzz", () => {
 
 		it("draws no row of groups with more crossings or reader-scale findings than main", () => {
 			const counts = rendered(direction).map((scene) => routingCounts(scene));
+			// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 			if (process.env.PRINT_ROUTING)
+				// @effect-diagnostics-next-line globalConsole:off -- The offline fuzz run prints its reproduction data directly to the invoking terminal.
 				console.log(
 					"PIN rows",
 					direction,

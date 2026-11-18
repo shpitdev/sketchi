@@ -211,6 +211,7 @@ export function dailyIconDraws(env: StudioEnv): number {
 
 /** Whole seconds from `now` to the next UTC midnight, when the day's budget starts again. */
 export function secondsUntilUtcMidnight(now: number): number {
+	// @effect-diagnostics-next-line globalDate:off -- This pure UTC calculation derives Retry-After from the supplied timestamp.
 	const next = new Date(now);
 	next.setUTCHours(24, 0, 0, 0);
 	return Math.max(1, Math.ceil((next.getTime() - now) / 1000));
@@ -354,6 +355,7 @@ export const drawIconFromBody = Effect.fn("playground.icons.draw")(function* (
 	if (refusal) return done(refusal.failure, refusal.retryAfterSeconds);
 	const authorModel = namedModel === "source" ? iconAuthorFor(input.success.source) : namedModel;
 	const outcome = yield* drawIcon(input.success, { authorModel }).pipe(
+		// @effect-diagnostics-next-line strictEffectProvide:off -- The icon HTTP request boundary supplies its request-specific imaging and gateway bindings.
 		Effect.provide(layer),
 		Effect.result,
 	);

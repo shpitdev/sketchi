@@ -118,6 +118,7 @@ const generate = Effect.fn("ops.sanity.generate")(function* (
 	if (!body.diagram?.excalidraw?.elements.length) {
 		return yield* opsError("the scene has no elements");
 	}
+	// @effect-diagnostics-next-line globalJsonInEffect:off -- The smoke check inspects the full serialized spec returned by Studio.
 	const spec = JSON.stringify(document.spec).toLowerCase();
 	const missing = input.labels.filter((label) => !spec.includes(label.toLowerCase()));
 	if (missing.length > 0) {

@@ -52,15 +52,18 @@ describe("output envelopes and exits", () => {
 					},
 				},
 				"unused",
+				// @effect-diagnostics-next-line strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
 			).pipe(Effect.provide(captureLayer(stdout, stderr)));
 			yield* Effect.exit(
 				reportFailure("generate", "json", providerFailure).pipe(
+					// @effect-diagnostics-next-line strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
 					Effect.provide(captureLayer(stdout, stderr)),
 				),
 			);
 
 			assert.strictEqual(exitCodeForFailure(providerFailure), 10);
 
+			// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 			assert.deepStrictEqual(JSON.parse(stdout.join("")), {
 				ok: true,
 				command: "generate",
@@ -78,6 +81,7 @@ describe("output envelopes and exits", () => {
 					},
 				},
 			});
+			// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 			assert.deepStrictEqual(JSON.parse(stderr.join("")), {
 				ok: false,
 				command: "generate",

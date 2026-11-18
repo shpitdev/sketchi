@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off -- The Nx generator test inspects CLI and filesystem seams independently of the generated projects.
+
 // @vitest-environment node
 import { updateJson, type Tree, workspaceRoot } from "@nx/devkit";
 import { FsTree } from "@nx/devkit/internal";

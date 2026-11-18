@@ -15,6 +15,7 @@ export function studioRejectedReply(issues: readonly BuildIssue[]): string {
 }
 
 function textParts(text: string): Response.AnyPart[] {
+	// @effect-diagnostics-next-line cryptoRandomUUID:off -- The synchronous AG-UI reply boundary supplies a unique message id.
 	const id = crypto.randomUUID();
 	return [
 		Response.makePart("text-start", { id }),

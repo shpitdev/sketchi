@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off -- The CLI contract harness owns a local HTTP server, real child processes and temporary document files.
+
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -120,6 +122,7 @@ function runGenerate(
 		endpoint: DEFAULT_GENERATE_ENDPOINT,
 		prompt: "Create a diagram",
 		...(type ? { type } : {}),
+		// @effect-diagnostics-next-line strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
 	}).pipe(Effect.provide(Layer.merge(capturingStoreLayer(created), unusedPatcher)));
 }
 
@@ -145,6 +148,7 @@ it.each(["generate", "revise"] as const)(
 		await mkdir(testParent, { recursive: true });
 		const root = await mkdtemp(join(testParent, "generate-replay-"));
 		try {
+			// @effect-diagnostics-next-line newPromise:off -- The transport fixture exposes native Promise boundaries for an HTTP server and stalled fetch body.
 			await new Promise<void>((listening) => server.listen(0, "127.0.0.1", listening));
 			const address = server.address();
 			if (!address || typeof address === "string") throw new Error("Expected a TCP address.");
@@ -195,6 +199,7 @@ describe("prompt-assisted generation over the public generate API", () => {
 				globalThis.fetch = (_input, init) => {
 					signal = init?.signal;
 					if (stall === "headers")
+						// @effect-diagnostics-next-line newPromise:off -- The transport fixture exposes native Promise boundaries for an HTTP server and stalled fetch body.
 						return new Promise<Response>(() => {
 							Deferred.doneUnsafe(started, Effect.void);
 						});
@@ -262,6 +267,7 @@ describe("prompt-assisted generation over the public generate API", () => {
 
 	it.effect("accepts published warnings and rejects an unknown accepted code before storage", () =>
 		Effect.gen(function* () {
+			// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 			const original = JSON.parse(yield* Effect.promise(() => buildSuccessBody(sequenceInput)));
 			for (const code of ["unknown_icon", "sequence_future_warning"]) {
 				const body = {

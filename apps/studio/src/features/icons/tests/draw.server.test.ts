@@ -138,6 +138,7 @@ describe("drawing is bounded per client and per day", () => {
 								},
 								limit,
 								windowMs,
+								// @effect-diagnostics-next-line globalDate:off -- The boundary fixture constructs explicit timestamps or measures elapsed time against the native host.
 								Date.now(),
 							),
 					};
@@ -194,6 +195,7 @@ describe("drawing is bounded per client and per day", () => {
 			SKETCHI_ICON_DAILY_DRAWS: "1",
 			ICON_DRAW_BUDGET: { getByName: () => budget },
 		};
+		// @effect-diagnostics-next-line globalDate:off -- The boundary fixture constructs explicit timestamps or measures elapsed time against the native host.
 		const at = (iso: string) => vi.setSystemTime(new Date(iso));
 		vi.useFakeTimers({ toFake: ["Date"] });
 		try {

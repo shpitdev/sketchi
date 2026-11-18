@@ -25,7 +25,7 @@ export class StudioAiModel extends Context.Service<
 			StudioBindings | StudioRequestMetadata
 		>;
 	}
->()("@sketchi/studio/PlaygroundAiModel") {}
+>()("@sketchi/studio/StudioAiModel") {}
 
 /**
  * A healthy response (reasoning effort none) streams events every few seconds, so this

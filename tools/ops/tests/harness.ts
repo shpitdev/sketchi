@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off -- The operations harness starts real child commands and constructs temporary checkout files.
+
 import { execFileSync, spawn, spawnSync, type SpawnOptions } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

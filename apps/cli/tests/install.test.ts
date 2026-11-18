@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off -- The installer harness runs the real shell installer against a temporary installation tree.
+
 import { spawnSync } from "node:child_process";
 import {
 	chmodSync,

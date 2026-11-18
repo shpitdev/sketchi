@@ -1,4 +1,6 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The CLI revise test exercises local files in an isolated temporary workspace.
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The CLI revise test exercises local files in an isolated temporary workspace.
 import { join, resolve } from "node:path";
 
 import { ArtifactStorageMemory, makeBuildRuntimeEnvironmentLayer } from "@sketchi/diagrams/build";
@@ -105,6 +107,7 @@ function withRealStore<A, E>(
 		}),
 		(root) =>
 			use.pipe(
+				// @effect-diagnostics-next-line strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
 				Effect.provide(
 					Layer.merge(
 						Layer.fresh(DiagramStoreLive).pipe(
@@ -135,6 +138,7 @@ describe("revising a stored diagram with a request", () => {
 				yield* store.create(builtDiagram());
 				const response = yield* Effect.promise(() => successBody(revisedInput));
 				stubFetch(async () => {
+					// @effect-diagnostics-next-line runEffectInsideEffect:off -- The test invokes the CLI as a separate runtime with its own input and output services.
 					await Effect.runPromise(
 						store.edit("release-flow", builtDiagram({ title: "Edited meanwhile" })),
 					);

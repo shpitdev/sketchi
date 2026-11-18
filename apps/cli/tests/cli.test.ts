@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off -- The CLI harness launches the released command surface with temporary files and a network-denial preload.
+
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";

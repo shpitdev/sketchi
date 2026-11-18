@@ -47,7 +47,7 @@ export interface StudioRequestBoundary {
 class StudioCallbackFibers extends Context.Service<
 	StudioCallbackFibers,
 	FiberSet.FiberSet<unknown, unknown>
->()("@sketchi/studio/PlaygroundCallbackFibers") {}
+>()("@sketchi/studio/StudioCallbackFibers") {}
 const StudioTelemetryLive = makeWorkersTelemetryLayer({
 	resource: { serviceName: "sketchi-studio" },
 });
@@ -81,7 +81,7 @@ export interface StudioRequestCallbacksShape {
 export class StudioRequestCallbacks extends Context.Service<
 	StudioRequestCallbacks,
 	StudioRequestCallbacksShape
->()("@sketchi/studio/PlaygroundRequestCallbacks") {}
+>()("@sketchi/studio/StudioRequestCallbacks") {}
 type StudioHttpError = RequestBodyReadError;
 type StudioRequestResult<A, E> =
 	| A

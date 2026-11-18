@@ -54,6 +54,7 @@ export const shareCommand = Command.make(
 					});
 				}
 				const artifact: unknown = yield* Effect.try({
+					// @effect-diagnostics-next-line globalJsonInEffect:off -- The CLI input/storage codec maps native JSON parse failure to its existing typed error.
 					try: () => JSON.parse(new TextDecoder().decode(source.bytes)),
 					catch: unsupportedPulledScene,
 				});

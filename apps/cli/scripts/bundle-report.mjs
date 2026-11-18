@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off -- The release size report reads and hashes the staged bundles in standalone Node.
+
 import { createHash } from "node:crypto";
 import { gzip } from "node:zlib";
 import { readFile, readdir, writeFile } from "node:fs/promises";

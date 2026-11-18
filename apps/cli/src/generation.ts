@@ -52,6 +52,7 @@ export interface GenerateDiagramResult {
  * overridable only for preview or local testing through the environment.
  */
 export function resolveGenerateEndpoint(): string {
+	// @effect-diagnostics-next-line processEnv:off -- The CLI reads the generation endpoint override before building its HTTP client.
 	return process.env[SKETCHI_GENERATE_ENDPOINT_ENV]?.trim() || DEFAULT_GENERATE_ENDPOINT;
 }
 

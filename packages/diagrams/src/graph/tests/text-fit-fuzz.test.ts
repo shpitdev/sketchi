@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { type ExportedElement, midWordBreaks } from "./text-fit-helpers";
 
 // The full routing target also runs this former routing coverage at its original size.
+// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 const FULL = process.env["ROUTING_FUZZ"] === "full";
 
 /**

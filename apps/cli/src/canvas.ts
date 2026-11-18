@@ -27,6 +27,7 @@ export interface CreateCanvasDiagramResult {
 }
 
 export function resolveCanvasEndpoint(): string {
+	// @effect-diagnostics-next-line processEnv:off -- The CLI reads the endpoint override from the invoking process before building its HTTP client.
 	return process.env[SKETCHI_CANVAS_ENDPOINT_ENV]?.trim() || DEFAULT_CANVAS_ENDPOINT;
 }
 
@@ -52,6 +53,7 @@ const decodeCanvasSpec = Schema.decodeUnknownEffect(CreateCanvasRequest.fields.s
 
 export const parseCanvasSpec = Effect.fn("sketchi.cli.canvas.parseSpec")(function* (text: string) {
 	const input: unknown = yield* Effect.try({
+		// @effect-diagnostics-next-line globalJsonInEffect:off -- The CLI input/storage codec maps native JSON parse failure to its existing typed error.
 		try: () => JSON.parse(text),
 		catch: () =>
 			CliInputError.make({

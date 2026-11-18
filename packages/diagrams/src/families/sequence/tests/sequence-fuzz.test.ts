@@ -15,6 +15,7 @@ import { renderSequenceDiagram } from "../render";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
 // CI samples a few diagrams; the local target runs the full matrix.
+// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 const COUNT = process.env["SEQUENCE_FUZZ"] === "full" ? 400 : 12;
 
 const PARTICIPANTS = [

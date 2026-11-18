@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off -- The view test hosts a local HTTP fixture and runs DuckDB against real files and sockets.
+
 // The checked-in DuckDB init and views, run by the real DuckDB CLI on local rows and a local
 // Iceberg REST catalog.
 import { execFile, spawnSync } from "node:child_process";
@@ -88,11 +90,13 @@ async function emptySpanCatalog() {
 			response.end(JSON.stringify({ error: { code: 404, message: "absent", type: "NotFound" } }));
 		}
 	});
+	// @effect-diagnostics-next-line newPromise:off -- The test owns a local native HTTP server and awaits its listen and close events.
 	await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
 	const { port } = server.address() as AddressInfo;
 	return {
 		endpoint: `http://127.0.0.1:${port}`,
 		requests,
+		// @effect-diagnostics-next-line newPromise:off -- The test owns a local native HTTP server and awaits its listen and close events.
 		close: () => new Promise((resolve) => server.close(resolve)),
 	};
 }

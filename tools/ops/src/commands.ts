@@ -122,6 +122,7 @@ const previewSelect = Command.make("select", {}, () =>
 			selectPreviewProjects({ selection, affected, changedFiles }),
 		);
 		yield* Console.log(`Preview projects (${selection}): ${projects.join(", ") || "none"}`);
+		// @effect-diagnostics-next-line globalJsonInEffect:off -- Preserve the JSON emitted to the deployment workflow or generated configuration consumer.
 		yield* writeOutputs({ projects: JSON.stringify(projects) });
 	}),
 ).pipe(Command.withDescription("Write the Worker apps this preview run deploys."));
@@ -195,6 +196,7 @@ const productionSelect = Command.make(
 		Effect.gen(function* () {
 			const projects = yield* attempt(() => selectProductionProjects(input.selection));
 			yield* Console.log(`Production projects (${input.selection}): ${projects.join(", ")}`);
+			// @effect-diagnostics-next-line globalJsonInEffect:off -- Preserve the JSON emitted to the deployment workflow or generated configuration consumer.
 			yield* writeOutputs({ projects: JSON.stringify(projects) });
 		}),
 ).pipe(Command.withDescription("Write the Worker apps this production dispatch deploys."));
@@ -244,6 +246,7 @@ const productionDomains = Command.make(
 			);
 			yield* fs.makeDirectory(path.dirname(target), { recursive: true }).pipe(Effect.orDie);
 			yield* fs
+				// @effect-diagnostics-next-line globalJsonInEffect:off -- Preserve the JSON emitted to the deployment workflow or generated configuration consumer.
 				.writeFileString(target, `${JSON.stringify(domainConfig, null, 2)}\n`)
 				.pipe(Effect.mapError(() => opsError(`Cannot write ${target}.`)));
 			yield* writeOutputs({

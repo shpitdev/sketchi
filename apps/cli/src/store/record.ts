@@ -1,3 +1,4 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- These synchronous host-native path calculations feed the scoped CLI filesystem operations.
 import { join } from "node:path";
 
 import { Effect, Schema } from "effect";
@@ -51,6 +52,7 @@ export function makeRecordReader({ fs, root }: StoreContext) {
 	) {
 		const text = yield* fs.readText(path);
 		const parsed: unknown = yield* Effect.try({
+			// @effect-diagnostics-next-line globalJsonInEffect:off -- The CLI input/storage codec maps native JSON parse failure to its existing typed error.
 			try: () => JSON.parse(text),
 			catch: () =>
 				storageError(
@@ -78,6 +80,7 @@ export function makeRecordReader({ fs, root }: StoreContext) {
 	) {
 		const text = yield* fs.readText(path);
 		const parsed: unknown = yield* Effect.try({
+			// @effect-diagnostics-next-line globalJsonInEffect:off -- The CLI input/storage codec maps native JSON parse failure to its existing typed error.
 			try: () => JSON.parse(text),
 			catch: () =>
 				storageError(

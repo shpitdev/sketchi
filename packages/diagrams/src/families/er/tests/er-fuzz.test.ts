@@ -382,11 +382,13 @@ const ER_BUNCHED = { ci: 0, full: 0 };
 
 /** Schemas checked in CI; the full fuzz runs locally with ER_FUZZ=full (and any ER_FUZZ_SEED). */
 const CI_SCHEMAS = 16;
+// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 const FULL = process.env["ER_FUZZ"] === "full";
 
 describe("ER routing fuzz", () => {
 	const schemas = randomSchemas(
 		FULL ? 240 : CI_SCHEMAS,
+		// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 		Number(process.env["ER_FUZZ_SEED"] ?? 20261019),
 	);
 
@@ -401,7 +403,9 @@ describe("ER routing fuzz", () => {
 		const counts = schemas
 			.slice(0, CI_SCHEMAS)
 			.map((schema) => routingCounts(renderDiagram(schema).pipe(Result.getOrThrow)));
+		// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 		if (process.env["PRINT_ROUTING"])
+			// @effect-diagnostics-next-line globalConsole:off -- The offline fuzz run prints its reproduction data directly to the invoking terminal.
 			console.log("PIN er", counts.map((c) => `${c.crossings}/${c.findings}`).join(" "));
 		const pinned = ER_ROUTING.split(" ").map((pair) => pair.split("/").map(Number));
 		const worse = counts.flatMap(({ crossings, findings }, index) => {
@@ -423,6 +427,7 @@ describe("ER routing fuzz", () => {
 			(sum, schema) => sum + bunchedEnds(renderDiagram(schema).pipe(Result.getOrThrow)),
 			0,
 		);
+		// @effect-diagnostics-next-line globalConsole:off processEnv:off -- The offline fuzz run prints its reproduction data directly to the invoking terminal. The offline diagnostic runner reads its sample or output options from the invoking environment.
 		if (process.env["PRINT_ROUTING"]) console.log("PIN er bunched", bunched);
 		expect(bunched).toBeLessThanOrEqual(FULL ? ER_BUNCHED.full : ER_BUNCHED.ci);
 	});

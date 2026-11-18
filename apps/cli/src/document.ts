@@ -119,6 +119,7 @@ export const parseJsonDocument = Effect.fn("sketchi.cli.document.parseJson")(fun
 	text: string,
 ) {
 	const input: unknown = yield* Effect.try({
+		// @effect-diagnostics-next-line globalJsonInEffect:off -- The CLI input/storage codec maps native JSON parse failure to its existing typed error.
 		try: () => JSON.parse(text),
 		catch: () =>
 			CliInputError.make({

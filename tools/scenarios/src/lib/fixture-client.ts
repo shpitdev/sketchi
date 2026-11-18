@@ -32,6 +32,7 @@ export const FixtureGenerationClientLayer = Layer.succeed(DiagramGenerationClien
 		const candidate = candidateFromText({
 			model: "fixture",
 			provider: "fixture",
+			// @effect-diagnostics-next-line globalJsonInEffect:off -- The fixture client supplies the same authored JSON bytes as the generation harness.
 			text: JSON.stringify({ title, diagram }, null, 2),
 		});
 		const finishedAt = yield* Clock.currentTimeMillis;

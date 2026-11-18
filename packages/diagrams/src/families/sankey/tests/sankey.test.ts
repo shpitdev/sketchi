@@ -28,6 +28,7 @@ function run<A, E extends BuildRejection<unknown>>(
 	return Effect.runPromise(
 		buildResponse(effect).pipe(
 			Effect.provideService(BuildRuntimeEnvironment, {
+				// @effect-diagnostics-next-line globalRandom:off -- The build test supplies opaque fixture IDs; their values do not affect the assertions.
 				createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 			}),
 			Effect.provideService(ArtifactStorage, artifacts),

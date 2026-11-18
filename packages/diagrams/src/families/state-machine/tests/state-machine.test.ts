@@ -23,6 +23,7 @@ function run<A>(effect: Effect.Effect<A, never, BuildRuntimeEnvironment | Artifa
 	return Effect.runPromise(
 		effect.pipe(
 			Effect.provideService(BuildRuntimeEnvironment, {
+				// @effect-diagnostics-next-line globalRandom:off -- The build test supplies opaque fixture IDs; their values do not affect the assertions.
 				createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 			}),
 			Effect.provideService(ArtifactStorage, storage),
@@ -66,6 +67,7 @@ describe("Code Mode state machine", () => {
 	it("builds the documented spec into an editable artifact with a bound composite frame", async () => {
 		const built = await build(playerSpec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 		expect(() => Schema.decodeUnknownSync(stateMachineBuild.result)(built)).not.toThrow();
 		expect(built.normalizedSpec.transitions.map((transition) => transition.id)).toEqual([
 			"transition-1-stopped-active",
@@ -190,6 +192,7 @@ describe("state machine regressions", () => {
 					'Composite "Active" has no initial; defaulted to its first listed regular substate "Playing".',
 			}),
 		]);
+		// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 		expect(() => Schema.decodeUnknownSync(stateMachineBuild.result)(built)).not.toThrow();
 	});
 

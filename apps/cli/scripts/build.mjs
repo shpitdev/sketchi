@@ -1,5 +1,7 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The release builder runs directly in Node and stages the compiled CLI and its assets.
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The release builder runs directly in Node and stages the compiled CLI and its assets.
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
@@ -111,6 +113,7 @@ const compiler = rspack({
 	],
 });
 
+// @effect-diagnostics-next-line newPromise:off -- The standalone build harness waits for the Rspack completion callback.
 const stats = await new Promise((resolveBuild, rejectBuild) => {
 	compiler.run((error, result) => {
 		compiler.close(() => undefined);

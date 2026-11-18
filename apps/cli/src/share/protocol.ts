@@ -400,6 +400,7 @@ export function serializeForShare(value: unknown): Effect.Effect<Uint8Array, Cli
 				try: () => {
 					const scene = sceneParts(value);
 					return textEncoder.encode(
+						// @effect-diagnostics-next-line globalJsonInEffect:off -- The share byte codec wraps native JSON in its protocol-specific typed failure and preserves the existing payload.
 						JSON.stringify(
 							{
 								type: scene.type,
@@ -448,6 +449,7 @@ export const encodeSharePayload = Effect.fn("sketchi.cli.share.encode")(function
 		MAX_SHARE_BODY_BYTES - (4 + 3 * 4) - ENCODING_METADATA.byteLength - 12 - 16;
 	const compressed = yield* Effect.try({
 		try: () => deflateShareContents(data, maximumCompressedBytes),
+		// @effect-diagnostics-next-line instanceOfSchema:off -- Dispatch on the concrete error from this local boundary; this is not decoding unknown input.
 		catch: (cause) => (cause instanceof CliShareError ? cause : encryptFailure()),
 	});
 	const iv = fixedIv ?? (yield* (yield* SecureRandom.SecureRandom).randomBytes(12));
@@ -561,6 +563,7 @@ export const decodeSharePayload = Effect.fn("sketchi.cli.share.decode")(function
 			if (!metadata || !iv || !encrypted || iv.byteLength !== 12) {
 				throw new Error("invalid encrypted payload chunks");
 			}
+			// @effect-diagnostics-next-line globalJsonInEffect:off -- The share byte codec wraps native JSON in its protocol-specific typed failure and preserves the existing payload.
 			const metadataValue: unknown = JSON.parse(fatalTextDecoder.decode(metadata));
 			if (
 				!isRecord(metadataValue) ||
@@ -596,6 +599,7 @@ export const decodeSharePayload = Effect.fn("sketchi.cli.share.decode")(function
 				throw new Error("unsupported contents metadata");
 			}
 			assertJsonDepth(inner[1]);
+			// @effect-diagnostics-next-line globalJsonInEffect:off -- The share byte codec wraps native JSON in its protocol-specific typed failure and preserves the existing payload.
 			return JSON.parse(fatalTextDecoder.decode(inner[1]));
 		},
 		catch: (cause) =>

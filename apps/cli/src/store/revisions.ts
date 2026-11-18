@@ -1,4 +1,5 @@
 import { CanvasSpec } from "@sketchi/drawing";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- These synchronous host-native path calculations feed the scoped CLI filesystem operations.
 import { join } from "node:path";
 
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
@@ -62,6 +63,7 @@ export function makeRevisions(
 		const text = yield* fs.readText(path);
 		return yield* Effect.try({
 			try: () => {
+				// @effect-diagnostics-next-line globalJsonInEffect:off -- The immutable revision reader maps malformed stored JSON to the existing revision failure.
 				const value: unknown = JSON.parse(text);
 				if (typeof value !== "object" || value === null) {
 					throw new Error("archived JSON must contain an object");

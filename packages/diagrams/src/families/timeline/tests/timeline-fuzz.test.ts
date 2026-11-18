@@ -143,8 +143,10 @@ function randomTimelines(count: number, horizon = 90, unit: "day" | "hour" = "da
 	];
 	const day = (offset: number) =>
 		unit === "day"
-			? new Date(Date.UTC(2026, 0, 1 + offset)).toISOString().slice(0, 10)
-			: new Date(Date.UTC(2026, 0, 1, offset)).toISOString();
+			? // @effect-diagnostics-next-line globalDate:off -- The boundary fixture constructs explicit timestamps or measures elapsed time against the native host.
+				new Date(Date.UTC(2026, 0, 1 + offset)).toISOString().slice(0, 10)
+			: // @effect-diagnostics-next-line globalDate:off -- The boundary fixture constructs explicit timestamps or measures elapsed time against the native host.
+				new Date(Date.UTC(2026, 0, 1, offset)).toISOString();
 	return Array.from({ length: count }, (_, index) => {
 		const lanes = pick([[], [], ["Eng"], ["Eng", "Ops"], ["Eng", "Ops", "Sales"]]);
 		const offsets = Array.from({ length: 3 }, () => Math.floor((random() * horizon * 2) / 3));
@@ -432,6 +434,7 @@ describe("timeline layout", () => {
 			...Array.from({ length: 59 }, (_, index) => ({
 				id: `release-${index + 1}`,
 				label: `Release ${index + 1}`,
+				// @effect-diagnostics-next-line globalDate:off -- The boundary fixture constructs explicit timestamps or measures elapsed time against the native host.
 				date: new Date(start + index * 35 * day).toISOString().slice(0, 10),
 			})),
 		]);

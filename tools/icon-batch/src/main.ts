@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off -- The Node command host loads local catalog, review notes and ledger files before and after a run.
+
 /**
  * Draw the icon catalog by hand: `draw` runs the draw service's engine over
  * every catalog mark without a recipe, `sheets` lays the results out for
@@ -102,6 +104,7 @@ async function writeLedger() {
 
 switch (command) {
 	case "draw": {
+		// @effect-diagnostics-next-line processEnv:off -- The Node command host reads the gateway credential from its invoking environment.
 		const token = process.env["CF_AIG_TOKEN"];
 		if (!token) throw new Error("Set CF_AIG_TOKEN to Sketchi's AI Gateway token.");
 		const marks = marksToDraw(nodeLogoIcons, recipeSlugs(), {

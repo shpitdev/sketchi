@@ -35,6 +35,7 @@ const handle = Effect.fn("playground.http.chat")(function* (request: Request) {
 	if (!body.messages.length) return new Response("No messages provided.", { status: 400 });
 	if (
 		body.messages.length > MAX_CHAT_MESSAGES ||
+		// @effect-diagnostics-next-line globalJsonInEffect:off -- The chat cap measures the existing JSON representation of validated messages.
 		JSON.stringify(body.messages).length > MAX_CHAT_TOTAL_CHARACTERS
 	)
 		return new Response("Chat messages exceed the conversation limit.", { status: 413 });
@@ -82,6 +83,7 @@ const handle = Effect.fn("playground.http.chat")(function* (request: Request) {
 		Stream.provideService(LanguageModel.LanguageModel, model),
 		AgUi.fromStreamParts,
 		Stream.provideService(IdGenerator.IdGenerator, {
+			// @effect-diagnostics-next-line cryptoRandomUUIDInEffect:off -- The agent SDK requests a unique message id through this supplied callback.
 			generateId: () => Effect.sync(() => crypto.randomUUID()),
 		}),
 		// Validate the serialized event before lifecycle sanitization, as AgUiServer.handler does.

@@ -22,6 +22,7 @@ function run<A>(effect: Effect.Effect<A, never, BuildRuntimeEnvironment | Artifa
 	return Effect.runPromise(
 		effect.pipe(
 			Effect.provideService(BuildRuntimeEnvironment, {
+				// @effect-diagnostics-next-line globalRandom:off -- The build test supplies opaque fixture IDs; their values do not affect the assertions.
 				createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 			}),
 			Effect.provideService(ArtifactStorage, storage),
@@ -62,6 +63,7 @@ describe("Code Mode ER diagram", () => {
 	it("builds the documented spec into tables and a crow's-foot line bound to its rows", async () => {
 		const built = await build(shopSpec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 		expect(() => Schema.decodeUnknownSync(erBuild.result)(built)).not.toThrow();
 		expect(built.normalizedSpec.entities[1]).toEqual({
 			id: "orders",

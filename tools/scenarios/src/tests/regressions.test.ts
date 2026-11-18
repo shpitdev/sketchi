@@ -1,5 +1,6 @@
 // Real model outputs the graders once got wrong, kept as saved. Each grades as recorded through
 // the same decoding the CLI applies to `--input`: a build or receipt, else bare IR.
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The scenario fixture test reads the checked-in regression corpus directly.
 import { readFileSync } from "node:fs";
 import { Option, Result } from "effect";
 import { describe, expect, it } from "vitest";

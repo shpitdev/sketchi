@@ -72,7 +72,9 @@ export const cliProgram = Effect.fn("sketchi.cli.run")(function* (args: Readonly
 			onFailure: (cause) =>
 				Effect.gen(function* () {
 					const failure = Option.getOrUndefined(Cause.findErrorOption(cause));
+					// @effect-diagnostics-next-line instanceOfSchema:off -- Dispatch on the concrete error from this local boundary; this is not decoding unknown input.
 					if (failure instanceof CliCommandExit) return failure.exitCode;
+					// @effect-diagnostics-next-line instanceOfSchema:off -- Dispatch on the concrete error from this local boundary; this is not decoding unknown input.
 					if (failure instanceof CliFilesystemError) return 7;
 					const parserExit = cliErrorExitCode(failure);
 					if (parserExit !== undefined) return parserExit;

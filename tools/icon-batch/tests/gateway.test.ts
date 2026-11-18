@@ -31,6 +31,7 @@ for (const stall of ["headers", "body"] as const) {
 			}> = [];
 			const fetch: typeof globalThis.fetch = async (_input, init) => {
 				requests.push({ method: init?.method, signal: init?.signal });
+				// @effect-diagnostics-next-line newPromise:off -- The fake gateway stalls its body until the request AbortSignal fires.
 				if (stall === "headers") return new Promise<Response>(() => undefined);
 				return new Response(
 					new ReadableStream({

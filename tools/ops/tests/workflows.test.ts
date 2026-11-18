@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off -- The workflow test reads checked-in YAML and drives the mocked CLI in a temporary checkout.
+
 // Scripts the workflows run inline, executed the way GitHub Actions runs them: the release
 // guard and publish step with `git` and `npm` stubs, and the preview PR resolver with a fixture
 // GitHub API. They run before any checkout or install, so they cannot be ops commands.
@@ -66,6 +68,7 @@ function runStep(script: string, stubs: { git?: Reply; npmView?: Reply; npmPubli
 		env: {
 			...process.env,
 			GITHUB_OUTPUT: githubOutput,
+			// @effect-diagnostics-next-line processEnv:off -- The subprocess test prepends fixture binaries to the real host PATH.
 			PATH: `${directory}:${process.env["PATH"]}`,
 			RUNNER_TEMP: directory,
 			VERSION: version,

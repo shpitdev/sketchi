@@ -1,4 +1,5 @@
 import { CanvasSpec } from "@sketchi/drawing";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- These synchronous host-native path calculations feed the scoped CLI filesystem operations.
 import { join } from "node:path";
 
 import { Effect, Result, Schema } from "effect";
@@ -46,6 +47,7 @@ export function makePatch(
 					return Schema.decodeUnknownResult(CanvasSpec, {
 						errors: "all",
 						reportInput: true,
+						// @effect-diagnostics-next-line globalJsonInEffect:off -- The stored patch reader retains its existing JSON error mapping before checking the patch shape.
 					})(JSON.parse(text));
 				} catch {
 					return undefined;

@@ -18,6 +18,7 @@ const PREFIX = "draws:";
 
 /** The UTC day a moment falls on, as the storage key's suffix: `2026-11-09`. */
 function utcDay(now: number): string {
+	// @effect-diagnostics-next-line globalDate:off -- The Durable Object uses wall-clock UTC dates for its persisted daily budget keys.
 	return new Date(now).toISOString().slice(0, 10);
 }
 
@@ -29,6 +30,7 @@ function utcDay(now: number): string {
  */
 export class IconDrawBudget extends DurableObject {
 	async admit(cap: number): Promise<IconDrawAdmission> {
+		// @effect-diagnostics-next-line globalDate:off -- The Durable Object uses wall-clock UTC dates for its persisted daily budget keys.
 		const today = `${PREFIX}${utcDay(Date.now())}`;
 		const days = [...(await this.ctx.storage.list<number>({ prefix: PREFIX })).entries()];
 		// A clock that steps back must not reopen a day, nor touch the count of a later one.

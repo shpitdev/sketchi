@@ -75,13 +75,15 @@ no-pick instead. HTTP failures keep the author's retry classification.
 
 Studio's `features/mcp/toolkit.server.ts` owns the public `docs`, `search` and
 `execute` definitions and handlers. `execute.server.ts` owns sandbox settlement,
-receipts and model delivery. Icons' `lib/toolkit.server.ts` owns `search_icons` and
-`get_icon`, with the request origin and source loader supplied through `IconSource`.
-Each host registers its Toolkit once with native `McpServer.toolkit`.
+receipts and model delivery. Icons' `features/mcp/toolkit.server.ts` owns
+`search_icons` and `get_icon`, with the request origin and source loader supplied
+through `IconSource`. Both hosts use native `McpServer.toolkit` registration.
 
-A Durable Object owns each native `McpServer.layerHttp` session. The opaque session
-header includes the object locator; an evicted object asks the client to initialize
-again. HTTP middleware supplies request bindings and telemetry. Studio's
+MCP is stateless across requests. `serveStatelessMcp` opens a request-owned
+`McpServer.layerHttp` handler, initializes it internally for non-initialize POSTs,
+and strips the native session header from the public response. The handler closes
+after body consumption or cancellation. No Durable Object owns an MCP session.
+HTTP middleware supplies request bindings and telemetry. Studio's
 `features/build/capabilities.server.ts` supplies concrete artifact, icon and render
 capabilities to the public diagram operations; it defines no operation facade.
 
@@ -91,45 +93,24 @@ only the already-encoded native result to readable docs, artifact delivery and r
 SVG. Native registration retains input decoding, typed errors, interruption and
 request context. It performs no schema redecoding or redispatch.
 
-## Diagnostic ratchet
+## Diagnostics
 
-`tsconfig.base.json` is the single executable policy for the pinned native compiler.
-Its explicit correctness and Effect-native rule lists are shared by all four purposes;
-no package is exempt because it is pure, UI, server or tooling. The following levels
-apply before a scope is converted:
+`pnpm ci:local` fails on correctness and Effect boundary errors. The native
+compiler applies `tsconfig.base.json` across projects. Oxlint also checks raw
+fetch, timers, Promise construction and Node built-in imports so scripts outside
+the TypeScript reference graph are covered. Inside-Effect variants are errors too.
 
-| Purpose | Correctness | Native operations and collections | Synchronous schema calls | Maturity |
-| --- | --- | --- | --- | --- |
-| Domain and rendering | error | warning | warning; deliberate synchronous boundaries need a local reason | off |
-| Server and persistence | error | warning | warning during migration; converted I/O uses effectful decoding | off |
-| React application | error | warning | warning; renderer callbacks do not exempt application workflows | off |
-| Tooling and Node | error | warning | warning; native Nx/bootstrap callbacks remain narrow | off |
+Collection and string preferences, `async` declaration shape, and standalone
+synchronous JSON preferences remain advisory outside existing stricter files.
+Pure layout and geometry retain their collection and string style exemptions,
+not exemptions from correctness or I/O checks. API maturity is not a failure.
 
-The native list includes both inside/outside-Effect variants supplied by upstream,
-collection/string preferences, `runEffectInsideEffect`, `strictEffectProvide` and
-`schemaSyncInEffect`. Correctness errors fail the compiler; migration warnings remain
-visible and do not affect its exit code. Maturity checks (`experimentalApiUsage`,
-`unstableApiUsage`, `apiStabilityLeak`) are off. Style rules keep their pinned upstream
-defaults; they are not all promoted to errors.
-
-Each converted project or family promotes this applicable native group to error using
-upstream configuration overrides. Preserve the base correctness list and unrelated
-scopes; a narrower list or lower severity requires independent review. Verify the
-resolved policy on a real source probe before accepting a promotion. Final adoption
-requires errors throughout and a concrete reason for every necessary native operation.
-Record counts temporarily in `.memory/`; there is no allowed-count baseline in CI.
-
-The Studio and Icons Toolkit/serving adapter files now promote the complete native
-group through explicit file overrides. The extracted execute workflow and other
-unconverted files retain migration warnings. SDK layer entry points and the retained
-Icons HTTP Promise host have local, reasoned exceptions; correctness stays at error.
-
-
-Prefer a local `@effect-diagnostics-next-line rule:off -- <concrete capability gap>`
-only for an actual host contract or deliberate synchronous boundary. Do not suppress
-correctness findings to make a migration pass, add package-wide suppressions, or use
-an exception to preserve a duplicate implementation. Lint and Effect diagnostic
-comments require reasons. Existing Nx dependency boundaries, Promise misuse checks,
+Use `@effect-diagnostics-next-line rule:off -- <concrete reason>` for a necessary
+host call or deliberate synchronous boundary. A per-file, per-rule directive is
+appropriate when a standalone build script or test harness repeats the same host
+operation. The reason must name the contract or operation, not the package or
+syntax. Do not disable a rule across an app or substitute an exception for a
+needed correctness fix. Existing Nx dependency boundaries, Promise misuse checks,
 Zod restrictions and React synchronization restrictions remain enforced.
 
 Upstream diagnostics are not a census of Promise syntax. Assigned `Promise.resolve`

@@ -66,6 +66,7 @@ export const acquireSlot = Effect.fn("ops.ciLocal.acquireSlot")(function* (optio
 				continue;
 			}
 			const startedAt = yield* Clock.currentTimeMillis;
+			// @effect-diagnostics-next-line globalJsonInEffect:off -- Write the slot owner marker in the existing format shared by concurrent gate processes.
 			yield* fs.writeFileString(info, JSON.stringify({ ...owner, startedAt })).pipe(Effect.orDie);
 			// The holder file goes while the slot is still held, so it never names the next one.
 			yield* Effect.addFinalizer(() =>

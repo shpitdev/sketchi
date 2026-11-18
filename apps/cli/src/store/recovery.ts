@@ -1,3 +1,4 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The recovery boundary derives native paths for leases left by earlier processes.
 import { dirname, join } from "node:path";
 
 import { Effect } from "effect";
@@ -17,6 +18,7 @@ import type { StoreContext } from "./service";
 export function processIsAlive(pid: number): boolean {
 	if (!Number.isSafeInteger(pid) || pid <= 0) return false;
 	try {
+		// A persisted lease may name a process this runtime did not spawn.
 		process.kill(pid, 0);
 		return true;
 	} catch (cause) {

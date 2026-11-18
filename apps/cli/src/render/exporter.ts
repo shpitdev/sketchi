@@ -32,6 +32,7 @@ function renderFailed(diagramId: string, error?: HeadlessPngRenderError) {
 
 function decodeJson(diagramId: string, bytes: Uint8Array): Effect.Effect<unknown, CliExportError> {
 	return Effect.try({
+		// @effect-diagnostics-next-line globalJsonInEffect:off -- The CLI input/storage codec maps native JSON parse failure to its existing typed error.
 		try: () => JSON.parse(new TextDecoder().decode(bytes)),
 		catch: () => renderFailed(diagramId),
 	});

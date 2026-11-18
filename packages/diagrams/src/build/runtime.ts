@@ -49,6 +49,7 @@ export function makeBuildRuntimeEnvironmentLayer(options: BuildRuntimeOptions = 
 }
 
 function defaultCreateId(prefix: string): string {
+	// @effect-diagnostics-next-line cryptoRandomUUID:off -- The synchronous build ID service supplies a unique id at its host boundary.
 	return `${prefix}_${globalThis.crypto.randomUUID()}`;
 }
 

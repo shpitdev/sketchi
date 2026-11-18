@@ -5,6 +5,7 @@
  * wordmark and the site's typeface) and renders a finished card to PNG. Each
  * app composes its own card from these and writes it at build time.
  */
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The Node-only social card renderer loads its bundled font and WASM bytes synchronously.
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 

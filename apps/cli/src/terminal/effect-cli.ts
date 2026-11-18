@@ -179,6 +179,7 @@ export function runEffectCommand<const Name extends string, Input, ContextInput,
 			if (property === "log") {
 				return (...values: ReadonlyArray<unknown>) => {
 					if (values.length === 1 && values[0] === "") return;
+					// @effect-diagnostics-next-line globalConsole:off -- This host output adapter preserves the native CLI console target and argument semantics.
 					target.log(...values);
 				};
 			}

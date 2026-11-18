@@ -79,7 +79,7 @@ export interface StudioBrowserRenderingShape {
 export class StudioBrowserRendering extends Context.Service<
 	StudioBrowserRendering,
 	StudioBrowserRenderingShape
->()("@sketchi/studio/PlaygroundBrowserRendering") {}
+>()("@sketchi/studio/StudioBrowserRendering") {}
 
 export const StudioBrowserRenderingLive = Layer.succeed(StudioBrowserRendering, {
 	renderer: createCloudflareBrowserRunArtifactRenderer,

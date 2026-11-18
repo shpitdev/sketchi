@@ -87,9 +87,11 @@ export const Reasoning = memo(
       if (isStreaming) {
         hasEverStreamedRef.current = true;
         if (startTimeRef.current === null) {
+          // @effect-diagnostics-next-line globalDate:off -- The UI measures elapsed wall time only for the native reasoning disclosure label.
           startTimeRef.current = Date.now();
         }
       } else if (startTimeRef.current !== null) {
+        // @effect-diagnostics-next-line globalDate:off -- The UI measures elapsed wall time only for the native reasoning disclosure label.
         setDuration(Math.ceil((Date.now() - startTimeRef.current) / MS_IN_S));
         startTimeRef.current = null;
       }
@@ -111,6 +113,7 @@ export const Reasoning = memo(
         !hasAutoClosed &&
         !hasUserToggled
       ) {
+        // @effect-diagnostics-next-line globalTimers:off -- The reasoning disclosure owns and clears this short presentation-only auto-close timer.
         const timer = setTimeout(() => {
           setIsOpen(false);
           setHasAutoClosed(true);

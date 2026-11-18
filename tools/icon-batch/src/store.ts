@@ -1,4 +1,6 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The Node ledger adapter writes temp siblings and renames them to preserve atomic resume.
 import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The Node ledger adapter writes temp siblings and renames them to preserve atomic resume.
 import { join } from "node:path";
 
 import type { BatchAuthor, MarkAttempt } from "./draw-mark";
