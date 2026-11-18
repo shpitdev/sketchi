@@ -160,8 +160,11 @@ The workflows run typed `pnpm ops` commands from `tools/ops`; `pnpm ops --help` 
 The `app-production-deploy` workflow runs on a push to `main` and by manual
 dispatch. A push deploys only the Worker apps whose `build` inputs it reaches
 from the previous `main` commit (`ops production select --project affected`);
-its path filter skips pushes that cannot reach a Worker build (docs, CI, tooling
-outside the app build inputs). A dispatch deploys all configured Worker apps or
+its path filter skips pushes of only root docs (`docs/`, root Markdown),
+`.github` or tooling outside the app build inputs. Selection follows Nx build
+inputs, so it is conservative: an app's own README or test config redeploys
+that app, and a push that also touches `tools/ops` redeploys every app. The
+`production` environment has no approval gate. A dispatch deploys all configured Worker apps or
 one named project. A failed deployment leaves the last deployed version active
 until the next push reaching that app or a dispatch. Production deploys pass
 `--no-x-provision`; Workers may bind existing resources, but these deploys do
