@@ -192,6 +192,7 @@ const requestCanvas = Effect.fn("sketchi.cli.canvas.request")(
 			}),
 		);
 	},
+	Effect.scoped,
 	Effect.timeoutOrElse({
 		duration: API_REQUEST_TIMEOUT,
 		orElse: () =>

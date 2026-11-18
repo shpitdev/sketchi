@@ -214,6 +214,7 @@ const requestGeneration = Effect.fn("sketchi.cli.generate.request")(
 			issues: success.issues ?? [],
 		};
 	},
+	Effect.scoped,
 	Effect.timeoutOrElse({
 		duration: GENERATE_REQUEST_TIMEOUT,
 		orElse: () => Effect.fail(timeoutFailure()),

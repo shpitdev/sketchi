@@ -1,3 +1,9 @@
+import { execFile } from "node:child_process";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { createServer } from "node:http";
+import { join, resolve } from "node:path";
+import { promisify } from "node:util";
+
 import { ArtifactStorageMemory, makeBuildRuntimeEnvironmentLayer } from "@sketchi/diagrams/build";
 import { afterEach, assert, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Result } from "effect";
@@ -116,6 +122,68 @@ function runGenerate(
 		...(type ? { type } : {}),
 	}).pipe(Effect.provide(Layer.merge(capturingStoreLayer(created), unusedPatcher)));
 }
+
+const binary = resolve(process.cwd(), "apps/cli/dist/sketchi.js");
+const testParent = resolve(process.cwd(), ".memory/cli-tests");
+const exec = promisify(execFile);
+
+it.each(["generate", "revise"] as const)(
+	"does not replay a %s POST after a 421 even when a second POST would succeed",
+	async (command) => {
+		const success = await buildSuccessBody(flowchartInput);
+		const received: string[] = [];
+		const path = "/api/v1/generate";
+		const server = createServer((request, response) => {
+			received.push(`${request.method} ${request.url}`);
+			request.resume();
+			request.on("end", () => {
+				response.setHeader("content-type", "application/json");
+				response.statusCode = received.length === 1 ? 421 : 200;
+				response.end(response.statusCode === 421 ? "{}" : success);
+			});
+		});
+		await mkdir(testParent, { recursive: true });
+		const root = await mkdtemp(join(testParent, "generate-replay-"));
+		try {
+			await new Promise<void>((listening) => server.listen(0, "127.0.0.1", listening));
+			const address = server.address();
+			if (!address || typeof address === "string") throw new Error("Expected a TCP address.");
+			const run = (args: string[]) =>
+				exec(process.execPath, [binary, ...args, "--output", "json"], {
+					cwd: root,
+					env: { ...process.env, HOME: root, USERPROFILE: root },
+					timeout: 30_000,
+				});
+			const args: string[] = [command];
+			if (command === "revise") {
+				await run(["create", "--json", JSON.stringify(flowchartInput)]);
+				args.push(flowchartInput.spec.id);
+			}
+			const code = await run([
+				...args,
+				"--prompt",
+				"Draw a release approval flowchart",
+				"--endpoint",
+				`http://127.0.0.1:${String(address.port)}${path}`,
+				"--format",
+				"excalidraw",
+			]).then(
+				() => 0,
+				(error: unknown) => {
+					if (error instanceof Error && "code" in error && typeof error.code === "number") {
+						return error.code;
+					}
+					throw error;
+				},
+			);
+			assert.deepStrictEqual(received, [`POST ${path}`], `CLI exited ${String(code)}`);
+			assert.strictEqual(code, 10);
+		} finally {
+			await server[Symbol.asyncDispose]();
+			await rm(root, { force: true, recursive: true });
+		}
+	},
+);
 
 describe("prompt-assisted generation over the public generate API", () => {
 	for (const stall of ["headers", "body"] as const) {
