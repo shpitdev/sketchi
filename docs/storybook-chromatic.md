@@ -4,14 +4,14 @@
 
 | Need                    | Command or URL                                                 |
 | ----------------------- | -------------------------------------------------------------- |
-| Run local Storybook     | `pnpm nx storybook editor -- --ci --host 127.0.0.1` |
-| Build Storybook         | `pnpm nx build-storybook editor`                    |
-| Publish/check Chromatic | `pnpm nx chromatic editor`                          |
+| Run local Storybook     | `pnpm nx storybook editor-surface -- --ci --host 127.0.0.1` |
+| Build Storybook         | `pnpm nx build-storybook editor-surface`                    |
+| Publish/check Chromatic | `pnpm nx chromatic editor-surface`                          |
 | Local MCP endpoint      | `http://127.0.0.1:6006/mcp`                                    |
 
 ```mermaid
 flowchart LR
-  UI["editor"] --> Storybook["Storybook"]
+  UI["editor-surface"] --> Storybook["Storybook"]
   Storybook --> MCP["/mcp endpoint"]
   Storybook --> Chromatic["Chromatic publish"]
   CI["pnpm ci:local"] --> Build["Canonical Nx gates"]
@@ -20,12 +20,12 @@ flowchart LR
 
 ## Targets
 
-`editor` owns the reusable Studio component stories. The Storybook
+`editor-surface` owns the reusable drawing component stories. The Storybook
 targets are Nx targets:
 
-- `pnpm nx storybook editor`
-- `pnpm nx build-storybook editor`
-- `pnpm nx chromatic editor`
+- `pnpm nx storybook editor-surface`
+- `pnpm nx build-storybook editor-surface`
+- `pnpm nx chromatic editor-surface`
 
 The Storybook serve/build targets use `@nx/storybook` executors. Chromatic does
 not ship as an Nx executor in this workspace, so `chromatic` is a small
@@ -55,7 +55,7 @@ npx mcp-add \
 Then start Storybook before asking an agent to inspect component docs:
 
 ```sh
-pnpm nx storybook editor -- --ci --host 127.0.0.1
+pnpm nx storybook editor-surface -- --ci --host 127.0.0.1
 ```
 
 Useful first MCP prompt:
@@ -70,8 +70,8 @@ published URL under `/mcp`.
 ## CI Contract
 
 The local gate, `pnpm ci:local`, runs the Nx-affected
-`typecheck,test,build` graph and builds `editor` Storybook whenever
-`editor` is affected. A successful full gate against `origin/main` on a clean,
+`typecheck,test,build` graph and builds the `editor-surface` Storybook whenever
+`editor-surface` is affected. A successful full gate against `origin/main` on a clean,
 pushed PR head can sign off `local-ci`; unit `--no-signoff` runs cannot.
 Chromatic remains an explicit, token-backed publishing target rather than a
 required pull-request check.
@@ -89,7 +89,7 @@ the token from Infisical rather than pasting it into a shell history:
 ```sh
 infisical run --env=staging --path=/github -- \
   pnpm exec chromatic \
-    --storybook-build-dir storybook-static/editor \
+    --storybook-build-dir storybook-static/editor-surface \
     --storybook-config-dir packages/editor/.storybook \
     --storybook-base-dir packages/editor \
     --patch-build=chore/chromatic-storybook-contrast...main

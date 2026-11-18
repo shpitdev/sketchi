@@ -2,7 +2,7 @@ import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
 import { createProject, resourceError } from "@/features/projects/client";
-import { DrawingEditor } from "@sketchi/editor";
+import { DrawingEditor } from "@sketchi/editor-surface";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 

@@ -6,8 +6,8 @@ import { type ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@sketchi/editor", async (original) => ({
-	...(await original<typeof import("@sketchi/editor")>()),
+vi.mock("@sketchi/editor-surface", async (original) => ({
+	...(await original<typeof import("@sketchi/editor-surface")>()),
 	DrawingEditor: ({
 		onChange,
 		scene,

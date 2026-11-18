@@ -3,7 +3,7 @@
  * build paths. Vite configs read this synchronously, so it throws instead of returning Effects.
  */
 const workerProjects = {
-	excalidraw: {
+	editor: {
 		buildOutputPath: "dist/apps/editor",
 		projectRoot: "apps/editor",
 		workerName: "sketchi-excalidraw",
@@ -15,7 +15,7 @@ const workerProjects = {
 		workerName: "sketchi-icons",
 		wranglerInputConfigPath: "apps/icons/wrangler.jsonc",
 	},
-	playground: {
+	studio: {
 		buildOutputPath: "dist/apps/studio",
 		projectRoot: "apps/studio",
 		workerName: "sketchi-studio",

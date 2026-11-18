@@ -1,4 +1,4 @@
-import { DrawingEditor } from "@sketchi/editor";
+import { DrawingEditor } from "@sketchi/editor-surface";
 import { createFileRoute } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";

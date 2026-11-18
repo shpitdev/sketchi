@@ -75,7 +75,7 @@ describe("production detach", () => {
 				{ hostname: "excalidraw.sketchi.app", id: "d", service: "sketchi-excalidraw" },
 			]);
 			const exit = yield* api.run(
-				["production", "detach", "--project", "excalidraw", "--apply"],
+				["production", "detach", "--project", "editor", "--apply"],
 				CREDENTIALS,
 			);
 			expect(failure(exit)).toBeUndefined();
@@ -142,8 +142,8 @@ describe("production domains", () => {
 	it.effect("fails closed on another Worker's config or an inactive zone, writing nothing", () =>
 		Effect.gen(function* () {
 			zoneStatus = "active";
-			const mismatch = yield* domains("playground", { ...source, name: "sketchi-playground" });
-			expect(failure(mismatch.exit)).toMatch(/Wrangler name mismatch for project "playground"/);
+			const mismatch = yield* domains("studio", { ...source, name: "sketchi-playground" });
+			expect(failure(mismatch.exit)).toMatch(/Wrangler name mismatch for project "studio"/);
 			expect(existsSync(mismatch.out)).toBe(false);
 			zoneStatus = "pending";
 			const pending = yield* domains("icons", source);
@@ -155,7 +155,7 @@ describe("production domains", () => {
 
 	it.effect("an unknown production project is refused", () =>
 		Effect.gen(function* () {
-			const { exit } = yield* domains("studio", source);
+			const { exit } = yield* domains("playground", source);
 			expect(Exit.isFailure(exit)).toBe(true);
 		}),
 	);

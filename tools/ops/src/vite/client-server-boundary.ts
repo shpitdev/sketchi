@@ -22,7 +22,7 @@ export function serverModuleIds(moduleIds: readonly string[], projectId: string)
 /** Fails a client build that bundles any of the project's server-only modules. */
 export function clientServerBoundary(projectId: string): Plugin {
 	return {
-		name: "playground-client-server-boundary",
+		name: "sketchi:client-server-boundary",
 		apply: "build",
 		applyToEnvironment: (environment) => environment.name === "client",
 		generateBundle(_options, bundle) {
@@ -33,7 +33,7 @@ export function clientServerBoundary(projectId: string): Plugin {
 				projectId,
 			);
 			if (leaked.length > 0) {
-				this.error(`Playground server modules entered the client bundle:\n${leaked.join("\n")}`);
+				this.error(`${projectId} server modules entered the client bundle:\n${leaked.join("\n")}`);
 			}
 		},
 	};

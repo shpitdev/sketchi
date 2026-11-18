@@ -4,7 +4,7 @@ import {
 	type ExcalidrawInitialDataState,
 	type ExcalidrawProps,
 } from "@excalidraw/excalidraw/types";
-import type { createFoldedRouteRelease } from "@sketchi/editor";
+import type { createFoldedRouteRelease } from "@sketchi/editor-surface";
 import { type ComponentType, useCallback, useRef } from "react";
 
 import {

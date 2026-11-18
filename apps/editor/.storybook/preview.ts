@@ -1,4 +1,4 @@
-import "@sketchi/editor/styles.css";
+import "@sketchi/editor-surface/styles.css";
 import "../src/styles/app.css";
 
 import { type Preview } from "@storybook/react-vite";

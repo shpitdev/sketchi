@@ -28,7 +28,7 @@ const config: StorybookConfig = {
 				import.meta.url,
 			).pathname.slice(0, -1),
 			...viteConfig.resolve.alias,
-			"@sketchi/playground/styles.css": new URL(
+			"@sketchi/studio/styles.css": new URL(
 				"../../../../apps/studio/src/styles/app.css",
 				import.meta.url,
 			).pathname,
@@ -48,12 +48,14 @@ const config: StorybookConfig = {
 				.pathname,
 			"@sketchi/diagram-scenarios": new URL("../../../scenarios/src/index.ts", import.meta.url)
 				.pathname,
-			"@sketchi/editor/styles.css": new URL(
+			"@sketchi/editor-surface/styles.css": new URL(
 				"../../../../packages/editor/src/styles.css",
 				import.meta.url,
 			).pathname,
-			"@sketchi/editor": new URL("../../../../packages/editor/src/index.ts", import.meta.url)
-				.pathname,
+			"@sketchi/editor-surface": new URL(
+				"../../../../packages/editor/src/index.ts",
+				import.meta.url,
+			).pathname,
 		};
 		return viteConfig;
 	},

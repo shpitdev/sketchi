@@ -397,7 +397,7 @@ export interface BrowserRenderPoolShape {
  * under a burst does not run into the account's launch limit.
  */
 export class BrowserRenderPool extends Context.Service<BrowserRenderPool, BrowserRenderPoolShape>()(
-	"@sketchi/playground/BrowserRenderPool",
+	"@sketchi/studio/BrowserRenderPool",
 ) {
 	static readonly layer = (binding: CloudflareBrowserRunBinding) =>
 		Layer.effect(

@@ -2,7 +2,7 @@ import { type CanvasSpec } from "@sketchi/drawing";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { useStudioChat } from "@/features/chat/chat-client";
 
-import { DrawingEditor } from "@sketchi/editor";
+import { DrawingEditor } from "@sketchi/editor-surface";
 import { createFileRoute } from "@tanstack/react-router";
 import { type ChatMessage } from "@/features/chat/chat-message";
 import { MessageSquare, PanelsTopLeft, Square } from "lucide-react";

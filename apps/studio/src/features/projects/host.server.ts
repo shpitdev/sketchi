@@ -20,7 +20,7 @@ import { PlaygroundBindings, PlaygroundClock, PlaygroundIds } from "../../server
 export class PlaygroundStudioLocalBucket extends Context.Service<
 	PlaygroundStudioLocalBucket,
 	MemoryStudioObjectBucket
->()("@sketchi/playground/PlaygroundStudioLocalBucket") {}
+>()("@sketchi/studio/PlaygroundStudioLocalBucket") {}
 
 export const PlaygroundStudioLocalBucketLive = Layer.effect(
 	PlaygroundStudioLocalBucket,

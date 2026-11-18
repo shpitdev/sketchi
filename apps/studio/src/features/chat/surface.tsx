@@ -1,7 +1,7 @@
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { mindmapTopics } from "@sketchi/diagrams/families/mindmap/index";
 import { type StudioBuildResult } from "./build-result";
-import { DrawingEditor } from "@sketchi/editor";
+import { DrawingEditor } from "@sketchi/editor-surface";
 import { type ChatStatus, type ChatMessage } from "@/features/chat/chat-message";
 import { type RefObject } from "react";
 

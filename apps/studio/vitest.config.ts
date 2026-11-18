@@ -66,11 +66,11 @@ export default defineConfig({
 				replacement: new URL("../../tools/scenarios/src/index.ts", import.meta.url).pathname,
 			},
 			{
-				find: "@sketchi/editor/styles.css",
+				find: "@sketchi/editor-surface/styles.css",
 				replacement: new URL("../../packages/editor/src/styles.css", import.meta.url).pathname,
 			},
 			{
-				find: "@sketchi/editor",
+				find: "@sketchi/editor-surface",
 				replacement: new URL("../../packages/editor/src/index.ts", import.meta.url).pathname,
 			},
 		],

@@ -7,7 +7,7 @@ import { localInspectorPort, localViteCacheDir } from "../../tools/local-dev-por
 import { excalidrawFonts } from "../../tools/ops/src/vite/excalidraw-fonts";
 import { workerProjectConfig } from "../../tools/ops/src/workers";
 
-const workerProject = workerProjectConfig("excalidraw");
+const workerProject = workerProjectConfig("editor");
 
 export default defineConfig({
 	root: new URL(".", import.meta.url).pathname,
@@ -15,7 +15,7 @@ export default defineConfig({
 		emptyOutDir: true,
 		outDir: new URL(`../../${workerProject.buildOutputPath}`, import.meta.url).pathname,
 	},
-	cacheDir: localViteCacheDir("excalidraw"),
+	cacheDir: localViteCacheDir("editor"),
 	publicDir: new URL("./public", import.meta.url).pathname,
 	plugins: [
 		excalidrawFonts(),
@@ -38,7 +38,7 @@ export default defineConfig({
 				replacement: new URL("../../packages/diagrams/src/", import.meta.url).pathname.slice(0, -1),
 			},
 			{
-				find: "@sketchi/editor/styles.css",
+				find: "@sketchi/editor-surface/styles.css",
 				replacement: new URL("../../packages/editor/src/styles.css", import.meta.url).pathname,
 			},
 			{
@@ -47,7 +47,7 @@ export default defineConfig({
 					.pathname,
 			},
 			{
-				find: "@sketchi/editor",
+				find: "@sketchi/editor-surface",
 				replacement: new URL("../../packages/editor/src/index.ts", import.meta.url).pathname,
 			},
 		],

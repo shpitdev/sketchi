@@ -13,7 +13,7 @@ import { Result } from "effect";
 
 import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
 
-import { copyText, DrawingEditor } from "@sketchi/editor";
+import { copyText, DrawingEditor } from "@sketchi/editor-surface";
 import { useMemo, useState } from "react";
 
 import { DiagramInspector } from "../diagram-inspector/index";

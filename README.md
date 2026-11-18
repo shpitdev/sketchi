@@ -72,7 +72,7 @@ prompt ─▶ model candidate ─▶ typed diagram ─▶ deterministic layout �
 | `packages/cloudflare`        | concrete shared AI Gateway binding adapter                             |
 | `packages/drawing` | Excalidraw conversion, real-scene validation and SVG import             |
 | `tools/scenarios`             | maintained scenarios and the scenario CLI                               |
-| `packages/editor`         | native React drawing editor; family compositions live in tools/storybook   |
+| `packages/editor`             | reusable React drawing surface (Nx `editor-surface`)                    |
 | `packages/icons/*`            | the icon catalog and search, community icons, and hand-drawn logos      |
 | `packages/observability`      | span telemetry for every Worker request                                 |
 | `packages/ui`                 | shadcn primitives and tokens for the Tailwind apps                      |
@@ -80,10 +80,10 @@ prompt ─▶ model candidate ─▶ typed diagram ─▶ deterministic layout �
 | App (`apps/`) | Nx project   | Serves                                                          |
 | ------------- | ------------ | --------------------------------------------------------------- |
 | `cli`         | `sketchi-cli` | the `sketchi` command                                          |
-| `studio`      | `playground` | playground.sketchi.app: Studio, the HTTP API and the MCP server |
+| `studio`      | `studio`      | playground.sketchi.app: Studio, the HTTP API and the MCP server |
 | `web`         | `web`        | sketchi.app: home, docs and agent setup                         |
 | `icons`       | `icons`      | icons.sketchi.app                                               |
-| `editor`      | `excalidraw` | an internal Excalidraw workspace for checking real scenes       |
+| `editor`      | `editor`      | an internal Excalidraw workspace for checking real scenes       |
 
 Every app except the CLI is a Cloudflare Worker. See the
 [architecture guide](docs/architecture.md) and, for each family,
@@ -97,7 +97,7 @@ Every app except the CLI is a Cloudflare Worker. See the
 mise trust && mise install
 pnpm install
 pnpm dev                    # every app, through Portless
-pnpm nx dev playground      # one app (apps/studio)
+pnpm nx dev studio          # one app (apps/studio)
 ```
 
 `pnpm ci:local` is the gate: lint and format, typecheck (TypeScript 6 and the

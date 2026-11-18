@@ -52,7 +52,7 @@ export interface PlaygroundGenerationShape {
 export class PlaygroundGeneration extends Context.Service<
 	PlaygroundGeneration,
 	PlaygroundGenerationShape
->()("@sketchi/playground/PlaygroundGeneration") {}
+>()("@sketchi/studio/PlaygroundGeneration") {}
 
 export const PlaygroundGenerationLive = Layer.effect(
 	PlaygroundGeneration,

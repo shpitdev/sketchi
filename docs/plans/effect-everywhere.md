@@ -51,7 +51,7 @@ This covers every public namespace of the published core package and every famil
 
 ## Application structure
 
-Keep the existing domain packages. Add a package only when it has a real independent owner or cross-application consumer; generate it with Nx. Candidate additions are a shared Cloudflare adapter package for repeated binding adapters and a Studio chat package if moving the shared event/tool controller out of `apps/playground` produces an actual reusable boundary. API contracts belong to their domain packages; an application assembles their groups. Do not create an empty generic platform, repository, service-base, runtime-manager or universal adapter framework.
+Keep the existing domain packages. Add a package only when it has a real independent owner or cross-application consumer; generate it with Nx. Candidate additions are a shared Cloudflare adapter package for repeated binding adapters and a Studio chat package if moving the shared event/tool controller out of `apps/studio` produces an actual reusable boundary. API contracts belong to their domain packages; an application assembles their groups. Do not create an empty generic platform, repository, service-base, runtime-manager or universal adapter framework.
 
 ```mermaid
 flowchart TD
@@ -93,7 +93,7 @@ Every current Nx project has an owner below. The native column names an actual h
 
 | Project | Owning slices | Native boundary that remains |
 | --- | --- | --- |
-| `playground` | 4 HTTP/runtime, 5 MCP, 6b chat, 7 UI/controllers, 8 DO, 9 export | React/TanStack page rendering; Cloudflare loader/browser/binding calls inside typed services |
+| `studio` | 4 HTTP/runtime, 5 MCP, 6b chat, 7 UI/controllers, 8 DO, 9 export | React/TanStack page rendering; Cloudflare loader/browser/binding calls inside typed services |
 | `icons` | 4 APIs, 5 MCP, 6a query atoms, 7 selection/preferences, 8 limits | React/TanStack rendering/navigation; host request/DO callbacks |
 | `excalidraw` | 6a query atoms, 7 editor/controller state | Excalidraw/React rendering and editor callbacks |
 | `web` | 4 replace `surface-urls-rpc`/server API policy, 7 interaction state | Marketing React/SSR/navigation and asset rendering |
@@ -241,7 +241,7 @@ Outcome (phase 3): the session-owned Durable Object lost sessions on eviction, s
 
 Retain the Cloudflare Code Mode loader/executor as a narrow external service: it is the product's sandbox, not a substitute for Effect orchestration. Replace its surrounding Promise composition, lifetime, concurrency and error translation. Preserve Code Mode receipts, partial results, PNG budgets and artifact visibility.
 
-Remove `effect-mcp-adapter.server.ts`, Standard Schema glue used only for SDK bridging, SDK transport construction and `createLegacyMcpHandler`. Resolve the real `agents/vite` consumer in `apps/playground/vite.config.ts` before deleting `agents`; check any remaining Code Mode loader peer separately. Remove direct SDK/Agents dependencies only when their actual consumers are gone. Replay `mcp-validation-issues-v2.json` through the new server before deciding which failures are product contracts worth keeping. Remove peer/source-inspection tests for deleted dependencies.
+Remove `effect-mcp-adapter.server.ts`, Standard Schema glue used only for SDK bridging, SDK transport construction and `createLegacyMcpHandler`. Resolve the real `agents/vite` consumer in `apps/studio/vite.config.ts` before deleting `agents`; check any remaining Code Mode loader peer separately. Remove direct SDK/Agents dependencies only when their actual consumers are gone. Replay `mcp-validation-issues-v2.json` through the new server before deciding which failures are product contracts worth keeping. Remove peer/source-inspection tests for deleted dependencies.
 
 **Exit:** actual clients initialize/list/call and obtain artifacts across requests, isolate changes, deploy/reconnect and an idle gap exceeding DO eviction; required notifications/cancellation work. The harness and captured wire oracle pass. Failure cannot erase an accepted receipt. Real preview telemetry parity precedes old-runtime removal; SDK servers/facade are gone.
 

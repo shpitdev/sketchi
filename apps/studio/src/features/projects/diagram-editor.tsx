@@ -1,6 +1,6 @@
 import { constant } from "effect/Function";
 import { createExcalidrawFile, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { downloadBlob, DrawingEditor } from "@sketchi/editor";
+import { downloadBlob, DrawingEditor } from "@sketchi/editor-surface";
 import { RegistryContext, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { Effect, Schema, Stream, String as Str } from "effect";
 import { Atom, AsyncResult } from "effect/reactivity";

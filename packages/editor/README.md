@@ -1,4 +1,4 @@
-# editor
+# editor-surface
 
 Reusable React components and Storybook states for Sketchi diagram review surfaces.
 
@@ -6,8 +6,8 @@ Reusable React components and Storybook states for Sketchi diagram review surfac
 flowchart LR
   Packages["diagram packages"] --> Components["review components"]
   Components --> Storybook["Storybook"]
-  Components --> Playground["apps/studio"]
-  Components --> Excalidraw["apps/editor"]
+  Components --> Studio["apps/studio"]
+  Components --> Editor["apps/editor"]
 ```
 
 | Owns                                  | Does not own                   |
@@ -20,11 +20,11 @@ flowchart LR
 ## Commands
 
 ```sh
-pnpm nx test editor
-pnpm nx typecheck editor
-pnpm nx build editor
-pnpm nx storybook editor
-pnpm nx build-storybook editor
+pnpm nx test editor-surface
+pnpm nx typecheck editor-surface
+pnpm nx build editor-surface
+pnpm nx storybook editor-surface
+pnpm nx build-storybook editor-surface
 ```
 
 ## Usage

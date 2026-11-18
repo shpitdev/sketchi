@@ -1,11 +1,11 @@
 {
-	"name": "@sketchi/excalidraw-app",
+	"name": "@sketchi/editor-app",
 	"private": true,
 	"type": "module",
 	"dependencies": {
 		"@excalidraw/excalidraw": "0.18.1",
 		"@sketchi/drawing": "workspace:*",
-		"@sketchi/editor": "workspace:*",
+		"@sketchi/editor-surface": "workspace:*",
 		"@effect/atom-react": "catalog:",
 		"effect": "catalog:",
 		"scheduler": "catalog:",

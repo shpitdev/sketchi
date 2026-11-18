@@ -21,7 +21,7 @@ const productionProjects: Record<
 		title: string;
 	}
 > = {
-	excalidraw: {
+	editor: {
 		domainPatterns: [],
 		publicSurface: false,
 		routePolicy: "internal canvas workspace; no public product domain",
@@ -33,7 +33,7 @@ const productionProjects: Record<
 		routePolicy: "icons.sketchi.app product surface",
 		title: "Sketchi Icons",
 	},
-	playground: {
+	studio: {
 		domainPatterns: ["playground.sketchi.app"],
 		publicSurface: true,
 		routePolicy: "playground.sketchi.app product surface; authenticated Studio remains unexposed",

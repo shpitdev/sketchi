@@ -1,5 +1,5 @@
 import { type ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import { downloadBlob, DrawingEditor, type DrawingEditorProps } from "@sketchi/editor";
+import { downloadBlob, DrawingEditor, type DrawingEditorProps } from "@sketchi/editor-surface";
 import {
 	convertSvgToExcalidraw,
 	parseSvg,

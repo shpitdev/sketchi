@@ -9,7 +9,7 @@ import {
 } from "@sketchi/diagrams/family";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
-import { DrawingEditor } from "@sketchi/editor";
+import { DrawingEditor } from "@sketchi/editor-surface";
 import { FlowchartValidationPanel } from "../flowchart-validation-panel/index";
 
 export interface GenerationWorkspaceProps {
