@@ -60,8 +60,9 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          # The selection compares this push with the previous main commit.
-          fetch-depth: ${{ github.event_name == 'push' && 0 || 1 }}
+          # The selection compares a push with the previous main commit, so it needs history.
+          # Keep this a literal: in an expression 0 is falsy, and a shallow clone deploys every app.
+          fetch-depth: 0
 
       - uses: ./.github/actions/setup-workspace
 
