@@ -25,7 +25,7 @@
 		"test": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "node --test packages/ui/wordmark/write.test.mjs"
+				"command": "node --test packages/ui/wordmark/tests/write.test.mjs"
 			}
 		},
 		"wordmark": {

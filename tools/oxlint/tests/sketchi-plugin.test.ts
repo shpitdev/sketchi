@@ -1,7 +1,7 @@
 import { RuleTester } from "oxlint/plugins-dev";
 import { describe, it } from "vitest";
 
-import plugin from "./sketchi-plugin";
+import plugin from "../sketchi-plugin";
 
 RuleTester.describe = describe;
 RuleTester.it = it;

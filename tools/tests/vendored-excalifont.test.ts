@@ -38,7 +38,7 @@ const FONT_DIRECTORY = "public/fonts/Excalifont";
 /** cn-font-split emits one file per unicode subset, not one file per face. */
 const EXPECTED_SUBSET_COUNT = 7;
 
-const repoRoot = fileURLToPath(new URL("../", import.meta.url));
+const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 
 const themeCss = readFileSync(join(repoRoot, THEME_CSS), "utf8");
 

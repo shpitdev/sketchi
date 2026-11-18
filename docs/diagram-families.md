@@ -12,7 +12,7 @@ Each family owns its document, layout and build under
 `packages/diagrams/src/families/<name>/`. The former generic node/edge scaffold
 is retired.
 
-`tools/diagram-families.test.ts` exercises generated-response ingestion and offline
+`tools/tests/diagram-families.test.ts` exercises generated-response ingestion and offline
 document builds without requiring particular source, story or test filenames.
 
 | Stage | Where | Guard |
