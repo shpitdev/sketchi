@@ -1,7 +1,16 @@
-import type {
-	CloudflareAiGateway,
-	CloudflareAiGatewayProvider,
+import {
+	type CloudflareAiGateway,
+	type CloudflareAiGatewayProvider,
+	isTransientHttpStatus,
 } from "@sketchi/cloudflare/ai-gateway";
+import { Duration, Effect, Schedule, Schema } from "effect";
+import {
+	FetchHttpClient,
+	HttpClient,
+	HttpClientError,
+	HttpClientRequest,
+	HttpClientResponse,
+} from "effect/http";
 
 /** Sketchi's Cloudflare account, whose AI Gateway stores the provider keys Studio uses. */
 export const SKETCHI_ACCOUNT_ID = "75f9660f39e4dafe8b95980b87e7399a";
@@ -61,58 +70,62 @@ export function httpGateway(
 	};
 }
 
-export interface GatewayLogCost {
-	readonly logId: string;
-	/** USD, as the gateway priced the call; undefined while the log has no cost yet. */
-	readonly cost?: number;
-	readonly model?: string;
-}
+const decodeLog = HttpClientResponse.schemaBodyJson(
+	Schema.Struct({ result: Schema.Struct({ cost: Schema.Finite }) }),
+);
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+// Six GETs at most per log: 5 seconds each, with gaps of 2, 4, 6, 8 and 10 seconds.
+const logRetry = Schedule.recurs(5).pipe(
+	Schedule.addDelay(({ attempt }) => Effect.succeed(Duration.seconds(2 * attempt))),
+);
 
-/**
- * What each logged call cost, read from the gateway's logs. A log lands a
- * little after its response, so a missing one is read again a few times.
- */
-export async function readLogCosts(
-	access: GatewayAccess,
-	gatewayId: string,
-	logIds: readonly string[],
-	options: { readonly attempts?: number; readonly waitMs?: number } = {},
-): Promise<GatewayLogCost[]> {
-	const send = access.fetch ?? fetch;
-	const attempts = options.attempts ?? 6;
-	const waitMs = options.waitMs ?? 2_000;
-	const read = async (logId: string): Promise<GatewayLogCost> => {
-		for (let attempt = 1; ; attempt += 1) {
-			try {
-				const response = await send(
-					`https://api.cloudflare.com/client/v4/accounts/${access.accountId}/ai-gateway/gateways/${gatewayId}/logs/${logId}`,
-					{ headers: { authorization: `Bearer ${access.token}` } },
-				);
-				if (response.ok) {
-					const body = (await response.json()) as {
-						readonly result?: { readonly cost?: unknown; readonly model?: unknown };
-					};
-					const cost = body.result?.cost;
-					if (typeof cost === "number" && Number.isFinite(cost)) {
-						return {
-							logId,
-							cost,
-							...(typeof body.result?.model === "string" ? { model: body.result.model } : {}),
-						};
-					}
-				} else {
-					await response.body?.cancel();
-				}
-			} catch {
-				// An unreachable or malformed read is tried again, like a log that has not landed.
-			}
-			if (attempt >= attempts) return { logId };
-			await sleep(waitMs * attempt);
-		}
-	};
-	const costs: GatewayLogCost[] = [];
-	for (const logId of logIds) costs.push(await read(logId));
-	return costs;
-}
+/** No price unless every log is priced. The caller keeps the draw and charges its estimate. */
+export const priceLogs = Effect.fn("sketchi.iconBatch.priceLogs")(
+	function* (access: GatewayAccess, logIds: readonly string[]) {
+		if (logIds.length === 0) return undefined;
+		const client = (yield* HttpClient.HttpClient).pipe(
+			HttpClient.withScope,
+			HttpClient.filterStatusOk,
+		);
+		const base = `https://api.cloudflare.com/client/v4/accounts/${access.accountId}/ai-gateway/gateways/${SKETCHI_GATEWAY_ID}/logs`;
+
+		return yield* Effect.reduce(
+			logIds,
+			() => 0,
+			(total, logId) =>
+				client
+					.execute(
+						HttpClientRequest.get(`${base}/${logId}`).pipe(
+							HttpClientRequest.bearerToken(access.token),
+						),
+					)
+					.pipe(
+						Effect.flatMap(decodeLog),
+						// Closing this attempt's scope aborts the transport even after headers arrived.
+						Effect.scoped,
+						Effect.timeout("5 seconds"),
+						Effect.retry({
+							schedule: logRetry,
+							while: (error) => {
+								if (
+									!HttpClientError.isHttpClientError(error) ||
+									error.reason._tag !== "StatusCodeError"
+								) {
+									return true;
+								}
+								const { status } = error.reason.response;
+								return status === 404 || isTransientHttpStatus(status);
+							},
+						}),
+						Effect.map(({ result }) => total + result.cost),
+					),
+		).pipe(Effect.orElseSucceed(() => undefined));
+	},
+	(effect, access) => {
+		// @effect-diagnostics-next-line strictEffectProvide:off -- This cost-log adapter owns the outgoing Fetch transport, separate from model POSTs.
+		const priced = effect.pipe(Effect.provide(FetchHttpClient.layer));
+		return access.fetch
+			? priced.pipe(Effect.provideService(FetchHttpClient.Fetch, access.fetch))
+			: priced;
+	},
+);

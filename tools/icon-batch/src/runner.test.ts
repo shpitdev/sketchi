@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { type IconRecipe } from "@sketchi/drawing";
 import { type SketchiIcon } from "@sketchi/icon-catalog";
 import { type IconAuthorModel } from "@sketchi/icon-draw";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { attemptCeilingUsd, type BatchAuthor, type MarkAttempt, priceLogs } from "./draw-mark";
+import { attemptCeilingUsd, type BatchAuthor, drawMark, type MarkAttempt } from "./draw-mark";
 import { initializeResvg, svgPng } from "./excalidraw-export";
 import { verdictLine, writeSheets } from "./sheets";
 import { promote } from "./promote";
@@ -308,39 +308,56 @@ describe("runBatch", () => {
 	});
 });
 
-describe("priceLogs", () => {
-	const fast = { attempts: 2, waitMs: 1 };
-
-	it("sums the gateway's prices once every log has one", async () => {
-		const access = {
-			accountId: "acct",
-			token: "token",
-			fetch: async (url: string | URL | Request) =>
-				Response.json({
-					result: {
-						cost: (url instanceof Request ? url.url : url.toString()).endsWith("/a") ? 0.01 : 0.02,
+it("charges the failed draw's ceiling when its log never prices and does not replay the POST", async () => {
+	await initializeResvg();
+	vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+	try {
+		const store = new RunStore(root);
+		const reading = Promise.withResolvers<void>();
+		let posts = 0;
+		const fetch: typeof globalThis.fetch = async (_input, init) => {
+			if (init?.method === "POST") {
+				posts++;
+				return Response.json(
+					{ type: "error", error: { type: "invalid_request_error", message: "refused" } },
+					{ status: 400, headers: { "cf-aig-log-id": "log-1" } },
+				);
+			}
+			reading.resolve();
+			return Response.json({ result: {} });
+		};
+		const ceiling = attemptCeilingUsd(SONNET);
+		const batch = runBatch({
+			marks: [icon("unpriced"), icon("next")],
+			store,
+			concurrency: 1,
+			spendCapUsd: ceiling,
+			authors: { first: SONNET, retry: SONNET },
+			draw: (mark, author) =>
+				drawMark(
+					{ accountId: "acct", token: "token", fetch },
+					{
+						slug: mark.slug,
+						name: mark.name,
+						svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" fill="#2496ed"/></svg>',
+						author,
+						traceId: "unpriced-draw",
+						loadCatalogSvg: async () => undefined,
 					},
-				}),
-		};
-		expect(await priceLogs(access, ["a", "b"], fast)).toBeCloseTo(0.03);
-	});
-
-	it("leaves the price unresolved, without throwing, when the logs cannot be read", async () => {
-		const unreachable = {
-			accountId: "acct",
-			token: "token",
-			fetch: async () => {
-				throw new Error("network down");
-			},
-		};
-		expect(await priceLogs(unreachable, ["a"], fast)).toBeUndefined();
-		const malformed = {
-			accountId: "acct",
-			token: "token",
-			fetch: async () => new Response("not json"),
-		};
-		expect(await priceLogs(malformed, ["a"], fast)).toBeUndefined();
-	});
+				),
+		});
+		expect(await Promise.race([reading.promise, batch])).toBeUndefined();
+		await vi.advanceTimersByTimeAsync(30_000);
+		expect(await batch).toMatchObject({ capped: true, pending: 2, spentUsd: ceiling });
+		expect(posts).toBe(1);
+		const [record] = await store.records();
+		expect(record?.attempts).toMatchObject([
+			{ outcome: "failed", estimatedCostUsd: ceiling, logIds: ["log-1"] },
+		]);
+		expect(record?.attempts[0]).not.toHaveProperty("costUsd");
+	} finally {
+		vi.useRealTimers();
+	}
 });
 
 describe("writeSheets", () => {
