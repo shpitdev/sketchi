@@ -19,7 +19,7 @@ import {
 	IconDrawModels,
 	IconDrawModelsGateway,
 	IconImaging,
-	type ModelCall,
+	type AccountedModelCall,
 	prepareIconInput,
 } from "../src/index";
 
@@ -78,10 +78,11 @@ function scripted(script: Script) {
 	const authorReplies = [...script.author];
 	const judgeReplies = [...script.judge];
 	const judged: number[] = [];
-	const call = (role: "author" | "judge"): ModelCall => ({
+	const call = (role: "author" | "judge"): AccountedModelCall => ({
 		role,
 		model: role,
 		usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 },
+		usageReported: true,
 		ms: 5,
 	});
 	const models = Layer.succeed(IconDrawModels, {

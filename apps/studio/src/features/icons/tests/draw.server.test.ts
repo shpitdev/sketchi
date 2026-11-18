@@ -204,7 +204,8 @@ describe("drawing is bounded per client and per day", () => {
 			expect(drawn.status).toBe(200);
 			expect(drawn.headers.get("cache-control")).toBe("no-store");
 			expect(drawn.headers.get("x-sketchi-event-id")).toBeTruthy();
-			expect(await drawn.json()).toMatchObject({
+			const body: unknown = await drawn.json();
+			expect(body).toMatchObject({
 				ok: true,
 				status: "drawn",
 				name: "Acme",
@@ -221,6 +222,8 @@ describe("drawing is bounded per client and per day", () => {
 					]),
 				},
 			});
+			// Provider usage completeness is engine bookkeeping, not part of the public response.
+			expect(JSON.stringify(body)).not.toContain('"usageReported"');
 			const refused = await withRequest(env, { name: "Acme", svg: SVG }, "198.51.100.2");
 			expect(refused.status).toBe(429);
 			expect(await refused.json()).toMatchObject({ issues: [{ code: "daily_limit" }] });

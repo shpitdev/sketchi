@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { MarkAttempt } from "./draw-mark";
+import type { BatchAuthor, MarkAttempt } from "./draw-mark";
 import type { CatalogMark } from "./selection";
 
 /** Recognized: the judge picked the drawing's source out of its look-alikes. */
@@ -14,6 +14,12 @@ export interface MarkRecord extends CatalogMark {
 	/** Absent until the mark is settled; a run resumes a mark without one. */
 	readonly status?: MarkStatus;
 	readonly attempts: readonly StoredAttempt[];
+	/** The next attempt (at attempts.length) may have dispatched. Replace it with the result atomically. */
+	readonly reservation?: {
+		readonly author: BatchAuthor;
+		readonly startedAt: string;
+		readonly ceilingUsd: number;
+	};
 	/** The attempt whose drawing stands for the mark: the recognized one, else the last drawn. */
 	readonly chosen?: number;
 }
@@ -24,7 +30,10 @@ export function attemptCost(attempt: StoredAttempt): number {
 }
 
 export function recordCost(record: MarkRecord): number {
-	return record.attempts.reduce((sum, attempt) => sum + attemptCost(attempt), 0);
+	return (
+		record.attempts.reduce((sum, attempt) => sum + attemptCost(attempt), 0) +
+		(record.reservation?.ceilingUsd ?? 0)
+	);
 }
 
 /**

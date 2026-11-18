@@ -12,7 +12,7 @@ import { parseArgs } from "node:util";
 import { getIconSourceFile, iconManifest, nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
 import { iconAuthorModel, type IconAuthorModel } from "@sketchi/icon-draw";
 
-import { drawMark } from "./draw-mark";
+import { attemptCeilingUsd, drawMark, REVIEW_NOTE_MAX_BYTES, reviewNoteFits } from "./draw-mark";
 import { SKETCHI_ACCOUNT_ID } from "./gateway";
 import { promote } from "./promote";
 import { readRecipe, type SheetTheme, writeRecipeSheets } from "./recipe-sheets";
@@ -64,6 +64,24 @@ function positiveNumber(value: string, flag: string): number {
 	return number;
 }
 
+function reviewNotes(file: string | undefined): Map<string, string> {
+	const notes = new Map<string, string>();
+	if (file === undefined) return notes;
+	const value: unknown = JSON.parse(readFileSync(file, "utf8"));
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		throw new Error("--notes expects an object mapping mark slugs to reviewer notes.");
+	}
+	for (const [slug, note] of Object.entries(value)) {
+		if (typeof note !== "string" || !reviewNoteFits(note)) {
+			throw new Error(
+				`--notes: ${slug} needs a text note of at most ${REVIEW_NOTE_MAX_BYTES} UTF-8 bytes.`,
+			);
+		}
+		notes.set(slug, note);
+	}
+	return notes;
+}
+
 const recipeSlugs = () =>
 	new Set(
 		readdirSync(recipesDir)
@@ -90,12 +108,9 @@ switch (command) {
 			...(values.slugs ? { slugs: values.slugs.split(",").map((slug) => slug.trim()) } : {}),
 			...(values.sample ? { sample: positiveNumber(values.sample, "sample") } : {}),
 		});
+		const notes = reviewNotes(values.notes);
 		await mkdir(store.root, { recursive: true });
 		const access = { accountId: SKETCHI_ACCOUNT_ID, token };
-		// Reviewer notes by slug, for redrawing marks a review rejected.
-		const notes = values.notes
-			? (JSON.parse(readFileSync(values.notes, "utf8")) as Record<string, string>)
-			: {};
 		const runId = values.run;
 		const outcome = await runBatch({
 			marks,
@@ -106,15 +121,18 @@ switch (command) {
 				first: values.author === "source" ? "source" : author(values.author),
 				retry: author(values.retry),
 			},
-			draw: (mark, model, attempt) =>
-				drawMark(access, {
+			ceilingUsd: (model, mark) => attemptCeilingUsd(model, notes.get(mark.slug)),
+			draw: (mark, model, attempt) => {
+				const note = notes.get(mark.slug);
+				return drawMark(access, {
 					slug: mark.slug,
 					name: mark.name,
 					author: model,
 					traceId: `icon-batch-${runId}-${mark.slug}-${attempt}`,
 					loadCatalogSvg: loadSvg,
-					...(Object.hasOwn(notes, mark.slug) ? { note: notes[mark.slug] } : {}),
-				}),
+					...(note === undefined ? {} : { note }),
+				});
+			},
 			log: (line) => process.stdout.write(`${line}\n`),
 		}).catch((error: unknown) => {
 			if (!(error instanceof BatchWriteError)) throw error;
@@ -130,8 +148,13 @@ switch (command) {
 			process.exitCode = 1;
 			break;
 		}
+		if (outcome.unresolved.length > 0) {
+			process.stderr.write(
+				`Unresolved attempts (ceiling charged; not replayed): ${outcome.unresolved.join(", ")}. Reconcile their mark records before retrying them.\n`,
+			);
+		}
 		process.stdout.write(
-			`${outcome.settled} settled, ${outcome.pending} pending, $${outcome.spentUsd.toFixed(2)} spent${outcome.capped ? " (stopped at the spend cap)" : ""}.\n`,
+			`${outcome.settled} settled, ${outcome.pending} pending, $${outcome.spentUsd.toFixed(2)} accounted${outcome.capped ? " (stopped at the spend cap)" : ""}.\n`,
 		);
 		process.stdout.write(await writeLedger());
 		break;

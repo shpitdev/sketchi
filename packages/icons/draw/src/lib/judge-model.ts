@@ -147,9 +147,11 @@ export const makeJudgeCall = (options: {
 			}),
 			Effect.retry(options.retry),
 		);
+		const inputTokens = reply.response?.usage.inputTokens.uncached;
+		const outputTokens = reply.response?.usage.outputTokens.total;
 		const usage = {
-			inputTokens: reply.response?.usage.inputTokens.uncached ?? 0,
-			outputTokens: reply.response?.usage.outputTokens.total ?? 0,
+			inputTokens: inputTokens ?? 0,
+			outputTokens: outputTokens ?? 0,
 			cacheReadTokens: reply.response?.usage.inputTokens.cacheRead ?? 0,
 			cacheWriteTokens: reply.response?.usage.inputTokens.cacheWrite ?? 0,
 		};
@@ -162,6 +164,12 @@ export const makeJudgeCall = (options: {
 		const finishedAt = yield* Clock.currentTimeMillis;
 		return {
 			text: String.trim(reply.response?.text ?? ""),
-			call: { role: "judge", model, usage, ms: finishedAt - startedAt },
+			call: {
+				role: "judge",
+				model,
+				usage,
+				ms: finishedAt - startedAt,
+				usageReported: inputTokens !== undefined && outputTokens !== undefined,
+			},
 		} satisfies JudgeCallReply;
 	});

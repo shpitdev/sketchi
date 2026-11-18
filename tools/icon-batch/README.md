@@ -57,18 +57,27 @@ pnpm nx draw icon-batch -- recipe-sheets --collection palantir --theme dark
   the most it can cost: every author call the engine allows at its output
   limit, about $0.46 on Sonnet and $0.85 on Opus (a draw whose author the
   source will choose holds Opus's), where a typical draw costs $0.02. A draw
-  that does not fit waits for in-flight attempts to checkpoint. Each attempt
-  is recorded atomically in `.memory/icon-batch/<run>/marks/<slug>.json`.
+  that does not fit waits for in-flight attempts to checkpoint. Use one
+  `draw` process per run. Before dispatch, the batch atomically records the
+  attempt's ceiling in `.memory/icon-batch/<run>/marks/<slug>.json`. The
+  completed attempt replaces that reservation in the same record.
   An unpriced draw with complete usage counts at its token estimate. An
   unpriced draw that dispatched a POST without complete usage counts at its
   ceiling, even if no log ID came back. A failure before dispatch costs zero.
 - A write failure stops new draws. Admitted draws finish and the command
   reports the full accounted spend before it exits with an error. A preview
-  failure does not discard the recipe or its charge. If a mark record could
-  not be written, repair the store and reconcile the replacement JSON printed
-  on stderr before resuming; the prior checkpoint remains intact.
+  failure does not discard the recipe or its charge. If a result could not
+  be saved or the process died after reserving it, the next run counts the
+  unresolved reservation at its ceiling and skips that mark, even if the
+  cap has room. `summary` includes unresolved reservations in its spend.
+  Repair the store and replace the mark record with the recovery JSON from
+  stderr if available. Otherwise check the gateway trace for that mark and
+  attempt (`attempts.length`); leave the reservation in place if the charge
+  or dispatch is uncertain. Do not delete it to retry a possibly paid draw.
 - `--notes notes.json` (`{ "slug": "what the last drawing lost" }`) hands
   the author a reviewer's note on a mark a review rejected, for a redraw.
+  Notes are limited to 1,024 UTF-8 bytes each and increase the reservation
+  for every author round that can read them.
 - A mark the judge does not pick out of its look-alikes, or one that ends
   without a drawing, can get one separately budgeted draw with `--retry`
   (Opus 5.5). If that misses too, it stays out and the summary lists it.

@@ -365,7 +365,8 @@ export const drawIconFromBody = Effect.fn("playground.icons.draw")(function* (
 		yield* Effect.annotateCurrentSpan({ "sketchi.icon.failure": outcome.failure._tag });
 		return done(errorFailure(outcome.failure));
 	}
-	return done({ ok: true, status: "drawn", ...outcome.success });
+	const { usageReported: _usageReported, ...drawn } = outcome.success;
+	return done({ ok: true, status: "drawn", ...drawn });
 });
 
 class CurrentIconDrawRequest extends Context.Service<

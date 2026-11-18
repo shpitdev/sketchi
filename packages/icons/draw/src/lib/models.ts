@@ -41,16 +41,22 @@ export function iconAuthorModel(model: string): IconAuthorModel | undefined {
 	);
 }
 
+/** Internal accounting extends the wire call without changing its schema. */
+export interface AccountedModelCall extends ModelCall {
+	/** False when the provider omitted usage; zero-filled totals are not a price estimate. */
+	readonly usageReported: boolean;
+}
+
 export interface AuthorCallReply {
 	/** The assistant prompt, with provider thinking metadata for replay in the next round. */
 	readonly content: Prompt.Prompt;
 	readonly text: string;
-	readonly call: ModelCall;
+	readonly call: AccountedModelCall;
 }
 
 export interface JudgeCallReply {
 	readonly text: string;
-	readonly call: ModelCall;
+	readonly call: AccountedModelCall;
 }
 
 export class IconDrawModels extends Context.Service<
