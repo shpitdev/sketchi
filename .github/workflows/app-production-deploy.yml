@@ -8,7 +8,7 @@ on:
     # What a Worker build reads: every project in the Worker apps' build graph (apps, packages,
     # Studio's tools/scenarios dependency), the tools/ops files their Vite configs import, and the
     # root files in Nx's sharedGlobals. The rest of tools/ops is deploy tooling no bundle contains,
-    # so a push to it, docs or CI starts nothing.
+    # so a push of only that, root docs or .github starts nothing.
     paths:
       - "apps/**"
       - "packages/**"

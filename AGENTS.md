@@ -67,7 +67,8 @@ most `<name>.test.ts`, `<name>-fuzz.test.ts` and `regressions.test.ts`, in a
 - Messages between agents are at most five lines plus a file path.
 - Anything touching production, and any failed pre-deploy check, goes to Fable
   first. Only the user or Fable starts a production deploy, dispatches
-  `release.yml`, or merges a change that starts a release. On main, a push under
+  `release.yml`, or merges a change that starts a release or a production deploy
+  (a push to main that reaches a Worker app's build; see below). On main, a push under
   `.changeset/` runs `changesets.yml`, which merges the Version Packages PR and
   dispatches `release.yml`; a push that changes `apps/cli/package.json` starts
   `release.yml` directly. `release.yml` submits `npm publish` only for an untagged,
@@ -151,15 +152,20 @@ apps it affects on every push (closing the PR deletes them), or dispatch
 stacked PR or a specific app such as `studio`; a dispatch also adds
 the label.
 
-A push to main deploys to production the Worker apps whose build it reaches
-(`app-production-deploy`, filtered to `apps/`, `packages/`, `tools/scenarios/`,
-the `tools/ops` files the app builds import and Nx's shared root inputs). Docs,
-CI and other tooling pushes deploy nothing. Dispatch `app-production-deploy` to
-deploy every app or one, or to attach or detach production domains.
-
 Keep the label off between proof runs: dispatch the project you need, then remove
 the label the dispatch adds. Routing/rendering proof uses the preview MCP (`pr-<N>-sketchi-studio`), relevant scenario replay and a small
 bounded set of inspected PNGs.
+
+A push to main deploys to production the Worker apps whose build it reaches
+(`app-production-deploy`, filtered to `apps/`, `packages/`, `tools/scenarios/`,
+the `tools/ops` files the app builds import and Nx's shared root inputs). A push
+of only root docs (`docs/`, root Markdown), `.github` or other tooling starts
+nothing. Selection is conservative: any app file outside Nx's `production`
+exclusions (tests, `tests/`, stories, `.storybook/`, snapshots,
+`tsconfig.spec.json`) redeploys that app, its README and test config included,
+and a push mixing app and `tools/ops` changes redeploys every app. Apps deploy
+in parallel and there is no approval gate. Dispatch `app-production-deploy` to
+deploy every app or one, or to attach or detach production domains.
 
 For UI-affecting changes, verify the changed flow against the real page with
 `agent-browser` on the PR preview or production, headless (its default). Never open a visible browser window on the owner's machine (`--headed` or any automation that pops up).
