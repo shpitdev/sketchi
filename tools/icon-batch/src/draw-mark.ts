@@ -20,7 +20,7 @@ import {
 import { TelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Layer, Result } from "effect";
 
-import { type GatewayAccess, httpGateway, readLogCosts, SKETCHI_GATEWAY_ID } from "./gateway";
+import { type GatewayAccess, httpGateway, priceLogs, SKETCHI_GATEWAY_ID } from "./gateway";
 import { NodeIconImaging } from "./imaging";
 
 /**
@@ -153,26 +153,6 @@ export interface DrawMarkRequest {
 	readonly note?: string;
 }
 
-/**
- * What the gateway's logs priced these calls at, or undefined while any is
- * unpriced or the logs cannot be read: a paid draw is kept either way, with its
- * log ids, so its price can be read later.
- */
-export async function priceLogs(
-	access: GatewayAccess,
-	logIds: readonly string[],
-	options?: { readonly attempts?: number; readonly waitMs?: number },
-): Promise<number | undefined> {
-	try {
-		const costs = await readLogCosts(access, SKETCHI_GATEWAY_ID, logIds, options);
-		return costs.every((entry) => entry.cost !== undefined)
-			? costs.reduce((sum, entry) => sum + (entry.cost ?? 0), 0)
-			: undefined;
-	} catch {
-		return undefined;
-	}
-}
-
 /** One draw through the service's engine, with its spend read back from the gateway. */
 export async function drawMark(
 	access: GatewayAccess,
@@ -233,7 +213,7 @@ export async function drawMark(
 			message: cause instanceof Error ? cause.message : String(cause),
 		});
 	}
-	const costUsd = await priceLogs(access, logIds);
+	const costUsd = await Effect.runPromise(priceLogs(access, logIds));
 	if (Result.isFailure(outcome)) {
 		const error = outcome.failure;
 		return {
