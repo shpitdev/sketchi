@@ -272,12 +272,15 @@ function recordStreamedBody(
 		Deferred.doneUnsafe(ended, Effect.succeed({ complete, text }));
 	};
 	const reader = stream.getReader();
+	let cancelling = false;
 	// Pulls one chunk per read, so the client's pace and its cancellation reach the source.
 	const body = new ReadableStream<Uint8Array>(
 		{
 			async pull(controller) {
 				try {
 					const chunk = await reader.read();
+					// Cancellation closes pending reads before the source's finalizers finish.
+					if (cancelling) return;
 					if (chunk.done) {
 						end(true);
 						controller.close();
@@ -286,13 +289,17 @@ function recordStreamedBody(
 					text += decoder.decode(chunk.value, { stream: true });
 					controller.enqueue(chunk.value);
 				} catch (error) {
+					if (cancelling) return;
 					end(false);
 					controller.error(error);
 				}
 			},
 			// The source's cancel resolves once its work has stopped and ended its spans, so the
 			// request's scope cannot close before them.
-			cancel: (reason) => reader.cancel(reason).finally(() => end(false)),
+			cancel(reason) {
+				cancelling = true;
+				return reader.cancel(reason).finally(() => end(false));
+			},
 		},
 		{ highWaterMark: 0 },
 	);
