@@ -11,7 +11,7 @@ Convex, Vercel, Bun, or Turborepo stack.
 - Prefer readable, tested package boundaries over compatibility layers.
 - Treat diagram generation as product-critical infrastructure: deterministic inputs, typed intermediate representation, functional tests, and Storybook coverage.
 - Delete obsolete approaches when replacing them. Do not carry parallel systems unless a migration step explicitly requires it.
-- Frontierclimb owns the graded catalogs `sketchi` and `sketchi-generate`, and currently calls Sketchi's scenario CLI for case discovery and deterministic grading. Preserve those real callers when moving scenarios to tools; do not add a parallel eval system or assume the existing graders are already copied to Frontierclimb.
+- Frontierclimb owns the graded catalogs `sketchi` and `sketchi-generate`, and currently calls Sketchi's scenario CLI for case discovery and deterministic grading from `tools/scenarios`. Preserve that real caller; do not add a parallel eval system or assume the existing graders are already copied to Frontierclimb.
 - Generation cost is product quality. A diagram that reads badly is a failure, and so is one that takes excess tokens, tool calls, retries or wall time to produce. Measure both before claiming an improvement.
 - Diagrams are Excalidraw sketches: keep them simple and readable at a glance. Prefer fewer elements and standard stroke widths to fine detail or thin lines. Size limits are ceilings, not targets: draw what the request needs, and keep each family to the size that still reads as a sketch.
 
@@ -45,32 +45,24 @@ most `<name>.test.ts`, `<name>-fuzz.test.ts` and `regressions.test.ts`, in a
 
 ## Delegated agents
 
-- One Codex primary in the canonical root owns the plan, Herdr coordination,
-  review routing, integration and staging PR. It does not implement product or
-  test changes. The current agreed primary model is `gpt-6.2-astra` with `high`
-  reasoning. The user will review and merge the final staging PR; do not merge
-  main autonomously during this restructure.
-- Authors use isolated Herdr worktrees and Codex models: `gpt-6.2-sol` with `high`
-  reasoning for straightforward work, `gpt-6.2-astra` with `xhigh` where the agreed
-  plan calls for architectural or graph work. Preserve explicit assignments.
-- Follow [the product structure plan](docs/plans/product-structure.md). Units
-  0–3 were serial. The user now permits up to four implementation authors with
-  demonstrably disjoint files, plus reviewers and verifiers as needed. Graph
-  stays single-author; the primary coordinates shared files and verification.
-- PR 810 finishes the restructure, all 15 families and the app work integrated
-  before graph acceptance. Remaining Effect work goes to coherent follow-up
-  PRs off main after the user merges 810. The plan's seven completion criteria
-  apply to the series; 810 explicitly lists its open mechanism rows.
-- Independent code review uses a separate read-only session, normally
-  `gpt-6.2-sol` with `high` reasoning and `codex review --base <parent>`.
-  Findings go back to the author once; the primary decides after recheck.
-  The same model in separate sessions is not self-review.
-- The existing user-selected Fable collaborator reviews the architecture after
-  unit 1, after units 2–3, after the shared graph split and before PR readiness.
-  This is a read-only role; do not spawn another Fable agent.
-- Browser and render verification uses Codex `gpt-6.2-sol` and the actual
-  product entrypoint. Preserve unfinished branches, worker evidence and user
-  focus when transferring ownership.
+- Fable is the coordinator and merger. It reviews architecture and merges each
+  accepted PR with `gh pr merge <n> --rebase --match-head-commit <sha>`; never
+  squash. It does not implement, and no agent spawns another Fable.
+- One primary coordinates and integrates. It routes work and reviews and reports
+  to Fable; it does not implement product or test changes.
+- Authors: one fresh author and isolated Herdr worktree per PR. The author gates
+  the pushed head, opens the PR to `main` and does not merge.
+- Reviewers: a separate, fresh, read-only session on a model the author did not
+  use, against the PR's base. Review tries to break the changed behaviour and sees
+  the tests fail. Findings go back to the author once; the primary decides after
+  recheck. Browser and render verification uses the actual product entrypoint.
+- Models: primary and authors use Claude Opus 5.5 (`cliproxy/claude-opus-5-5`)
+  high. Reviewers use `cliproxy/gpt-6.2-sol` or `cliproxy/gpt-6.2-astra` high,
+  whichever answers; if neither answers within five minutes, use a fresh Opus
+  session and say so. Launch with `pi --model <id> --thinking high '<task>'`.
+  Preserve explicit assignments.
+- Messages between agents are at most five lines plus a file path.
+- Only the user or Fable starts a production deploy or a package publish.
 
 ## Proof
 
@@ -79,7 +71,7 @@ double check that also catches a bad merge with the base. It is not the place fo
 heavy suites or timing-sensitive tests. If you find yourself fighting CI, verify
 the change locally and slim CI instead of adding to it.
 
-Choose each check for a concrete failure it could catch. Units that do not touch
+Choose each check for a concrete failure it could catch. Changes that do not touch
 layout, drawing or graph need no timing harness and no browser run unless they
 change UI behavior; use focused tests, the gate and independent review. Changes
 to layout, drawing or graph retain artifact identity, affected fuzz and timing.
@@ -94,12 +86,10 @@ scenario CLI smoke, typecheck/build/test, root TypeScript references and the
 `editor-surface` Storybook build. Checks reuse the native local task cache. Workflow
 changes select the native actionlint target. Full gates also run sampled routing.
 
-- Before publishing an accepted unit, run `pnpm ci:local --no-signoff`.
-  A unit may use `--base <last-fully-gated-staging-head>`; record that verified
-  base and reuse unchanged earlier proof. Documentation-only changes and
-  unchanged patches do not require a duplicate runtime gate.
-- Before PR readiness and signoff, run the full gate against `origin/main`.
-  Unit gates with a different base cannot post `local-ci`, even with `--all`.
+- Before pushing, run `pnpm ci:local --no-signoff`. `--base <ref>` compares
+  with another verified base; such a gate cannot post `local-ci`, even with
+  `--all`. Documentation-only changes and unchanged patches do not require a
+  duplicate runtime gate.
 - For signoff after the push, run `pnpm ci:local` on the pushed head. It refuses a dirty
   worktree or a HEAD the PR does not have, and on success posts the `local-ci`
   commit status that merging needs.
@@ -116,7 +106,7 @@ the gate derives individual target names from their configuration so native Nx 2
 input selection keeps family changes narrow. Nx CLI target lists do not expand
 wildcards, and an affected aggregate would pull every family dependency in.
 `drawing:test` owns only drawing tests. `diagrams:routing-sample` is selected by
-its native inputs in unit gates: graph, Flowchart, drawing, fonts and shared
+its native inputs in `--base` gates: graph, Flowchart, drawing, fonts and shared
 runtime/config. Full `origin/main`, signoff and `--all` always run it once.
 
 Build, typecheck and test targets reuse Nx's native local cache across worktrees.
@@ -153,16 +143,15 @@ the label.
 Production Worker deployment requires an explicit `app-production-deploy`
 workflow dispatch. Merging or pushing to main does not deploy production.
 
-For PR 810, keep the `preview` label off between proof runs. When a changed
-entrypoint needs a deployed preview, dispatch `app-preview` for the required
-project and remove the label it re-adds; existing previews remain available.
-Routing/rendering proof uses the normal preview MCP (`pr-<N>-sketchi-studio`),
-relevant scenario replay and a small bounded set of inspected PNGs. Official
-Cloudflare Worker Previews are already in use; no platform migration is needed.
+Keep the `preview` label off between proof runs. When a changed entrypoint needs
+a deployed preview, dispatch `app-preview` for the required project and remove the
+label it re-adds; existing previews remain available. Routing/rendering proof uses
+the preview MCP (`pr-<N>-sketchi-studio`), relevant scenario replay and a small
+bounded set of inspected PNGs.
 
 For UI-affecting changes, verify the changed flow against the real page.
 
-For real-page checks, use `agent-browser` against the PR preview or production, headless (its default) or with `-p browserbase`. Never open a visible browser window on the owner's machine (`--headed` or any automation that pops up).
+For real-page checks, use `agent-browser` against the PR preview or production, headless (its default). Never open a visible browser window on the owner's machine (`--headed` or any automation that pops up).
 
 ## Temporary Artifacts
 
