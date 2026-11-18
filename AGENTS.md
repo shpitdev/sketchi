@@ -57,10 +57,11 @@ most `<name>.test.ts`, `<name>-fuzz.test.ts` and `regressions.test.ts`, in a
   use, against the PR's base. Review tries to break the changed behaviour and sees
   the tests fail. Findings go back to the author once; the primary decides after
   recheck. Browser and render verification uses the actual product entrypoint.
-- Models: primary and authors use Claude Opus 5.5 (`cliproxy/claude-opus-5-5`)
-  high. Reviewers use `cliproxy/gpt-6.2-sol` or `cliproxy/gpt-6.2-astra` high,
-  whichever answers. Only if neither answers within five minutes may a fresh Opus
-  session review an Opus author's PR; say so. Launch with
+- Models: the primary is Claude Opus 5.5 (`cliproxy/claude-opus-5-5`) or
+  `cliproxy/gpt-6.2-astra`. Authors and reviewers default to `cliproxy/gpt-6.2-sol`
+  and `cliproxy/gpt-6.2-astra` high, with the reviewer on a model the author did
+  not use. If a model returns 503 for five minutes, switch to another and say so;
+  Claude Opus 5.5 is the fallback for any role. Launch with
   `/Users/anandpant/Library/pnpm/bin/pi --model <id> --thinking high '<task>'`.
   Preserve explicit assignments.
 - Messages between agents are at most five lines plus a file path.
