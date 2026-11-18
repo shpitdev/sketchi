@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off -- The package builder stages the compiled CLI and calls the native archive tools.
+
 import { mkdir, readdir, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

@@ -1,4 +1,6 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The detached clipboard helper owns native stdio and process unref during CLI exit.
 import { spawn } from "node:child_process";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The clipboard helper synchronously resolves host PATH entries.
 import { join } from "node:path";
 
 import { Context, type Duration, Effect, FileSystem, Layer } from "effect";
@@ -235,6 +237,7 @@ const runTool = ({ tool, args, env, stdin }: RunInput) =>
 			if (stderrEnded || !child.stderr) finish();
 			else {
 				child.stderr.once("end", finish);
+				// @effect-diagnostics-next-line globalTimers:off -- The unrefed timer bounds detached stdin handoff without keeping the CLI process alive.
 				setTimeout(finish, 250).unref();
 			}
 		});

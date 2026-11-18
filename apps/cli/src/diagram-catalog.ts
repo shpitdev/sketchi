@@ -68,6 +68,7 @@ export function relativeTime(time: number, now: number): string {
 	if (elapsed < DAY) return `${String(Math.floor(elapsed / HOUR))}h ago`;
 	if (elapsed < 2 * DAY) return "yesterday";
 	if (elapsed < 30 * DAY) return `${String(Math.floor(elapsed / DAY))}d ago`;
+	// @effect-diagnostics-next-line globalDate:off -- Format a supplied file timestamp for the catalog, without sampling the current clock.
 	return new Date(time).toISOString().slice(0, 10);
 }
 

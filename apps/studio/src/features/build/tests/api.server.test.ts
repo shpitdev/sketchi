@@ -496,6 +496,7 @@ describe("Code Mode API handlers", () => {
 						sizeBytes: 142,
 					},
 				],
+				// @effect-diagnostics-next-line globalDate:off -- The boundary fixture constructs explicit timestamps or measures elapsed time against the native host.
 				createdAt: new Date().toISOString(),
 			}),
 		);
@@ -545,6 +546,7 @@ describe("Code Mode API handlers", () => {
 						sizeBytes: 4,
 					},
 				],
+				// @effect-diagnostics-next-line globalDate:off -- The boundary fixture constructs explicit timestamps or measures elapsed time against the native host.
 				createdAt: new Date().toISOString(),
 			}),
 		);

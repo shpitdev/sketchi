@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// @effect-diagnostics nodeBuiltinImport:off -- The standalone toolchain verifier probes the actual installed executables and package manifests.
+
 // Verifies the pinned toolchain. It runs before and without workspace dependencies (the release
 // guard sets up no install), so it stays dependency-free JavaScript.
 import assert from "node:assert/strict";

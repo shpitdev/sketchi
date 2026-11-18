@@ -50,6 +50,7 @@ function transportFailure() {
 
 const request = Effect.fn("sketchi.cli.share.request")(function* (url: string, init: RequestInit) {
 	return yield* Effect.tryPromise({
+		// @effect-diagnostics-next-line globalFetchInEffect:off -- The external Excalidraw share backend uses the request signal and forbids redirects.
 		try: (signal) => fetch(url, { ...init, redirect: "error", signal }),
 		catch: transportFailure,
 	});

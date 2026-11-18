@@ -293,6 +293,7 @@ function randomWireframe(r: Random, id: string): WireframeDiagram | undefined {
 }
 
 /** CI draws a small fixed sample; `WIREFRAME_FUZZ=full` runs the local proof. */
+// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 const FULL = process.env["WIREFRAME_FUZZ"] === "full";
 const WIREFRAMES = FULL ? 400 : 8;
 const SEEDS = FULL ? [5, 23, 61] : [5];
@@ -338,6 +339,7 @@ describe("wireframe fuzz", () => {
 					shortfalls.push(`${name}: ${widened.map((issue) => issue.message).join("; ")}`);
 			}
 			if (FULL)
+				// @effect-diagnostics-next-line globalConsole:off -- The offline fuzz run prints its reproduction data directly to the invoking terminal.
 				console.info(
 					`seed ${seed}: ${shortfalls.length} shortfalls of ${WIREFRAMES}\n${shortfalls.join("\n")}`,
 				);

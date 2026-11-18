@@ -133,6 +133,7 @@ describe("Studio diagram editor", () => {
 
 	it("keeps an edit made while saving as unsaved", async () => {
 		let finish: (value: unknown) => void = () => undefined;
+		// @effect-diagnostics-next-line newPromise:off -- The browser persistence fixture exposes pending native write callbacks to test draft ordering.
 		studio.save.mockReturnValue(new Promise((resolve) => (finish = resolve)));
 		renderEditor();
 		act(() => canvas.change?.(saved));
@@ -150,6 +151,7 @@ describe("Studio diagram editor", () => {
 	it("shows an edit made while the saved draft is being dropped as unsaved", async () => {
 		let dropped: () => void = () => undefined;
 		drafts.clear.mockReturnValueOnce(
+			// @effect-diagnostics-next-line newPromise:off -- The browser persistence fixture exposes pending native write callbacks to test draft ordering.
 			new Promise<undefined>((resolve) => (dropped = () => resolve(undefined))),
 		);
 		renderEditor();

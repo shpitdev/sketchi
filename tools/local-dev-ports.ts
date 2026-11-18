@@ -1,6 +1,7 @@
 const INSPECTOR_PORT_OFFSET = 10_000;
 
 function readPort(name: string, fallback: number): number {
+	// @effect-diagnostics-next-line processEnv:off -- Vite and the local dev bootstrap read the invoking process port override synchronously.
 	const raw = process.env[name]?.trim();
 	const value = raw ? Number.parseInt(raw, 10) : fallback;
 

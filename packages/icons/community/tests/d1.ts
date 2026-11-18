@@ -1,4 +1,6 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The D1 fixture reads the production SQL migrations into its temporary database.
 import { mkdir, mkdtemp, writeFile, rm } from "node:fs/promises";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The D1 fixture reads the production SQL migrations into its temporary database.
 import { resolve } from "node:path";
 import { getPlatformProxy } from "wrangler";
 import type { D1Client } from "@effect/sql-d1";

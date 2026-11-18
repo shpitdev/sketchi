@@ -73,6 +73,7 @@ export const readBoundedJson = Effect.fn("playground.http.readBoundedJson")(
 				}
 				const text = new TextDecoder().decode(bytes);
 				try {
+					// @effect-diagnostics-next-line globalJsonInEffect:off -- The bounded native reader preserves its malformed-JSON result and byte count for HTTP mapping.
 					return { bytesRead: byteLength, result: { _tag: "Body", body: JSON.parse(text) }, text };
 				} catch {
 					return { bytesRead: byteLength, result: { _tag: "InvalidJson" }, text };

@@ -1,4 +1,5 @@
 import { createRequire, registerHooks } from "node:module";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The Node editor shim resolves the installed browser bundle before loading it.
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -91,6 +92,7 @@ const editorModule = () =>
 export function withoutHeldTimers<T>(edit: () => T): T {
 	const setTimeout = globalThis.setTimeout;
 	globalThis.setTimeout = ((...args: Parameters<typeof setTimeout>) =>
+		// @effect-diagnostics-next-line globalTimers:off -- The foreign Excalidraw timer needs an unrefed Node handle so the scenario CLI can exit.
 		setTimeout(...args).unref()) as typeof globalThis.setTimeout;
 	try {
 		return edit();

@@ -1,3 +1,4 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- These synchronous host-native path calculations feed the scoped CLI filesystem operations.
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { Effect } from "effect";
@@ -47,6 +48,7 @@ export const writeExportFile = Effect.fn("sketchi.cli.export.writeFile")(functio
 	}
 	const temp = join(
 		resolvedParent,
+		// @effect-diagnostics-next-line cryptoRandomUUIDInEffect:off -- The on-disk export stage needs a process-independent unique temporary sibling.
 		`.${basename(destination)}.sketchi.${String(process.pid)}.${crypto.randomUUID()}`,
 	);
 	return yield* Effect.acquireUseRelease(

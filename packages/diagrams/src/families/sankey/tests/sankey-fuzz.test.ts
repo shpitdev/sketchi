@@ -1,5 +1,6 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The offline fuzz runner writes an optional failing scene to the requested diagnostic file.
 import { writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { getCanvasValidationIssues, type CanvasSpec } from "@sketchi/drawing";
@@ -200,6 +201,7 @@ function scaleIssues(diagram: SankeyDiagram, scene: CanvasSpec): string[] {
 }
 
 /** CI draws a small fixed sample; `SANKEY_FUZZ=full` runs the local proof. */
+// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 const FULL = process.env["SANKEY_FUZZ"] === "full";
 const COUNT = FULL ? 400 : 10;
 const SEEDS = FULL ? [7, 31, 59] : [7];
@@ -254,15 +256,18 @@ describe("Sankey fuzz", () => {
 				if (problems.length > 0) defects.push(`${name}: ${problems.slice(0, 3).join("; ")}`);
 				if (
 					(problems.length > 0 || bands.filter((band) => band.leader).length > 3) &&
+					// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 					process.env["SANKEY_FUZZ_DUMP"]
 				)
 					writeFileSync(
+						// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 						`${process.env["SANKEY_FUZZ_DUMP"]}/${diagram.id}.json`,
 						JSON.stringify(diagram),
 					);
 				if (shortfalls.length > 0 && shortfalls.at(-1)!.startsWith("aspect"))
 					shortfalls[shortfalls.length - 1] = `${name}: ${shortfalls.at(-1)}`;
 			}
+			// @effect-diagnostics-next-line globalConsole:off -- The offline fuzz run prints its reproduction data directly to the invoking terminal.
 			console.log(
 				`seed ${seed}: ${leaders} of ${values} values on leaders (${[...byShape].map(([shape, count]) => `${shape} ${count}`).join(", ")}); ${papers} labels on paper; ${shortfalls.length} shortfalls`,
 			);

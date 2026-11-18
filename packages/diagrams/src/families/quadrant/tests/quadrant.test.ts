@@ -20,6 +20,7 @@ import { renderQuadrantDiagram } from "../render";
 
 const storage = makeMemoryArtifactStorage();
 const environment = {
+	// @effect-diagnostics-next-line globalRandom:off -- The build test supplies opaque fixture IDs; their values do not affect the assertions.
 	createId: (prefix: string) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 };
 function run<A, E extends BuildRejection<unknown>>(

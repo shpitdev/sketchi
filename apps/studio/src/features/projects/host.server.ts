@@ -20,7 +20,7 @@ import { StudioBindings, StudioClock, StudioIds } from "../../server/context.ser
 export class StudioLocalBucket extends Context.Service<
 	StudioLocalBucket,
 	MemoryStudioObjectBucket
->()("@sketchi/studio/PlaygroundStudioLocalBucket") {}
+>()("@sketchi/studio/StudioLocalBucket") {}
 
 export const StudioLocalBucketLive = Layer.effect(
 	StudioLocalBucket,

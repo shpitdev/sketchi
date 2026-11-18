@@ -50,7 +50,7 @@ export interface StudioGenerationShape {
 }
 
 export class StudioGeneration extends Context.Service<StudioGeneration, StudioGenerationShape>()(
-	"@sketchi/studio/PlaygroundGeneration",
+	"@sketchi/studio/StudioGeneration",
 ) {}
 
 export const StudioGenerationLive = Layer.effect(
@@ -123,6 +123,7 @@ export const StudioGenerationLive = Layer.effect(
 				const client = yield* clientForBindings(env.AI, config.gatewayId, route);
 				// A revision keeps the logos its current diagram names, as well as any the request adds.
 				const logos = logosNamedIn(
+					// @effect-diagnostics-next-line globalJsonInEffect:off -- The prompt adapter preserves the exact JSON text appended for an existing base diagram.
 					input.base ? `${input.prompt}\n${JSON.stringify(input.base)}` : input.prompt,
 				);
 				return yield* client.generate({

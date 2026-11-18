@@ -1,4 +1,5 @@
 import { formatFiles, generateFiles, joinPathFragments, names, type Tree } from "@nx/devkit";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- Nx template generation needs a synchronous host path relative to the generator module.
 import path from "node:path";
 
 import { type UiComponentGeneratorSchema } from "./schema";

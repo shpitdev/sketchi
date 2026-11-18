@@ -34,6 +34,7 @@ export function httpGateway(
 	access: GatewayAccess,
 	track: { readonly onDispatch: () => void; readonly onLog: (logId: string) => void },
 ): CloudflareAiGatewayProvider {
+	// The HTTPS binding adapter passes the provider's signal through to the native host fetch.
 	const send = access.fetch ?? fetch;
 	return {
 		gateway(gatewayId: string): CloudflareAiGateway {

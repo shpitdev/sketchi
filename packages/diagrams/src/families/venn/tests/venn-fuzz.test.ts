@@ -131,6 +131,7 @@ function randomDiagrams(count: number, start: number): VennDiagram[] {
 const aspect = (scene: CanvasSpec) => scene.width / scene.height;
 
 /** CI draws a small fixed sample; `VENN_FUZZ=full` runs the local proof. */
+// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 const FULL = process.env["VENN_FUZZ"] === "full";
 const DIAGRAMS = FULL ? 300 : 12;
 const SEEDS = FULL ? [7, 31, 53] : [7];

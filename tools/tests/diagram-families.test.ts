@@ -58,6 +58,7 @@ describe("canonical diagram family consumers", () => {
 			const fixture = familyForType(family).fixture;
 			await Effect.runPromise(
 				Effect.gen(function* () {
+					// @effect-diagnostics-next-line globalJsonInEffect:off -- Encode the authored scenario fixture as JSON independently of the parser under test.
 					const document = yield* parseJsonDocument(JSON.stringify(documentFor(family)));
 					const builder = yield* DiagramBuilder;
 					const built = yield* builder.build(document);

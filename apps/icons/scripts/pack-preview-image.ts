@@ -1,5 +1,7 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- This offline asset builder reads SVG inputs and writes rendered preview files.
 import { readdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- This offline asset builder reads SVG inputs and writes rendered preview files.
 import { resolve } from "node:path";
 
 import { initWasm, Resvg } from "@resvg/resvg-wasm";

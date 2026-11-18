@@ -141,9 +141,11 @@ export function makeStudioChat(httpLayer = FetchHttpClient.layer) {
 				text = messageText(current.messages[index]);
 				current = { ...current, messages: current.messages.slice(0, index) };
 			}
+			// @effect-diagnostics-next-line cryptoRandomUUIDInEffect:off -- The browser assigns correlation and message IDs in the existing chat wire format.
 			const runId = crypto.randomUUID();
 			const messages = [
 				...current.messages,
+				// @effect-diagnostics-next-line cryptoRandomUUIDInEffect:off -- The browser assigns correlation and message IDs in the existing chat wire format.
 				{ id: crypto.randomUUID(), role: "user" as const, content: text },
 			];
 			get.set(state, { ...current, messages, status: "submitted", error: undefined });

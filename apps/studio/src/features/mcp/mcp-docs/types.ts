@@ -98,6 +98,7 @@ const sharedContracts = [
 	["CanvasSpec", CreateCanvasRequest.fields.spec],
 ] as const;
 
+// @effect-diagnostics-next-line schemaSync:off -- Decoding a shipped authoring example synchronously rejects broken static tool docs at load time.
 const record = Schema.decodeUnknownSync(Schema.Record(Schema.String, Schema.Unknown));
 
 function canonical(value: unknown): string {

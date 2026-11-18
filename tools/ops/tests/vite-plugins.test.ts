@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off -- The Vite plugin test constructs real package assets and temporary directories.
+
 // The build plugins the Worker apps load from tools/ops/src/vite, and the font files and cache
 // headers they ship.
 import { execFileSync } from "node:child_process";

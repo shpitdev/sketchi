@@ -1,3 +1,4 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The standalone Node renderer loads a local WASM asset before rasterizing icons.
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 

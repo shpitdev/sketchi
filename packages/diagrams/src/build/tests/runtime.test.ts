@@ -110,6 +110,7 @@ function expectGetOk(
 }
 
 function parseInlineScene(value: unknown) {
+	// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 	return Schema.decodeUnknownSync(CanvasSpec, {
 		errors: "all",
 		reportInput: true,

@@ -16,6 +16,7 @@ export const localFileSystemLive = Effect.runSync(
  * captured once. Tests swap `globalThis.fetch` per case, so they read it on every request.
  */
 export const swappableFetch = Layer.succeed(FetchHttpClient.Fetch, (input, init) =>
+	// @effect-diagnostics-next-line globalFetch:off -- Forward to the current fetch stub; the CLI test replaces it between cases.
 	globalThis.fetch(input, init),
 );
 

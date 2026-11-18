@@ -65,6 +65,7 @@ const STRESS_WALK = Array.from({ length: 30 }).reduce<number[]>((walk, _, index)
 export const laneStressFixtures: Readonly<
 	Record<"six-lanes-thirty-steps" | "cross-lane-loops", FlowchartDiagram>
 > = {
+	// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 	"six-lanes-thirty-steps": Schema.decodeUnknownSync(FlowchartDiagram)({
 		id: "six-lanes-thirty-steps",
 		title: "Thirty steps across six lanes",
@@ -95,6 +96,7 @@ export const laneStressFixtures: Readonly<
 		],
 		layout: { direction: "LR", edgeRouting: "orthogonal" },
 	}),
+	// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 	"cross-lane-loops": Schema.decodeUnknownSync(FlowchartDiagram)({
 		id: "cross-lane-loops",
 		title: "Loops across lanes",

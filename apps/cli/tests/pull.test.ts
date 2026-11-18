@@ -1,4 +1,6 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The CLI pull test verifies actual files written by the command in a temporary workspace.
 import { mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The CLI pull test verifies actual files written by the command in a temporary workspace.
 import { join, resolve } from "node:path";
 
 import { assert, describe, it } from "@effect/vitest";
@@ -61,6 +63,7 @@ describe("pull transaction", () => {
 					}
 					assert.deepStrictEqual(yield* Effect.promise(() => snapshotTree(record)), before);
 				}).pipe(
+					// @effect-diagnostics-next-line strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
 					Effect.provide(
 						Layer.mergeAll(
 							Layer.fresh(DiagramStoreLive).pipe(

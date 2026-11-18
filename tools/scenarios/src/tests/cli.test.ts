@@ -2,7 +2,9 @@
 // for a JSON grade on stdout, exit 0 or 1 for a grade and anything else for a crash.
 import { NodeFileSystem } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The scenario contract test reads and writes real command input and output files.
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The scenario contract test reads and writes real command input and output files.
 import path from "node:path";
 import { Cause, Effect, Exit, Fiber, Schema } from "effect";
 import { vi } from "vitest";
@@ -70,6 +72,7 @@ function grade(scenarioId: string, input: unknown) {
 		Effect.gen(function* () {
 			const inputPath = path.join(yield* workDir, "input.json");
 			yield* Effect.promise(() =>
+				// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 				writeFile(inputPath, typeof input === "string" ? input : JSON.stringify(input)),
 			);
 			const { stdout, exitCode } = yield* cli(["--scenario", scenarioId, "--input", inputPath]);
@@ -176,7 +179,9 @@ describe("scenario CLI", () => {
 					`${stdout}\n`,
 				);
 				const scene = yield* Effect.promise(() => readFile(scenePath, "utf8"));
+				// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 				assert.strictEqual(scene, `${JSON.stringify(JSON.parse(scene), null, 2)}\n`);
+				// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 				assert.property(JSON.parse(scene), "elements");
 				const candidatePath = path.join(candidateDir, `${onboarding.id}.candidate.txt`);
 				assert.deepStrictEqual(
@@ -265,6 +270,7 @@ describe("scenario CLI", () => {
 	for (const [name, argv] of usage)
 		it.effect(`exits 2 for ${name}`, () =>
 			Effect.gen(function* () {
+				// @effect-diagnostics-next-line processEnvInEffect:off -- The test sets or restores an endpoint override in the CLI’s actual host environment.
 				delete process.env.SKETCHI_TEST_UNSET_GENERATOR;
 				const { exit, exitCode } = yield* cli(argv);
 				assert.isTrue(Exit.isFailure(exit));
@@ -347,12 +353,15 @@ describe("generator command", () => {
 					const child = "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);";
 					const parent = [
 						"const { spawn } = require('node:child_process');",
+						// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 						`const child = spawn(process.execPath, ['-e', ${JSON.stringify(child)}], { stdio: 'ignore' });`,
+						// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 						`require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(child.pid));`,
 						child,
 					].join("");
 					const spec = {
 						args: [],
+						// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 						command: `${JSON.stringify(process.execPath)} -e ${JSON.stringify(parent)}`,
 						env: process.env,
 						shell: true,
@@ -362,6 +371,7 @@ describe("generator command", () => {
 						forceSettleGraceMs: 250,
 						hardKillGraceMs: 150,
 						timeoutMs: 500,
+						// @effect-diagnostics-next-line strictEffectProvide:off -- The test is the runtime entry point for this fixture layer.
 					}).pipe(Effect.provide(ToolProcessSpawnerLive), Effect.forkChild);
 					const descendant = yield* poll(
 						() =>

@@ -1,3 +1,4 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- These synchronous host-native path calculations feed the scoped CLI filesystem operations.
 import { join } from "node:path";
 
 import { Clock, Effect } from "effect";
@@ -33,6 +34,7 @@ export function makeCreate(
 						diagram.id,
 					);
 				}
+				// @effect-diagnostics-next-line globalDateInEffect:off -- Preserve ISO formatting of the timestamp already read from Effect Clock.
 				const createdAt = new Date(yield* Clock.currentTimeMillis).toISOString();
 				const manifest = DiagramRecordManifest.make({
 					schemaVersion: RECORD_SCHEMA_VERSION,

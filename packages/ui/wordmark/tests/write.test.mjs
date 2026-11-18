@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The build test reads the emitted wordmark bytes directly.
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 

@@ -9,6 +9,7 @@ import { DurableObject } from "cloudflare:workers";
  */
 export class ClientRateLimit extends DurableObject {
 	async take(limit: number, windowMs: number): Promise<ClientLimitDecision> {
+		// @effect-diagnostics-next-line globalDate:off -- The Durable Object records the wall clock used by its persisted rate-limit window and alarm.
 		const now = Date.now();
 		const decision = await takeClientRequest(this.ctx.storage, limit, windowMs, now);
 		// Once a window passes without a request there is nothing left to count.

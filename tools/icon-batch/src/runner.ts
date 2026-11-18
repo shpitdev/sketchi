@@ -146,6 +146,7 @@ const runWorkers = Effect.fn("sketchi.iconBatch.run")(function* (options: RunOpt
 			const reservation = ceiling(author, mark);
 			if (!(yield* claim(reservation))) return;
 			const index = attempts.length;
+			// @effect-diagnostics-next-line globalDateInEffect:off -- The persisted reservation records the wall-clock attempt start in the existing ledger format.
 			const startedAt = new Date().toISOString();
 			const checkpoint = settle(mark, attempts, false);
 			// Replacing this reservation with the result is one atomic mark write. A process

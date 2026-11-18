@@ -5,6 +5,7 @@
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
 	"plugins": [
 		"eslint",
+		"effecttsgo",
 		"import",
 		"jsx-a11y",
 		"node",
@@ -33,6 +34,17 @@
 		"reportUnusedDisableDirectives": "error"
 	},
 	"rules": {
+		// Apply the I/O boundary rules even to scripts outside the TypeScript reference graph.
+		"effecttsgo/global-fetch": "error",
+		"effecttsgo/global-fetch-in-effect": "error",
+		"effecttsgo/global-timers": "error",
+		"effecttsgo/global-timers-in-effect": "error",
+		"effecttsgo/new-promise": "error",
+		"effecttsgo/node-builtin-import": "error",
+		// Match the compiler: API maturity is not a correctness failure.
+		"effecttsgo/api-stability-leak": "off",
+		"effecttsgo/experimental-api-usage": "off",
+		"effecttsgo/unstable-api-usage": "off",
 		"eslint/eqeqeq": "error",
 		"eslint/no-restricted-imports": [
 			"error",

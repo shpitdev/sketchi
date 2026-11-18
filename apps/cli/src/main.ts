@@ -14,6 +14,7 @@ const main = cliProgram(process.argv.slice(2)).pipe(
 			process.exitCode = exitCode;
 		}),
 	),
+	// @effect-diagnostics-next-line strictEffectProvide:off -- The Node CLI entry point provides its host layer before runMain.
 	Effect.provide(MainLayer),
 );
 

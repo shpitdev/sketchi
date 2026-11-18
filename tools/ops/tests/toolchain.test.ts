@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off -- The toolchain smoke test invokes installed executables and inspects their manifests.
+
 // `tools/ops/verify-toolchain.mjs` against the real mise installation.
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";

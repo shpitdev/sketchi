@@ -74,7 +74,9 @@ describe("laned routing fuzz", () => {
 						.map((issue) => `${issue.elementId} on a lane boundary`),
 				].map((defect) => `${index}: ${defect}`);
 			});
+			// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 			if (process.env.PRINT_ROUTING)
+				// @effect-diagnostics-next-line globalConsole:off -- The offline fuzz run prints its reproduction data directly to the invoking terminal.
 				console.log("LABELS laned", direction, JSON.stringify(defects));
 			expect(
 				defects.filter((defect) => !KNOWN_LANED_LABEL_DEFECTS[direction].includes(defect)),
@@ -83,7 +85,9 @@ describe("laned routing fuzz", () => {
 
 		it("draws no laned flowchart with more crossings or reader-scale findings than pinned", () => {
 			const counts = rendered(direction).map((scene) => routingCounts(scene));
+			// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 			if (process.env.PRINT_ROUTING)
+				// @effect-diagnostics-next-line globalConsole:off -- The offline fuzz run prints its reproduction data directly to the invoking terminal.
 				console.log(
 					"PIN laned",
 					direction,

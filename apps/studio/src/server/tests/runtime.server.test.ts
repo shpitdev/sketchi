@@ -127,9 +127,11 @@ describe("Playground request runtime", () => {
 			const deferred = rows.find((row) => row.name === "playground.request.deferred");
 			assert.strictEqual(stream?.parent_span_id, root?.span_id);
 			assert.strictEqual(deferred?.parent_span_id, root?.span_id);
+			// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 			assert.deepInclude(JSON.parse(stream?.attributes ?? "{}"), {
 				"http.response.body": "data: one\n\ndata: é two\n\n",
 			});
+			// @effect-diagnostics-next-line globalJsonInEffect:off -- The test handles fixture JSON independently of the product codec.
 			assert.notProperty(JSON.parse(stream?.attributes ?? "{}"), "http.response.body.complete");
 			assert.include(deferred?.events, "late callback");
 			for (const row of rows) {
@@ -159,6 +161,7 @@ describe("Playground request runtime", () => {
 							Effect.withSpan("test.model.attempt"),
 							Effect.timeoutOrElse({
 								duration: "1 millis",
+								// @effect-diagnostics-next-line globalErrorInEffectFailure:off -- Inject an untagged host failure to exercise the request runtime failure boundary.
 								orElse: () => Effect.fail(new Error("model deadline")),
 							}),
 						)

@@ -49,6 +49,7 @@ function generationText(diagram: Readonly<Record<string, unknown>>): string {
 	// A drawn flowchart fixture reaches the model's answer as its document.
 	if (type === "flowchart" && Array.isArray(diagram["nodes"])) {
 		const { title: documentTitle, ...document } = scenarioFlowchartDocument(
+			// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 			Schema.decodeUnknownSync(FlowchartDiagram)(diagram),
 		);
 		return JSON.stringify({ title: documentTitle, diagram: { type, ...document } });
@@ -142,6 +143,7 @@ describe("generate responses installed CLIs can decode", () => {
 			if (!body.ok) return;
 			decoded.add(diagram.type);
 			const decode = (schema: Schema.Top & { readonly DecodingServices: never }, value: unknown) =>
+				// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 				Schema.decodeUnknownSync(schema)(value);
 			expect(() => decode(CanvasSpec, body.diagram?.scene)).not.toThrow();
 			expect(() => decode(ExcalidrawFile, body.diagram?.excalidraw)).not.toThrow();

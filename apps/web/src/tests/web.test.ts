@@ -1,3 +1,4 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The web integration harness starts the real app in a separate Node process.
 import { spawnSync } from "node:child_process";
 
 import { describe, expect, it, vi } from "vitest";

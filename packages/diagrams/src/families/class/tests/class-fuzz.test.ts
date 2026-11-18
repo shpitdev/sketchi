@@ -623,11 +623,13 @@ const CLASS_ROUTING = "0/0 0/0 0/0 0/2 0/0 0/0 0/2 0/0 0/0 1/0 0/0 0/1 0/0 0/0 0
 
 /** Models checked in CI; the full fuzz runs locally with CLASS_FUZZ=full (and any CLASS_FUZZ_SEED). */
 const CI_MODELS = 16;
+// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 const FULL = process.env["CLASS_FUZZ"] === "full";
 
 describe("class diagram routing fuzz", () => {
 	const models = randomModels(
 		FULL ? 240 : CI_MODELS,
+		// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 		Number(process.env["CLASS_FUZZ_SEED"] ?? 20261019),
 	);
 
@@ -649,7 +651,9 @@ describe("class diagram routing fuzz", () => {
 		const counts = models
 			.slice(0, CI_MODELS)
 			.map((model) => routingCounts(renderDiagram(model).pipe(Result.getOrThrow)));
+		// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 		if (process.env["PRINT_ROUTING"])
+			// @effect-diagnostics-next-line globalConsole:off -- The offline fuzz run prints its reproduction data directly to the invoking terminal.
 			console.log("PIN class", counts.map((c) => `${c.crossings}/${c.findings}`).join(" "));
 		const pinned = CLASS_ROUTING.split(" ").map((pair) => pair.split("/").map(Number));
 		const worse = counts.flatMap(({ crossings, findings }, index) => {
@@ -670,6 +674,7 @@ describe("class diagram routing fuzz", () => {
 /** Text-fit fuzz: member counts up to the limit and signatures up to the longest allowed. */
 describe("class diagram text fit fuzz", () => {
 	it("fits every compartment's text in its box at any member count and signature length", () => {
+		// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 		const { random, pick } = seeded(Number(process.env["CLASS_FUZZ_SEED"] ?? 7));
 		const failures: string[] = [];
 		for (let round = 0; round < (FULL ? 120 : 12); round += 1) {

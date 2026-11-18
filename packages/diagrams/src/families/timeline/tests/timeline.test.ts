@@ -90,6 +90,7 @@ describe("Code Mode native timeline", () => {
 			return {
 				id: `e${index + 1}`,
 				label: `Milestone ${index + 1} for the program`,
+				// @effect-diagnostics-next-line globalDate:off -- The boundary fixture constructs explicit timestamps or measures elapsed time against the native host.
 				date: new Date(day).toISOString().slice(0, 10),
 				lane: lanes[Math.floor((index * lanes.length) / TIMELINE_MAX_EVENTS)],
 			};

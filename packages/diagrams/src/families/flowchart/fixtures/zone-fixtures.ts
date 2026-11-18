@@ -213,6 +213,7 @@ const STRESS_EDGES: readonly (readonly [number, number])[] = [
 export const zoneStressFixtures: Readonly<
 	Record<"depth-four" | "thirty-services", FlowchartDiagram>
 > = {
+	// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 	"depth-four": Schema.decodeUnknownSync(FlowchartDiagram)({
 		id: "depth-four",
 		title: "Two availability zones, four zones deep",
@@ -251,6 +252,7 @@ export const zoneStressFixtures: Readonly<
 		],
 		layout: { direction: "LR", edgeRouting: "orthogonal" },
 	}),
+	// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 	"thirty-services": Schema.decodeUnknownSync(FlowchartDiagram)({
 		id: "thirty-services",
 		title: "Thirty services in eight zones",

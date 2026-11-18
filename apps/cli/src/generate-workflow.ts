@@ -1,3 +1,4 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The CLI translates host paths synchronously before handing them to its filesystem adapter.
 import { join, resolve } from "node:path";
 
 import { Effect } from "effect";

@@ -1,4 +1,6 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The renderer corpus harness loads fixture SVGs and writes pixel-comparison artifacts.
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The renderer corpus harness loads fixture SVGs and writes pixel-comparison artifacts.
 import { resolve } from "node:path";
 
 import { exportToSvg, restoreElements } from "@excalidraw/excalidraw";
@@ -348,6 +350,7 @@ describe("full corpus Excalidraw renderer", () => {
 		const renderer = await rendererReport();
 		const reportPath = resolve(
 			process.cwd(),
+			// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 			process.env.SVG_NATIVE_CORPUS_REPORT ?? ".memory/svg-native-corpus/native-renderer.json",
 		);
 		mkdirSync(resolve(reportPath, ".."), { recursive: true });

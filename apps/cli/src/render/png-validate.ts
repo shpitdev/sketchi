@@ -126,6 +126,7 @@ function hasValidInflatedPngData(
 			info: true,
 			maxOutputLength: MAX_DECOMPRESSED_BYTES,
 		});
+		// @effect-diagnostics-next-line schemaSync:off -- The native PNG validator synchronously checks the inflated bytes before returning its boundary result.
 		const decoded = Schema.decodeUnknownSync(InflatedPng)(result);
 		if (decoded.engine.bytesWritten !== compressed.byteLength) return false;
 		const inflated = decoded.buffer;

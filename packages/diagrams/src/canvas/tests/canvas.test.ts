@@ -175,6 +175,7 @@ function expectPatchFailure(
 }
 
 function parseInlineScene(value: unknown) {
+	// @effect-diagnostics-next-line schemaSync:off -- Decode an authored fixture synchronously so invalid test input fails at setup.
 	return Schema.decodeUnknownSync(CanvasSpec, {
 		errors: "all",
 		reportInput: true,
@@ -521,6 +522,7 @@ describe("limits", () => {
 		"returns a typed rejection for deeply nested unknown fields in %s",
 		async (operation) => {
 			// A Date leaf selects the recursive serializer even with Node's fast path.
+			// @effect-diagnostics-next-line globalDate:off -- The boundary fixture constructs explicit timestamps or measures elapsed time against the native host.
 			let nested: unknown = new Date(0);
 			for (let depth = 0; depth < 10_000; depth += 1) nested = [nested];
 			const scene = {

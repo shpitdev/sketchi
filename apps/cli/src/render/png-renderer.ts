@@ -28,6 +28,7 @@ function renderPng(input: PngRenderInput): Effect.Effect<Uint8Array, HeadlessPng
 			return runtime.renderPngBytes(input);
 		},
 		catch: (cause) =>
+			// @effect-diagnostics-next-line instanceOfSchema:off -- Dispatch on the concrete error from this local boundary; this is not decoding unknown input.
 			cause instanceof HeadlessPngRenderError
 				? cause
 				: HeadlessPngRenderError.make({
@@ -47,6 +48,7 @@ function normalizeExcalidraw(input: unknown): Effect.Effect<unknown, HeadlessPng
 			return runtime.normalizeExcalidrawArtifact(input);
 		},
 		catch: (cause) =>
+			// @effect-diagnostics-next-line instanceOfSchema:off -- Dispatch on the concrete error from this local boundary; this is not decoding unknown input.
 			cause instanceof HeadlessPngRenderError
 				? cause
 				: HeadlessPngRenderError.make({

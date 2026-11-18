@@ -1,3 +1,4 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- These synchronous host-native path calculations feed the scoped CLI filesystem operations.
 import { join } from "node:path";
 
 import { Effect } from "effect";
@@ -85,6 +86,7 @@ export function makeTransactions(
 		const source = recordPath(root.path, diagramId);
 		const backup = join(
 			root.path,
+			// @effect-diagnostics-next-line cryptoRandomUUIDInEffect:off -- The recovery protocol needs a unique on-disk backup name across processes.
 			`${BACKUP_PREFIX}${encodedId(diagramId)}.${String(process.pid)}.${crypto.randomUUID()}`,
 		);
 		yield* fs.rename(source, backup);

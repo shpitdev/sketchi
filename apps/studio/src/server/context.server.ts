@@ -17,13 +17,13 @@ export interface StudioRequestMetadataShape {
 }
 
 export class StudioBindings extends Context.Service<StudioBindings, StudioEnv>()(
-	"@sketchi/studio/PlaygroundBindings",
+	"@sketchi/studio/StudioBindings",
 ) {}
 
 export class StudioRequestMetadata extends Context.Service<
 	StudioRequestMetadata,
 	StudioRequestMetadataShape
->()("@sketchi/studio/PlaygroundRequestMetadata") {}
+>()("@sketchi/studio/StudioRequestMetadata") {}
 
 export interface StudioPlatformCallbacksShape {
 	readonly waitUntil: (effect: Effect.Effect<void, never, StudioRequestServices>) => void;
@@ -37,17 +37,18 @@ export interface StudioPlatformBoundaryShape {
 export class StudioPlatformCallbacks extends Context.Service<
 	StudioPlatformCallbacks,
 	StudioPlatformCallbacksShape
->()("@sketchi/studio/PlaygroundPlatformCallbacks") {}
+>()("@sketchi/studio/StudioPlatformCallbacks") {}
 
 export interface StudioIdsShape {
 	readonly create: (prefix: string) => string;
 }
 
 export class StudioIds extends Context.Service<StudioIds, StudioIdsShape>()(
-	"@sketchi/studio/PlaygroundIds",
+	"@sketchi/studio/StudioIds",
 ) {}
 
 export const StudioIdsLive = Layer.succeed(StudioIds, {
+	// @effect-diagnostics-next-line cryptoRandomUUID:off -- The Studio ID service implements the existing synchronous host ID contract.
 	create: (prefix) => `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`,
 });
 
@@ -57,11 +58,12 @@ export interface StudioClockShape {
 }
 
 export class StudioClock extends Context.Service<StudioClock, StudioClockShape>()(
-	"@sketchi/studio/PlaygroundClock",
+	"@sketchi/studio/StudioClock",
 ) {}
 
 export const StudioClockLive = Layer.succeed(StudioClock, {
 	nowMillis: Clock.currentTimeMillis,
+	// @effect-diagnostics-next-line globalDate:off -- Format an already acquired Effect Clock timestamp in the existing ISO representation.
 	nowIso: Clock.currentTimeMillis.pipe(Effect.map((millis) => new Date(millis).toISOString())),
 });
 

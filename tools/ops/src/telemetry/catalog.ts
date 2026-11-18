@@ -212,6 +212,7 @@ export function telemetryEnvironments(environment: string) {
 export const printResources = Effect.fn("ops.telemetry.resources")(function* (environment: string) {
 	const environments = yield* telemetryEnvironments(environment);
 	yield* Console.log(
+		// @effect-diagnostics-next-line globalJsonInEffect:off -- The catalog command writes the existing resource inventory JSON format.
 		JSON.stringify({ resources: environments.map((env) => telemetryTarget(env)) }, null, 2),
 	);
 });

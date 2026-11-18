@@ -38,6 +38,7 @@ function zoneName(offsetMinutes: number): string {
 /** Instants show in their shared offset, or in UTC when offsets differ. */
 function localDate(date: TimelineDate, offsetMinutes: number): LocalDate {
 	if (date.granularity !== "instant") return { granularity: date.granularity, ...date.fields };
+	// @effect-diagnostics-next-line globalDate:off -- The caption formats an explicit calendar timestamp, not the host clock.
 	const shifted = new Date(date.start + offsetMinutes * 60_000);
 	return {
 		granularity: "instant",

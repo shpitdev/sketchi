@@ -30,6 +30,7 @@ function harness(respond: (body: AgUiSchema.RunAgentInput, init: RequestInit) =>
 	disposers.push(() => registry.dispose());
 	const state = () => registry.get(chat.state);
 	const until = (test: (state: StudioChatState) => boolean) =>
+		// @effect-diagnostics-next-line newPromise:off -- The AG-UI transport fixture deliberately leaves a native callback pending.
 		new Promise<StudioChatState>((resolve) => {
 			let off = () => {};
 			const check = (value: StudioChatState) => {

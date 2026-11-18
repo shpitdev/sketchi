@@ -396,6 +396,7 @@ function backwardProblems(readout: GanttReadout): string[] {
  * Plans per fuzz. CI runs a handful; `pnpm nx run diagram-renderer:gantt-fuzz` runs 300 as
  * local proof when layout or routing changes.
  */
+// @effect-diagnostics-next-line processEnv:off -- The offline diagnostic runner reads its sample or output options from the invoking environment.
 const FUZZ_SEEDS = Number(process.env["GANTT_FUZZ_SEEDS"] ?? 4);
 const FUZZ_TIMEOUT = Math.max(60_000, FUZZ_SEEDS * 1_000);
 

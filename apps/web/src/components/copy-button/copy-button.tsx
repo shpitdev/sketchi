@@ -33,6 +33,7 @@ export function CopyButton({ value, label }: CopyButtonProps) {
 		}
 		setCopied(true);
 		clearTimeout(timer.current);
+		// @effect-diagnostics-next-line globalTimers:off -- The browser clears transient clipboard feedback, replacing the previous reset on another copy.
 		timer.current = setTimeout(() => setCopied(false), 1600);
 	}
 

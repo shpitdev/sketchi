@@ -1,6 +1,8 @@
 // @vitest-environment node
 
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The ASSETS test binding reads the actual catalog files from disk.
 import { mkdir, mkdtemp, writeFile, rm } from "node:fs/promises";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The ASSETS test binding reads the actual catalog files from disk.
 import { resolve } from "node:path";
 import { getPlatformProxy } from "wrangler";
 

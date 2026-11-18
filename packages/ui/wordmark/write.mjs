@@ -3,6 +3,7 @@
  * src/components/sketchi-wordmark-ink.ts from strokes.mjs. With `--check` it
  * only reports whether that file is current.
  */
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- The standalone wordmark generator writes its SVG before package build.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 

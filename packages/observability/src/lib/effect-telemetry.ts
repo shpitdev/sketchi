@@ -226,6 +226,7 @@ export const recordMetric = Effect.fn(function* (
 			attributes: normalized,
 			metric: metric.id,
 			metric_type: metric.type,
+			// @effect-diagnostics-next-line globalDateInEffect:off -- The exporter formats an acquired Effect Clock value in the existing Pipeline row format.
 			time: new Date(now).toISOString(),
 			value,
 		},
@@ -240,6 +241,7 @@ function randomHex(bytes: number): string {
 }
 
 function isoFromNanos(nanos: bigint): string {
+	// @effect-diagnostics-next-line globalDate:off -- The exporter preserves its existing ISO timestamps at the Pipeline row boundary.
 	return new Date(Number(nanos / 1_000_000n)).toISOString();
 }
 
@@ -328,6 +330,7 @@ class RequestSpans {
 
 	add(span: TelemetrySpan): void {
 		if (this.#spans) this.#spans.push(span);
+		// @effect-diagnostics-next-line globalConsole:off -- The telemetry sink reports to the host console without re-entering its own Effect logger.
 		else console.error("Span ended after its request's spans were sent", { name: span.name });
 	}
 
@@ -338,6 +341,7 @@ class RequestSpans {
 			this.#spans = undefined;
 			const failed = (cause: Cause.Cause<unknown>) =>
 				Effect.sync(() =>
+					// @effect-diagnostics-next-line globalConsoleInEffect:off -- The Pipeline export failure falls back to host console without re-entering this exporter.
 					console.error("Span export failed", {
 						error: toJsonValue(Cause.squash(cause)),
 						names: [...new Set(spans.map((span) => span.name))],
@@ -384,6 +388,7 @@ class SpanExporter implements TelemetryExporterShape {
 
 	/** A log or metric with no open span to hold it becomes a row of its own. */
 	standalone(event: TelemetryEvent, parent: Tracer.AnySpan | undefined): void {
+		// @effect-diagnostics-next-line globalDate:off -- The exporter preserves its existing ISO timestamps at the Pipeline row boundary.
 		const time = "time" in event ? event.time : new Date().toISOString();
 		const request = parent instanceof ExportingSpan ? parent.request : undefined;
 		this.finish(
@@ -464,6 +469,7 @@ class ExportingSpan extends Tracer.NativeSpan {
 		try {
 			this.#exporter.finish(this.#finished(endTime, exit), this.#request);
 		} catch (error) {
+			// @effect-diagnostics-next-line globalConsole:off -- The telemetry sink reports to the host console without re-entering its own Effect logger.
 			console.error("Span could not be recorded", { error: toJsonValue(error), name: this.name });
 		}
 	}
@@ -542,7 +548,9 @@ function makeTelemetryLogger(exporter: SpanExporter) {
 			type: "log",
 			...(parts.values.length > 0 ? { values: parts.values } : {}),
 		};
+		// @effect-diagnostics-next-line globalConsole:off -- The telemetry sink reports to the host console without re-entering its own Effect logger.
 		if (logLevel === "Warn") console.warn(event.message, event);
+		// @effect-diagnostics-next-line globalConsole:off -- The telemetry sink reports to the host console without re-entering its own Effect logger.
 		if (logLevel === "Error" || logLevel === "Fatal") console.error(event.message, event);
 		const parent = Context.getOrUndefined(fiber.context, Tracer.ParentSpan);
 		if (parent instanceof ExportingSpan && parent.record(event)) return;

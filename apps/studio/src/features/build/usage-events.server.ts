@@ -105,7 +105,7 @@ export interface StudioCodeModeUsageShape {
 export class StudioCodeModeUsage extends Context.Service<
 	StudioCodeModeUsage,
 	StudioCodeModeUsageShape
->()("@sketchi/studio/PlaygroundCodeModeUsage") {}
+>()("@sketchi/studio/StudioCodeModeUsage") {}
 
 /** The request's run and attempt, and a new event for this call. */
 const createCodeModeUsageContext = Effect.fn("playground.codeModeUsage.createContext")(

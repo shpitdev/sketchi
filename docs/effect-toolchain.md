@@ -21,20 +21,17 @@ name recognized by the native compiler; a separate TS6 language-service package
 is not needed. All native project targets and the tooling compiler use it.
 
 - The upstream correctness group is explicitly error, except maturity checks.
-- The Effect-native group, `runEffectInsideEffect`, `strictEffectProvide`, and
-  `schemaSyncInEffect` are warnings while their scopes await conversion.
-- Warnings do not change the compiler exit code. Correctness errors do.
+- Effect boundary errors, including raw I/O, layer lifetime, and synchronous
+  schema rules, fail the compiler. Advisory diagnostics do not affect its exit code.
 - `experimentalApiUsage`, `unstableApiUsage`, and `apiStabilityLeak` are off.
   Maturity alone does not reject an API.
 - Other upstream diagnostics retain their defaults. Suggestion output is
   omitted from compiler logs; style suggestions are not promoted to errors.
 
-Effect diagnostics run in the compiler. Oxlint retains its existing
-type-aware rules, custom plugins, and `denyWarnings` gate; it does not duplicate
-the Effect rules. This keeps migration warnings visible without relaxing the
-existing lint gate. The checked-in levels are the fixed policy for domain, server,
-React and tooling purposes in [Effect conventions](effect-conventions.md). Converted
-scopes promote the applicable native group; they do not narrow correctness.
+Oxlint's upstream `effecttsgo` plugin also enforces the raw I/O rules, including
+in JavaScript and standalone build scripts outside the compiler's project graph.
+Both runners recognize `@effect-diagnostics` directives. See
+[Effect conventions](effect-conventions.md) for exceptions and advisory rules.
 
 Slice 1c removes the old Effect exclusions and Promise/runtime syntax census after
 live diagnostic proof. Coverage is not identical: assigned `Promise.resolve`, `.then`
