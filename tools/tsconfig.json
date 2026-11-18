@@ -14,5 +14,5 @@
     },
     "composite": false
   },
-  "include": ["*.ts", "*.mts", "oxlint/*.ts", "storybook/**/*.tsx"]
+  "include": ["*.ts", "*.mts", "tests/**/*.ts", "oxlint/**/*.ts", "storybook/**/*.tsx"]
 }

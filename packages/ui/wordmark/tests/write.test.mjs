@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { OUTPUT, render } from "./write.mjs";
+import { OUTPUT, render } from "../write.mjs";
 
 test("the committed wordmark is what the strokes ink to", () => {
 	assert.equal(

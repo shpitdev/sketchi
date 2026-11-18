@@ -14,8 +14,8 @@ import {
 	withSpanContent,
 	withTelemetryCorrelation,
 	withTelemetryExport,
-} from "./effect-telemetry";
-import { toJsonValue } from "./json";
+} from "../effect-telemetry";
+import { toJsonValue } from "../json";
 import {
 	MAX_ROW_BYTES,
 	rowBatches,
@@ -23,7 +23,7 @@ import {
 	spanRows,
 	type TelemetrySpan,
 	type TelemetrySpanRow,
-} from "./rows";
+} from "../rows";
 
 const requestCounter = Metric.counter("sketchi_test_requests", {
 	description: "Test request count",
@@ -45,7 +45,7 @@ interface StreamField {
 }
 
 const streamSchema = JSON.parse(
-	readFileSync(new URL("../../spans.schema.json", import.meta.url), "utf8"),
+	readFileSync(new URL("../../../spans.schema.json", import.meta.url), "utf8"),
 ) as { readonly fields: readonly StreamField[] };
 
 function fakeExport(

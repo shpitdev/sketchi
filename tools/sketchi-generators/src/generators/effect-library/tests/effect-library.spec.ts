@@ -14,7 +14,7 @@ import {
 import { createRequire } from "node:module";
 import path from "node:path";
 
-import { effectLibraryGenerator } from "./effect-library";
+import { effectLibraryGenerator } from "../effect-library";
 
 const workspaceRequire = createRequire(path.join(workspaceRoot, "package.json"));
 const nxCli = workspaceRequire.resolve("nx/bin/nx.js");

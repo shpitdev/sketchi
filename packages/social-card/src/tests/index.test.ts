@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CARD_HEIGHT, CARD_WIDTH, card, renderCard, text, tile, wordmark } from "./index";
+import { CARD_HEIGHT, CARD_WIDTH, card, renderCard, text, tile, wordmark } from "../index";
 
 describe("renderCard", () => {
 	it("draws a 1200 by 630 PNG from the brand pieces", async () => {
