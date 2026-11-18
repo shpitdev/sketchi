@@ -8,7 +8,7 @@ import {
 import "@tanstack/react-start/server-only";
 
 import { normalizeIconSlug } from "@sketchi/diagrams/build";
-import { type CodeModeIssue } from "@sketchi/diagrams/build/contract";
+import { type BuildIssue } from "@sketchi/diagrams/build/contract";
 import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";
 import { type Effect } from "effect";
 
@@ -31,11 +31,11 @@ function groundSpecIcons(
 	logos: readonly OfferedLogo[],
 ): {
 	readonly input: StudioBuildFlowchartInput;
-	readonly issues: CodeModeIssue[];
+	readonly issues: BuildIssue[];
 } {
 	const offered = new Set(logos.map((logo) => logo.slug));
 	const fills = Boolean(input.spec.logos);
-	const issues: CodeModeIssue[] = [];
+	const issues: BuildIssue[] = [];
 	const bare = Object.entries(input.spec.nodes).flatMap(
 		([id, node]): { id: string; label: string; icon?: { slug: string } }[] =>
 			typeof node === "string"

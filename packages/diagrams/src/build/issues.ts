@@ -1,18 +1,18 @@
 import { inputIssues, formatContractSchemaError } from "./input";
-import { CodeModeIssue, type CodeModeIssueCode, type CodeModeIssueRef } from "./result";
+import { BuildIssue, type BuildIssueCode, type BuildIssueRef } from "./result";
 
 import { type Cause, Schema } from "effect";
 
 import { storageIssue, type ArtifactStorageError } from "./artifacts";
 
 export function issue(input: {
-	code: CodeModeIssueCode;
-	severity?: CodeModeIssue["severity"];
-	stage: CodeModeIssue["stage"];
-	ref?: CodeModeIssueRef;
+	code: BuildIssueCode;
+	severity?: BuildIssue["severity"];
+	stage: BuildIssue["stage"];
+	ref?: BuildIssueRef;
 	message: string;
 	hint: string;
-}): CodeModeIssue {
+}): BuildIssue {
 	return {
 		code: input.code,
 		severity: input.severity ?? "error",
@@ -27,8 +27,8 @@ export function issue(input: {
 export function codeModeInputIssues(
 	error: Schema.SchemaError,
 	hintFor?: (path: string) => string,
-	codeFor?: (path: string) => CodeModeIssueCode | undefined,
-): CodeModeIssue[] {
+	codeFor?: (path: string) => BuildIssueCode | undefined,
+): BuildIssue[] {
 	return inputIssues(formatContractSchemaError(error), hintFor, codeFor);
 }
 
@@ -44,7 +44,7 @@ export function storageFailureIssue(
 }
 
 export const FailureContextSchema = Schema.Struct({
-	issues: Schema.Array(Schema.toEncoded(CodeModeIssue)).pipe(Schema.mutable),
+	issues: Schema.Array(Schema.toEncoded(BuildIssue)).pipe(Schema.mutable),
 });
 
 /** A workflow's typed failure: the rejected status and the response context it carries. */
@@ -57,7 +57,7 @@ export interface CodeModeWorkflowFailure<Status extends string, C> extends Cause
 export function workflowFailure<
 	const Tag extends string,
 	const Statuses extends readonly string[],
-	C extends { readonly issues: CodeModeIssue[] },
+	C extends { readonly issues: BuildIssue[] },
 >(
 	tag: Tag,
 	status: Schema.Literals<Statuses>,

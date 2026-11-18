@@ -6,6 +6,6 @@ export {
 	type EditFlowchartResult,
 } from "./edit-flowchart-contract";
 export { formatContractSchemaError } from "./input";
-export { BuildOptions, CodeModeIssue, CodeModeIssueCodeSchema, CodeModeIssueRef } from "./result";
+export { BuildOptions, BuildIssue, BuildIssueCodeSchema, BuildIssueRef } from "./result";
 export { toCodeModeJsonSchema } from "./schema";
 export { SearchIconsRequest, SearchIconsResultSchema } from "./search-icons-contract";

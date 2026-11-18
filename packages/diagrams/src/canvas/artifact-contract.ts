@@ -1,4 +1,4 @@
-import { CodeModeIssue } from "../build/result";
+import { BuildIssue } from "../build/result";
 
 import { ArtifactFormatSchema, ArtifactProvenance } from "@sketchi/drawing/artifacts";
 import { Schema } from "effect";
@@ -41,7 +41,7 @@ export const GetArtifactRejected = Schema.Struct({
 		"expired",
 		"storage_failed",
 	]),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	issues: Schema.Array(BuildIssue).pipe(Schema.mutable),
 }).annotate({ identifier: undefined });
 
 export interface GetArtifactRejected extends Schema.Schema.Type<typeof GetArtifactRejected> {}

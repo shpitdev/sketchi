@@ -1,4 +1,4 @@
-import { type CodeModeIssue } from "../build/result";
+import { type BuildIssue } from "../build/result";
 import { canvasFailureStatus, canvasValidationIssues } from "../build/scene";
 
 import {
@@ -65,7 +65,7 @@ function hintForContractIssue(path: string): string {
 	return `Fix ${path} so it matches the Code Mode API contract.`;
 }
 
-function patchInputIssues(error: Schema.SchemaError): CodeModeIssue[] {
+function patchInputIssues(error: Schema.SchemaError): BuildIssue[] {
 	return codeModeInputIssues(error, hintForContractIssue, (path) =>
 		isPatchOperationNamePath(path) ? "unsupported_patch_operation" : undefined,
 	);
@@ -266,7 +266,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 		});
 	}
 	const beforeConnectivity = sourceConnectivity(scene);
-	let patchIssues: CodeModeIssue[] = [];
+	let patchIssues: BuildIssue[] = [];
 	for (const operation of request.operations) {
 		patchIssues = applyPatchOperation(scene, operation);
 		if (patchIssues.length > 0) break;

@@ -5,9 +5,9 @@ import {
 	SearchIconsRequest,
 	SearchIconsResultSchema,
 	BuildOptions,
-	CodeModeIssue,
-	CodeModeIssueCodeSchema,
-	CodeModeIssueRef,
+	BuildIssue,
+	BuildIssueCodeSchema,
+	BuildIssueRef,
 } from "@sketchi/diagrams/build/contract";
 import {
 	GetArtifactRequest,
@@ -83,9 +83,9 @@ export function contractForOperation(operation: CodeModeOperation) {
  * per-operation declarations stay small as families are added.
  */
 const sharedContracts = [
-	["IssueCode", CodeModeIssueCodeSchema],
-	["IssueRef", CodeModeIssueRef],
-	["Issue", CodeModeIssue],
+	["IssueCode", BuildIssueCodeSchema],
+	["IssueRef", BuildIssueRef],
+	["Issue", BuildIssue],
 	["BuildOptions", BuildOptions],
 	["Quality", flowchartBuild.accepted.fields.quality],
 	["ArtifactFormatRef", flowchartBuild.accepted.fields.artifact.fields.formats.schema.value],

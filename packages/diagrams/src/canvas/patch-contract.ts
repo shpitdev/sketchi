@@ -1,5 +1,5 @@
 import { contractDiscriminatorAnnotation } from "../build/input";
-import { CodeModeIssue } from "../build/result";
+import { BuildIssue } from "../build/result";
 
 import {
 	ArtifactBundleSchema,
@@ -255,7 +255,7 @@ export const ApplyDiagramPatchAccepted = Schema.Struct({
 	requestId: optionalContract(Schema.String),
 	sourceArtifactId: optionalContract(Schema.String),
 	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	issues: Schema.Array(BuildIssue).pipe(Schema.mutable),
 }).annotate({ identifier: undefined });
 
 export interface ApplyDiagramPatchAccepted extends Schema.Schema.Type<
@@ -278,7 +278,7 @@ export const ApplyDiagramPatchRejected = Schema.Struct({
 	requestId: optionalContract(Schema.String),
 	sourceArtifactId: optionalContract(Schema.String),
 	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	issues: Schema.Array(BuildIssue).pipe(Schema.mutable),
 }).annotate({ identifier: undefined });
 
 export interface ApplyDiagramPatchRejected extends Schema.Schema.Type<

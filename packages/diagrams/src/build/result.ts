@@ -1,5 +1,5 @@
 import { Schema, type Effect } from "effect";
-export const CODE_MODE_ISSUE_CODES = [
+export const BUILD_ISSUE_CODES = [
 	"missing_field",
 	"invalid_type",
 	"invalid_enum",
@@ -127,11 +127,11 @@ export const CODE_MODE_ISSUE_CODES = [
 	"icon_possible",
 ] as const;
 
-export const CodeModeIssueCodeSchema = Schema.Literals(CODE_MODE_ISSUE_CODES);
+export const BuildIssueCodeSchema = Schema.Literals(BUILD_ISSUE_CODES);
 
-export type CodeModeIssueCode = string;
+export type BuildIssueCode = string;
 
-export const CodeModeIssueKindSchema = Schema.Literals([
+export const BuildIssueKindSchema = Schema.Literals([
 	"request",
 	"diagram",
 	"node",
@@ -143,7 +143,7 @@ export const CodeModeIssueKindSchema = Schema.Literals([
 	"artifact",
 ]);
 
-export const CodeModeIssueStageSchema = Schema.Literals([
+export const BuildIssueStageSchema = Schema.Literals([
 	"input",
 	"canvas",
 	"flowchart",
@@ -155,30 +155,30 @@ export const CodeModeIssueStageSchema = Schema.Literals([
 	"coverage",
 ]);
 
-export const CodeModeIssueRef = Schema.Struct({
-	kind: CodeModeIssueKindSchema,
+export const BuildIssueRef = Schema.Struct({
+	kind: BuildIssueKindSchema,
 	id: Schema.optionalKey(Schema.NonEmptyString),
 	path: Schema.optionalKey(Schema.NonEmptyString),
 }).annotate({ identifier: undefined });
 
-export interface CodeModeIssueRef extends Schema.Schema.Type<typeof CodeModeIssueRef> {}
+export interface BuildIssueRef extends Schema.Schema.Type<typeof BuildIssueRef> {}
 
-export const CodeModeIssue = Schema.Struct({
+export const BuildIssue = Schema.Struct({
 	code: Schema.String,
 	/** info notes report what a build did for the caller; nothing to fix. */
 	severity: Schema.Literals(["error", "warning", "info"]),
-	stage: CodeModeIssueStageSchema,
-	ref: Schema.optionalKey(CodeModeIssueRef),
+	stage: BuildIssueStageSchema,
+	ref: Schema.optionalKey(BuildIssueRef),
 	message: Schema.NonEmptyString,
 	hint: Schema.NonEmptyString,
 }).annotate({ identifier: undefined });
 
-export interface CodeModeIssue extends Schema.Schema.Type<typeof CodeModeIssue> {}
+export interface BuildIssue extends Schema.Schema.Type<typeof BuildIssue> {}
 
 /** Accepted warning codes remain decodable by the released CLI. Rejected diagnostics are open. */
-export const PublishedBuildIssue = CodeModeIssue.mapFields((fields) => ({
+export const PublishedBuildIssue = BuildIssue.mapFields((fields) => ({
 	...fields,
-	code: CodeModeIssueCodeSchema,
+	code: BuildIssueCodeSchema,
 }));
 
 export interface DiagramCounts {
@@ -193,7 +193,7 @@ export interface QualityCheck {
 	readonly passed: boolean;
 	readonly severity: "error" | "warning";
 	readonly message: string;
-	readonly refs: CodeModeIssueRef[];
+	readonly refs: BuildIssueRef[];
 }
 
 export interface QualityReport {
@@ -209,7 +209,7 @@ export const QualityCheckSchema = Schema.Struct({
 	passed: Schema.Boolean,
 	severity: Schema.Literals(["error", "warning"]),
 	message: Schema.String,
-	refs: Schema.Array(CodeModeIssueRef).pipe(Schema.mutable),
+	refs: Schema.Array(BuildIssueRef).pipe(Schema.mutable),
 });
 
 export const QualityReportSchema = Schema.Struct({
@@ -262,15 +262,15 @@ export interface ArtifactBuildCapabilities<R> {
 		{
 			readonly status: "limit_exceeded" | "export_failed" | "storage_failed";
 			readonly partial?: PartialArtifactBundle;
-			readonly issues: CodeModeIssue[];
+			readonly issues: BuildIssue[];
 		},
 		R
 	>;
 }
 
-export function qualityIssues(quality: QualityReport): CodeModeIssue[] {
+export function qualityIssues(quality: QualityReport): BuildIssue[] {
 	return quality.checks.map((check) => ({
-		code: CodeModeIssueCodeFromString(check.code),
+		code: buildIssueCodeFromString(check.code),
 		severity: check.severity,
 		stage: "quality",
 		message: check.message,
@@ -281,7 +281,7 @@ export function qualityIssues(quality: QualityReport): CodeModeIssue[] {
 	}));
 }
 
-function CodeModeIssueCodeFromString(value: string): CodeModeIssueCode {
+function buildIssueCodeFromString(value: string): BuildIssueCode {
 	if (value === "generic_label" || value === "label_too_long" || value === "disconnected_graph") {
 		return value;
 	}

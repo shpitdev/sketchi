@@ -1,4 +1,4 @@
-import { type CodeModeIssue } from "../build/result";
+import { type BuildIssue } from "../build/result";
 import { cleanToolString } from "../clean-text";
 import { families } from "../family";
 
@@ -23,7 +23,7 @@ import { type CanvasInput } from "./input";
 
 export function canvasExportIssues(
 	validationIssues: ReturnType<typeof validateExcalidrawScene>["issues"],
-): CodeModeIssue[] {
+): BuildIssue[] {
 	return exportIssues(
 		// Canvas authoring permits intentional overlaps and connector crossings;
 		// these quality diagnostics are not hard structural export failures.
@@ -54,7 +54,7 @@ function canvasIconSlug(
 }
 
 /** Warnings for canvas icons that name no slug and carry no drawable recipe. */
-export function undrawableCanvasIconIssues(scene: CanvasInput): CodeModeIssue[] {
+export function undrawableCanvasIconIssues(scene: CanvasInput): BuildIssue[] {
 	return scene.elements.flatMap((element, index) => {
 		const ref = element.type === "icon" ? element : "icon" in element ? element.icon : undefined;
 		if (!ref) return [];

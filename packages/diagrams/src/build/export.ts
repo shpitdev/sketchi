@@ -1,4 +1,4 @@
-import { type CodeModeIssue, type ArtifactBuildCapabilities, type BuildDelivery } from "./result";
+import { type BuildIssue, type ArtifactBuildCapabilities, type BuildDelivery } from "./result";
 
 import { CANVAS_LIMITS, type CanvasSpec } from "@sketchi/drawing";
 import {
@@ -159,7 +159,7 @@ function sizeBytesForArtifactData(data: unknown): number {
 	return jsonSizeBytes(data);
 }
 
-function artifactExportIssues(error: ArtifactExportError): CodeModeIssue[] {
+function artifactExportIssues(error: ArtifactExportError): BuildIssue[] {
 	return [
 		issue({
 			code: "render_failed",
@@ -178,7 +178,7 @@ function artifactExportIssues(error: ArtifactExportError): CodeModeIssue[] {
 
 export function exportIssues(
 	validationIssues: ReturnType<typeof validateExcalidrawScene>["issues"],
-): CodeModeIssue[] {
+): BuildIssue[] {
 	return validationIssues.map((validationIssue) => {
 		const code =
 			validationIssue.code === "overlapping-arrow-segment"

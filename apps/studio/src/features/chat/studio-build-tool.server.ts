@@ -1,7 +1,7 @@
 import { type FamilyBuildOperation } from "@sketchi/diagrams/family";
 import "@tanstack/react-start/server-only";
 
-import { type BuildOptions, type CodeModeIssue } from "@sketchi/diagrams/build/contract";
+import { type BuildOptions, type BuildIssue } from "@sketchi/diagrams/build/contract";
 import {
 	type BuildRejection,
 	normalizeIconSlug,
@@ -26,7 +26,7 @@ const studioBuildRetries = Metric.counter("sketchi_chat_build_retries", {
 /** The shape every canonical Code Mode build result shares. */
 interface StudioBuildResult {
 	readonly ok: boolean;
-	readonly issues: readonly CodeModeIssue[];
+	readonly issues: readonly BuildIssue[];
 }
 
 export interface StudioBuildToolExecutor<Result, E = never, R = never> {
@@ -52,7 +52,7 @@ export interface StudioBuildTurn {
 		};
 		readonly attempts: number;
 		/** The issues of the turn's last rejected build, which the reply shows when nothing was saved. */
-		readonly rejected?: readonly CodeModeIssue[];
+		readonly rejected?: readonly BuildIssue[];
 	}>;
 }
 
@@ -60,7 +60,7 @@ export interface StudioBuildTurn {
 export interface StudioTurnOutcome {
 	readonly attempts: number;
 	readonly saved: boolean;
-	readonly rejected: readonly CodeModeIssue[];
+	readonly rejected: readonly BuildIssue[];
 }
 
 export function studioTurnOutcome(turn: StudioBuildTurn): Effect.Effect<StudioTurnOutcome> {
@@ -206,7 +206,7 @@ export function studioModelResult(result: unknown): StudioModelResult {
 	};
 }
 
-export const attemptLimitIssue: CodeModeIssue = {
+export const attemptLimitIssue: BuildIssue = {
 	code: "quality_below_threshold",
 	severity: "error",
 	stage: "quality",
@@ -215,7 +215,7 @@ export const attemptLimitIssue: CodeModeIssue = {
 	hint: "Explain that the draft needs another pass and invite the user to simplify or clarify the request.",
 };
 
-export const turnAlreadyAcceptedIssue: CodeModeIssue = {
+export const turnAlreadyAcceptedIssue: BuildIssue = {
 	code: "quality_below_threshold",
 	severity: "error",
 	stage: "quality",
@@ -243,10 +243,10 @@ export function groundOfferedLogos<Element extends LogoElement>(
 ): {
 	readonly changed: boolean;
 	readonly elements: Element[];
-	readonly issues: CodeModeIssue[];
+	readonly issues: BuildIssue[];
 } {
 	const offered = new Set(logos.map((logo) => logo.slug));
-	const issues: CodeModeIssue[] = elements.flatMap((element) =>
+	const issues: BuildIssue[] = elements.flatMap((element) =>
 		element.icon && !offered.has(normalizeIconSlug(element.icon.slug ?? ""))
 			? [
 					{
@@ -298,11 +298,11 @@ export function makeStudioBuildToolExecutor<
 	readonly decode: (input: unknown) => Effect.Effect<Input, BuildRejection<Result>>;
 	readonly build: (input: unknown) => Effect.Effect<Result, E, R>;
 	/** This tool's rejected result carrying one issue. */
-	readonly rejected: (issue: CodeModeIssue) => Result;
+	readonly rejected: (issue: BuildIssue) => Result;
 	readonly operation: StudioBuildOperation;
 	readonly ground?: (input: Input) => {
 		readonly input: Input;
-		readonly issues: readonly CodeModeIssue[];
+		readonly issues: readonly BuildIssue[];
 	};
 	/**
 	 * An accepted result that misses what the request states (a flowchart checked against the
