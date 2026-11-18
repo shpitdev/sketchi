@@ -6,7 +6,6 @@ import {
 	type ScenarioCheck,
 } from "./lib/evaluate";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { NodeFileSystem, NodeRuntime } from "@effect/platform-node";
 import {
@@ -441,7 +440,6 @@ const main = runScenarioCli(process.argv.slice(2)).pipe(
 	),
 );
 
-const entryPointPath = process.argv[1];
-if (entryPointPath && import.meta.url === pathToFileURL(entryPointPath).href) {
+if (import.meta.main) {
 	NodeRuntime.runMain(main.pipe(Effect.provide([ToolProcessSpawnerLive, NodeFileSystem.layer])));
 }
