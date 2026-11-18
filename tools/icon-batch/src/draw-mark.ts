@@ -74,9 +74,8 @@ const JUDGE_IMAGES = 6;
  * allows, each reading the instructions, every image so far and every earlier
  * reply at full length, all billed as cache writes, and each replying at its
  * output limit; then both judge calls. Measured draws cost a twentieth of it.
- * A provider error is retried by the engine but not billed. An author chosen
- * from the source is not known until the draw reads it, so it counts at the
- * dearer model.
+ * The batch does not replay model requests. An author chosen from the source
+ * is not known until the draw reads it, so it counts at the dearer model.
  */
 export function attemptCeilingUsd(author: BatchAuthor): number {
 	if (author === "source") {
@@ -122,7 +121,7 @@ export interface MarkAttempt {
 	readonly ms: number;
 	/** What the gateway's logs priced the attempt at; undefined while any call is unpriced. */
 	readonly costUsd?: number;
-	/** From token counts and list prices, for the spend stop. */
+	/** Token estimate or attempt ceiling when the charge is unknown. */
 	readonly estimatedCostUsd: number;
 	readonly logIds: readonly string[];
 	readonly previews?: { readonly png28: string; readonly png112: string };
@@ -143,7 +142,6 @@ export function drawName(name: string): string {
 export interface DrawMarkRequest {
 	readonly slug: string;
 	readonly name: string;
-	readonly svg: string;
 	readonly author: BatchAuthor;
 	/** Tags the attempt's gateway calls, so its logs can be found together. */
 	readonly traceId: string;
@@ -159,6 +157,7 @@ export async function drawMark(
 	request: DrawMarkRequest,
 ): Promise<MarkAttempt> {
 	const logIds: string[] = [];
+	let posts = 0;
 	const startedAt = new Date().toISOString();
 	const started = Date.now();
 	const layer = Layer.mergeAll(
@@ -174,7 +173,12 @@ export async function drawMark(
 				Layer.mergeAll(
 					Layer.succeed(
 						CloudflareAiGatewayBinding,
-						httpGateway(access, (logId) => logIds.push(logId)),
+						httpGateway(access, {
+							onDispatch: () => {
+								posts += 1;
+							},
+							onLog: (logId) => logIds.push(logId),
+						}),
 					),
 					Layer.succeed(IconDrawGatewayConfig, {
 						gatewayId: SKETCHI_GATEWAY_ID,
@@ -182,6 +186,7 @@ export async function drawMark(
 						surface: "icon-batch",
 						judgeModel: JUDGE_MODEL,
 						authorEffort: "low",
+						retryModelPosts: false,
 					}),
 				),
 			),
@@ -192,8 +197,10 @@ export async function drawMark(
 		| undefined;
 	let author = request.author === "source" ? undefined : request.author;
 	try {
+		const svg = await request.loadCatalogSvg(request.slug);
+		if (svg === undefined) throw new Error(`${request.slug} has no source SVG.`);
 		outcome = await Effect.runPromise(
-			prepareIconInput({ name: drawName(request.name), svg: request.svg }).pipe(
+			prepareIconInput({ name: drawName(request.name), svg }).pipe(
 				Effect.flatMap((input) => {
 					author ??= iconAuthorFor(input.source);
 					return drawIcon(input, {
@@ -213,7 +220,10 @@ export async function drawMark(
 			message: cause instanceof Error ? cause.message : String(cause),
 		});
 	}
-	const costUsd = await Effect.runPromise(priceLogs(access, logIds));
+	// A subset of the dispatched POSTs can never establish the full charge.
+	const costUsd =
+		posts === logIds.length ? await Effect.runPromise(priceLogs(access, logIds)) : undefined;
+	const ceiling = attemptCeilingUsd(author ?? request.author);
 	if (Result.isFailure(outcome)) {
 		const error = outcome.failure;
 		return {
@@ -221,7 +231,7 @@ export async function drawMark(
 			startedAt,
 			outcome: "failed",
 			error: { tag: error._tag, message: error.message },
-			calls: logIds.length,
+			calls: posts,
 			inputTokens: 0,
 			outputTokens: 0,
 			cacheReadTokens: 0,
@@ -229,8 +239,7 @@ export async function drawMark(
 			ms: Date.now() - started,
 			...(costUsd === undefined ? {} : { costUsd }),
 			// A failed draw reports no usage: until its logs are priced, count the most it could cost.
-			estimatedCostUsd:
-				costUsd ?? (logIds.length === 0 ? 0 : attemptCeilingUsd(author ?? request.author)),
+			estimatedCostUsd: costUsd ?? (posts === 0 ? 0 : ceiling),
 			logIds,
 		};
 	}
@@ -251,7 +260,11 @@ export async function drawMark(
 		cacheWriteTokens: result.usage.cacheWriteTokens,
 		ms: result.usage.ms,
 		...(costUsd === undefined ? {} : { costUsd }),
-		estimatedCostUsd: result.usage.byCall.reduce((sum, call) => sum + estimateCallCost(call), 0),
+		// The engine can return a recipe even when a judge or timed-out revision didn't report usage.
+		estimatedCostUsd:
+			posts > result.usage.calls
+				? ceiling
+				: result.usage.byCall.reduce((sum, call) => sum + estimateCallCost(call), 0),
 		logIds,
 		previews: result.previews,
 	};

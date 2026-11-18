@@ -21,7 +21,7 @@ export default defineConfig(() => ({
 		globals: true,
 		environment: "node",
 		server: { deps: { inline: true as const } },
-		include: ["src/**/*.test.ts"],
+		include: ["tests/**/*.test.ts"],
 		testTimeout: 60_000,
 		reporters: ["default"],
 		coverage: {

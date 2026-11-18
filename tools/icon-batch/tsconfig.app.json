@@ -4,7 +4,7 @@
     "noEmit": true,
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
   "references": [
     {
       "path": "../../packages/cloudflare/tsconfig.lib.json"

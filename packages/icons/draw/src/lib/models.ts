@@ -77,6 +77,8 @@ export interface IconDrawGatewayConfigValue {
 	readonly judgeModel: string;
 	/** How hard the author thinks; low is enough to draw a mark and keeps rounds short. */
 	readonly authorEffort: "low" | "medium" | "high";
+	/** Budgeted operators can forbid replay of a model request on ambiguous transport errors. */
+	readonly retryModelPosts?: false;
 }
 
 export class IconDrawGatewayConfig extends Context.Service<
@@ -107,12 +109,13 @@ export const IconDrawModelsGateway = Layer.effect(IconDrawModels)(
 		const binding = yield* CloudflareAiGatewayBinding;
 		const config = yield* IconDrawGatewayConfig;
 		const gateway = binding.gateway(config.gatewayId);
+		const retry = config.retryModelPosts === false ? Schedule.recurs(0) : transientRetry;
 
 		const author = makeAuthorCall({
 			gateway,
 			config,
 			timeoutMs: AUTHOR_TIMEOUT_MS,
-			retry: transientRetry,
+			retry,
 			transient: isTransient,
 			maxTokens: AUTHOR_MAX_TOKENS,
 		});
@@ -121,7 +124,7 @@ export const IconDrawModelsGateway = Layer.effect(IconDrawModels)(
 			gateway,
 			config,
 			timeoutMs: JUDGE_TIMEOUT_MS,
-			retry: transientRetry,
+			retry,
 			transient: isTransient,
 			maxOutputTokens: JUDGE_MAX_OUTPUT_TOKENS,
 		});

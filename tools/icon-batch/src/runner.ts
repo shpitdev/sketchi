@@ -1,4 +1,5 @@
 import type { IconAuthorModel } from "@sketchi/icon-draw";
+import { Data, Deferred, Effect, Result } from "effect";
 
 import { attemptCeilingUsd, type BatchAuthor, type MarkAttempt } from "./draw-mark";
 import type { CatalogMark } from "./selection";
@@ -17,10 +18,7 @@ export interface RunOptions {
 	readonly concurrency: number;
 	/** No draw starts once spend, with what is in flight, could pass this. */
 	readonly spendCapUsd: number;
-	/**
-	 * The service's author (`"source"`: chosen from the mark, as the service does); then one retry
-	 * with the stronger one for a mark the judge did not recognize.
-	 */
+	/** First author, then a separate stronger draw if the mark is not recognized. */
 	readonly authors: { readonly first: BatchAuthor; readonly retry: IconAuthorModel };
 	readonly draw: (mark: CatalogMark, author: BatchAuthor, attempt: number) => Promise<MarkAttempt>;
 	readonly log?: (line: string) => void;
@@ -35,6 +33,14 @@ export interface RunOutcome {
 	/** True when the spend cap left a mark unsettled. */
 	readonly capped: boolean;
 }
+
+export class BatchWriteError extends Data.TaggedError("BatchWriteError")<{
+	readonly message: string;
+	readonly spentUsd: number;
+	/** Full replacements for mark records that could not be saved. */
+	readonly unwritten: readonly MarkRecord[];
+	readonly cause: unknown;
+}> {}
 
 function settle(mark: CatalogMark, attempts: readonly StoredAttempt[], final: boolean): MarkRecord {
 	const recognized = attempts.findIndex((attempt) => attempt.judge?.recognizable === true);
@@ -57,118 +63,136 @@ function settle(mark: CatalogMark, attempts: readonly StoredAttempt[], final: bo
 	};
 }
 
-/**
- * Draw every mark that is not settled yet, a few at a time: the first author,
- * then one retry with the stronger author when the judge did not recognize the
- * drawing or no drawing came back. Each attempt is saved as it finishes, and
- * no draw starts that could take spend past the cap.
- */
-export async function runBatch(options: RunOptions): Promise<RunOutcome> {
-	const log = options.log ?? (() => undefined);
+const messageOf = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));
+
+const runWorkers = Effect.fn("sketchi.iconBatch.run")(function* (options: RunOptions) {
 	const ceiling = options.ceilingUsd ?? attemptCeilingUsd;
-	const existing = new Map((await options.store.records()).map((record) => [record.slug, record]));
-	let spent = [...existing.values()].reduce((sum, record) => sum + recordCost(record), 0);
-	let inFlight = 0;
+	const records = yield* Effect.tryPromise(() => options.store.records());
+	const existing = new Map(records.map((record) => [record.slug, record]));
+	const queue = options.marks.filter((mark) => existing.get(mark.slug)?.status === undefined);
+	let settled = options.marks.length - queue.length;
+	let spent = records.reduce((sum, record) => sum + recordCost(record), 0);
+	let held = 0;
 	let capped = false;
-	let waiting: Array<() => void> = [];
-	/**
-	 * Claim room under the cap for one attempt at its most: wait while attempts in
-	 * flight hold the room it needs, and give up only when nothing is in flight.
-	 */
-	const claim = async (author: BatchAuthor) => {
-		for (;;) {
-			if (spent + inFlight + ceiling(author) <= options.spendCapUsd) {
-				inFlight += ceiling(author);
+	let changed = Deferred.makeUnsafe<void>();
+	let firstFailure: { readonly operation: string; readonly cause: unknown } | undefined;
+	const unwritten: MarkRecord[] = [];
+
+	const wakeClaims = () => {
+		const previous = changed;
+		changed = Deferred.makeUnsafe();
+		Deferred.doneUnsafe(previous, Effect.void);
+	};
+	const stop = (operation: string, cause: unknown) => {
+		if (firstFailure !== undefined) return;
+		firstFailure = { operation, cause };
+		wakeClaims();
+	};
+	const claim = Effect.fnUntraced(function* (reservation: number) {
+		while (!firstFailure) {
+			if (spent + held + reservation <= options.spendCapUsd) {
+				held += reservation;
 				return true;
 			}
-			if (inFlight === 0) {
+			if (held === 0) {
 				capped = true;
 				return false;
 			}
-			await new Promise<void>((resolve) => waiting.push(resolve));
+			yield* Deferred.await(changed);
 		}
-	};
-	const release = (held: number) => {
-		inFlight -= held;
-		const woken = waiting;
-		waiting = [];
-		for (const wake of woken) wake();
-	};
+		return false;
+	});
+	const save = Effect.fnUntraced(function* (record: MarkRecord) {
+		const saved = yield* Effect.result(Effect.tryPromise(() => options.store.save(record)));
+		if (Result.isFailure(saved)) {
+			unwritten.push(record);
+			stop(`mark record for ${record.slug}`, saved.failure.cause);
+		} else if (record.status !== undefined) {
+			settled += 1;
+		}
+	});
 
-	const queue = options.marks.filter((mark) => existing.get(mark.slug)?.status === undefined);
-	let settled = options.marks.length - queue.length;
-	let next = 0;
-
-	const attempt = async (
-		mark: CatalogMark,
-		author: BatchAuthor,
-		index: number,
-	): Promise<StoredAttempt> => {
-		const held = ceiling(author);
-		const startedAt = new Date().toISOString();
-		try {
-			const { previews, ...stored } = await options
-				.draw(mark, author, index)
-				.catch((cause: unknown): MarkAttempt => ({
+	const plan: readonly BatchAuthor[] = [options.authors.first, options.authors.retry];
+	const work = Effect.fnUntraced(function* (mark: CatalogMark) {
+		if (firstFailure) return;
+		let attempts = [...(existing.get(mark.slug)?.attempts ?? [])];
+		if (attempts.length >= plan.length || attempts.some((done) => done.judge?.recognizable)) {
+			yield* save(settle(mark, attempts, true));
+			return;
+		}
+		for (const author of plan.slice(attempts.length)) {
+			const reservation = ceiling(author);
+			if (!(yield* claim(reservation))) return;
+			const index = attempts.length;
+			const startedAt = new Date().toISOString();
+			const { previews, ...stored } = yield* Effect.tryPromise(() =>
+				options.draw(mark, author, index),
+			).pipe(
+				Effect.orElseSucceed(({ cause }): MarkAttempt => ({
 					...(author === "source" ? {} : { author }),
 					startedAt,
 					outcome: "failed",
-					error: {
-						tag: "Defect",
-						message: cause instanceof Error ? cause.message : String(cause),
-					},
+					error: { tag: "Defect", message: messageOf(cause) },
 					calls: 0,
 					inputTokens: 0,
 					outputTokens: 0,
 					cacheReadTokens: 0,
 					cacheWriteTokens: 0,
 					ms: 0,
-					// Whether it reached a model is unknown, so it counts at its most.
-					estimatedCostUsd: held,
+					// A callback that throws without reporting dispatch is an unknown outcome.
+					estimatedCostUsd: reservation,
 					logIds: [],
-				}));
-			if (previews) await options.store.savePreviews(mark.slug, index, previews);
-			spent += attemptCost(stored);
-			return stored;
-		} finally {
-			release(held);
-		}
-	};
-
-	/** Settle one mark; false when the cap left it pending. */
-	const work = async (mark: CatalogMark) => {
-		let attempts = [...(existing.get(mark.slug)?.attempts ?? [])];
-		const plan: readonly BatchAuthor[] = [options.authors.first, options.authors.retry];
-		while (attempts.length < plan.length) {
-			if (attempts.some((done) => done.judge?.recognizable === true)) break;
-			const author = plan[attempts.length]!;
-			if (!(await claim(author))) return false;
-			attempts = [...attempts, await attempt(mark, author, attempts.length)];
-			const final = attempts.length >= plan.length || attempts.at(-1)?.judge?.recognizable === true;
-			await options.store.save(settle(mark, attempts, final));
-			const last = attempts.at(-1)!;
-			log(
-				`${mark.slug} ${(last.author ?? author).replace("anthropic/claude-", "")}: ${last.outcome === "failed" ? `failed (${last.error?.tag})` : last.judge?.recognizable ? "recognized" : `judge picked ${last.judge?.picked ?? "nothing"}`} $${attemptCost(last).toFixed(4)} ${(last.ms / 1000).toFixed(1)}s | spent $${spent.toFixed(2)}`,
+				})),
 			);
+			// Keep the reservation until the checkpoint finishes, even after this draw is priced.
+			// Admissions see either the whole reservation or the charge, never a gap or both.
+			if (previews) {
+				const preview = yield* Effect.result(
+					Effect.tryPromise(() => options.store.savePreviews(mark.slug, index, previews)),
+				);
+				if (Result.isFailure(preview)) stop(`previews for ${mark.slug}`, preview.failure.cause);
+			}
+			attempts = [...attempts, stored];
+			const record = settle(mark, attempts, attempts.length >= plan.length);
+			// The recipe and charge are still recoverable without its preview PNGs.
+			yield* save(record);
+			spent += attemptCost(stored);
+			held -= reservation;
+			wakeClaims();
+			options.log?.(
+				`${mark.slug} ${(stored.author ?? author).replace("anthropic/claude-", "")}: ${stored.outcome === "failed" ? `failed (${stored.error?.tag})` : stored.judge?.recognizable ? "recognized" : `judge picked ${stored.judge?.picked ?? "nothing"}`} $${attemptCost(stored).toFixed(4)} ${(stored.ms / 1000).toFixed(1)}s | spent $${spent.toFixed(2)}`,
+			);
+			if (record.status !== undefined) return;
 		}
-		await options.store.save(settle(mark, attempts, true));
-		settled += 1;
-		return true;
-	};
+	});
 
-	// A mark the cap leaves pending does not stop the others: a cheaper attempt may still fit.
-	const worker = async () => {
-		while (next < queue.length) {
-			const mark = queue[next]!;
-			next += 1;
-			await work(mark);
-		}
-	};
-	await Promise.all(Array.from({ length: Math.max(1, options.concurrency) }, worker));
+	// A cap rejection doesn't stop other marks: a cheaper draw may still fit.
+	// A write failure closes admissions instead of failing the traversal: already admitted
+	// draws must finish and checkpoint their cost, not be interrupted as if that were a refund.
+	yield* Effect.forEach(queue, work, {
+		concurrency: Math.max(1, Math.floor(options.concurrency)),
+		discard: true,
+	});
+	if (firstFailure !== undefined) {
+		const { operation, cause } = firstFailure;
+		const recovery =
+			unwritten.length === 0 ? "" : " Reconcile unwritten mark records before resuming.";
+		return yield* new BatchWriteError({
+			message: `Could not save ${operation}: ${messageOf(cause)}. Accounted $${spent.toFixed(4)}.${recovery}`,
+			spentUsd: spent,
+			unwritten,
+			cause,
+		});
+	}
 	return {
 		settled,
 		pending: options.marks.length - settled,
 		spentUsd: spent,
 		capped: capped && settled < options.marks.length,
-	};
+	} satisfies RunOutcome;
+});
+
+/** Own the worker traversal until every admitted draw has been accounted for. */
+export function runBatch(options: RunOptions): Promise<RunOutcome> {
+	return Effect.runPromise(runWorkers(options));
 }

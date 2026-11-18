@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { drawName } from "./draw-mark";
+import { drawName } from "../src/draw-mark";
 
 describe("drawName", () => {
 	it("keeps a name the draw input accepts", () => {

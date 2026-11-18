@@ -16,7 +16,7 @@ import { drawMark } from "./draw-mark";
 import { SKETCHI_ACCOUNT_ID } from "./gateway";
 import { promote } from "./promote";
 import { readRecipe, type SheetTheme, writeRecipeSheets } from "./recipe-sheets";
-import { runBatch } from "./runner";
+import { BatchWriteError, runBatch } from "./runner";
 import { marksToDraw } from "./selection";
 import { writeSheets } from "./sheets";
 import { RunStore } from "./store";
@@ -106,21 +106,30 @@ switch (command) {
 				first: values.author === "source" ? "source" : author(values.author),
 				retry: author(values.retry),
 			},
-			draw: async (mark, model, attempt) => {
-				const svg = await loadSvg(mark.slug);
-				if (svg === undefined) throw new Error(`${mark.slug} has no source SVG.`);
-				return drawMark(access, {
+			draw: (mark, model, attempt) =>
+				drawMark(access, {
 					slug: mark.slug,
 					name: mark.name,
-					svg,
 					author: model,
 					traceId: `icon-batch-${runId}-${mark.slug}-${attempt}`,
 					loadCatalogSvg: loadSvg,
 					...(Object.hasOwn(notes, mark.slug) ? { note: notes[mark.slug] } : {}),
-				});
-			},
+				}),
 			log: (line) => process.stdout.write(`${line}\n`),
+		}).catch((error: unknown) => {
+			if (!(error instanceof BatchWriteError)) throw error;
+			process.stderr.write(`${error.message}\n`);
+			for (const record of error.unwritten) {
+				process.stderr.write(
+					`${join(store.marksDir, `${record.slug}.json`)}:\n${JSON.stringify(record)}\n`,
+				);
+			}
+			return undefined;
 		});
+		if (outcome === undefined) {
+			process.exitCode = 1;
+			break;
+		}
 		process.stdout.write(
 			`${outcome.settled} settled, ${outcome.pending} pending, $${outcome.spentUsd.toFixed(2)} spent${outcome.capped ? " (stopped at the spend cap)" : ""}.\n`,
 		);

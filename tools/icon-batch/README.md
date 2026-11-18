@@ -27,7 +27,8 @@ flowchart LR
   `CF_AIG_TOKEN`, through the same `IconDrawModelsGateway` the Worker uses, so
   the public endpoint's per-client and daily limits do not apply. Each call is
   tagged with `sketchiTraceId = icon-batch-<run>-<slug>-<attempt>`, and each
-  attempt's cost is read back from the gateway's logs.
+  attempt's cost is read back from the gateway's logs. The batch never
+  retries a model POST; it only retries cost-log GETs.
 - **Imaging.** Studio's harness page draws logos on a browser canvas; here
   resvg draws them (as it did for the catalog's look-alike features) and
   Excalidraw's own SVG export, rasterized by resvg, renders the recipes, with
@@ -55,17 +56,22 @@ pnpm nx draw icon-batch -- recipe-sheets --collection palantir --theme dark
   take the run's spend past `--cap` (default $60). Each draw in flight holds
   the most it can cost: every author call the engine allows at its output
   limit, about $0.46 on Sonnet and $0.85 on Opus (a draw whose author the
-  source will choose holds Opus's), where a typical draw costs $0.02. A draw that does not fit waits for those in flight; the run leaves a
-  mark pending only when nothing is in flight. Every attempt is written to
-  `.memory/icon-batch/<run>/marks/<slug>.json` as it finishes, including one
-  whose price the gateway's logs could not give (it keeps its log ids and
-  counts at its token estimate, or its ceiling); running again resumes the
-  marks that are not settled.
+  source will choose holds Opus's), where a typical draw costs $0.02. A draw
+  that does not fit waits for in-flight attempts to checkpoint. Each attempt
+  is recorded atomically in `.memory/icon-batch/<run>/marks/<slug>.json`.
+  An unpriced draw with complete usage counts at its token estimate. An
+  unpriced draw that dispatched a POST without complete usage counts at its
+  ceiling, even if no log ID came back. A failure before dispatch costs zero.
+- A write failure stops new draws. Admitted draws finish and the command
+  reports the full accounted spend before it exits with an error. A preview
+  failure does not discard the recipe or its charge. If a mark record could
+  not be written, repair the store and reconcile the replacement JSON printed
+  on stderr before resuming; the prior checkpoint remains intact.
 - `--notes notes.json` (`{ "slug": "what the last drawing lost" }`) hands
   the author a reviewer's note on a mark a review rejected, for a redraw.
 - A mark the judge does not pick out of its look-alikes, or one that ends
-  without a drawing, gets one retry with `--retry` (Opus 5.5). If that misses
-  too, it stays out and the summary lists it.
+  without a drawing, can get one separately budgeted draw with `--retry`
+  (Opus 5.5). If that misses too, it stays out and the summary lists it.
 - `sheets` writes `sheets/recognized-NN.png` and `sheets/review-NN.png`: 32
   marks each, the source beside the drawing at 112 and 28 px, with the verdict,
   author, rounds, parts and cost.
