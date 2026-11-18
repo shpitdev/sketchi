@@ -73,7 +73,7 @@ The exact integrated Class gate `95a611a9` against `533b76e1` passes in 245.77 s
 apps/
   studio/                 # Studio (Nx `studio`): chat, projects, tool hosting, Worker assembly
   icons/                  # catalog/community pages and their Worker assembly
-  editor/                 # Nx `excalidraw`: the standalone editing application
+  editor/                 # Nx `editor`: the standalone editing application
   web/                    # marketing site
   cli/                    # commands, terminal input/output, Node assembly
 packages/
@@ -98,7 +98,7 @@ packages/
     excalidraw/            # native types, binding translation, files and exports
     svg/                  # SVG import
     artifacts.ts          # shared export/storage capability required by build workflows
-  editor/src/             # one React editor surface over native Excalidraw scenes
+  editor/src/             # Nx `editor-surface`: React editor over native Excalidraw scenes
   cloudflare/src/         # only concrete shared host adapters, e.g. stored-key gateway transport
   observability/src/      # actual shared telemetry exporter
   ui/src/                 # presentation primitives
@@ -123,7 +123,7 @@ The currently shared icon recipe/shape data moves to its proper owner with consu
 - diagram-core, diagram-renderer and diagram-agent stop being separate public layers. Family contracts, normalization, layout, quality and operations move together in diagrams. Their shared canvas/geometry/artifact machinery moves to drawing.
 - diagram-generation joins diagrams/generate. Its icon provider transport dependency is removed by placing the concrete shared gateway adapter at the host boundary.
 - diagram-excalidraw and svg-excalidraw join drawing/excalidraw and drawing/svg.
-- diagram-ui becomes editor; app-specific panels and page controllers return to their owning app. Remove forwarding components and restated scene types.
+- `diagram-ui` becomes `editor-surface` (`packages/editor`); app-specific panels and page controllers return to their owning app. Remove forwarding components and restated scene types.
 - icon-catalog, community-icons and icon-draw become the corresponding icons features. Actual browser/server exports stay distinct.
 - Studio projects moved into `apps/studio/src/features/projects`. The apps live in `apps/studio` and `apps/editor` and use Nx IDs `studio` and `editor`; `packages/editor` uses `editor-surface`. The deployed Worker names stay `sketchi-studio` and `sketchi-excalidraw`.
 - diagram-scenarios and native-conversion-storybook become tools. The native-conversion Storybook is `tools/storybook/native-conversion` beside the family stories (Nx name unchanged). Keep the Nx name `diagram-scenarios` during relocation and pair the real Frontierclimb path/fingerprint update. Frontierclimb runs the graded catalogs but currently calls Sketchi for deterministic case discovery and grading; those implementations cannot be deleted on the assumption that Frontierclimb already owns them. Family expected diagrams belong with their family; editor regression support retains an explicit local owner.
