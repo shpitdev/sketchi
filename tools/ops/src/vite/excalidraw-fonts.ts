@@ -1,6 +1,7 @@
-// oxlint-disable-next-line no-restricted-imports -- Vite resolves and copies fonts synchronously during plugin setup.
+/* oxlint-disable no-restricted-imports -- Vite resolves the editor's Excalidraw package and copies its fonts synchronously during plugin setup. */
 import { createReadStream, existsSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+/* oxlint-enable no-restricted-imports */
 import { dirname, join } from "node:path";
 
 import type { Plugin } from "vite";

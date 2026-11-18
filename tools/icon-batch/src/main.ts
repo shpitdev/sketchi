@@ -1,13 +1,13 @@
-/* oxlint-disable no-restricted-imports -- The Node command host loads local catalog, review notes and ledger files before and after a run. */
-
 /**
  * Draw the icon catalog by hand: `draw` runs the draw service's engine over
  * every catalog mark without a recipe, `sheets` lays the results out for
  * review, `summary` writes the ledger, and `promote` turns recognized marks
  * into catalog recipes. See README.md.
  */
+/* oxlint-disable no-restricted-imports -- The Node command host loads local catalog, review notes and ledger files before and after a run. */
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+/* oxlint-enable no-restricted-imports */
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
