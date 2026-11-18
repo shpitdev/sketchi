@@ -47,11 +47,11 @@ most `<name>.test.ts`, `<name>-fuzz.test.ts` and `regressions.test.ts`, in a
 
 - One Codex primary in the canonical root owns the plan, Herdr coordination,
   review routing, integration and staging PR. It does not implement product or
-  test changes. The current agreed primary model is `gpt-6-astra` with `high`
+  test changes. The current agreed primary model is `gpt-6.2-astra` with `high`
   reasoning. The user will review and merge the final staging PR; do not merge
   main autonomously during this restructure.
-- Authors use isolated Herdr worktrees and Codex models: `gpt-6.1-sol` with `high`
-  reasoning for straightforward work, `gpt-6-astra` with `xhigh` where the agreed
+- Authors use isolated Herdr worktrees and Codex models: `gpt-6.2-sol` with `high`
+  reasoning for straightforward work, `gpt-6.2-astra` with `xhigh` where the agreed
   plan calls for architectural or graph work. Preserve explicit assignments.
 - Follow [the product structure plan](docs/plans/product-structure.md). Units
   0–3 were serial. The user now permits up to four implementation authors with
@@ -62,13 +62,13 @@ most `<name>.test.ts`, `<name>-fuzz.test.ts` and `regressions.test.ts`, in a
   PRs off main after the user merges 810. The plan's seven completion criteria
   apply to the series; 810 explicitly lists its open mechanism rows.
 - Independent code review uses a separate read-only session, normally
-  `gpt-6.1-sol` with `high` reasoning and `codex review --base <parent>`.
+  `gpt-6.2-sol` with `high` reasoning and `codex review --base <parent>`.
   Findings go back to the author once; the primary decides after recheck.
   The same model in separate sessions is not self-review.
 - The existing user-selected Fable collaborator reviews the architecture after
   unit 1, after units 2–3, after the shared graph split and before PR readiness.
   This is a read-only role; do not spawn another Fable agent.
-- Browser and render verification uses Codex `gpt-6.1-sol` and the actual
+- Browser and render verification uses Codex `gpt-6.2-sol` and the actual
   product entrypoint. Preserve unfinished branches, worker evidence and user
   focus when transferring ownership.
 
