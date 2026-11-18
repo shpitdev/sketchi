@@ -41,18 +41,14 @@ import {
 	browserRunHarnessUrl,
 	type CodeModePngRendererNamespace,
 } from "../render/browser-renderer.server";
-import { NODE_LOGO_ASSET_PATH, type PlaygroundAssetsBinding } from "../build/icon-catalog.server";
+import { NODE_LOGO_ASSET_PATH, type StudioAssetsBinding } from "../build/icon-catalog.server";
 import { rendererOptions } from "../build/capabilities.server";
 import {
 	codeModeUsageResponseHeaders,
 	type CodeModeUsageContext,
-	PlaygroundCodeModeUsage,
+	StudioCodeModeUsage,
 } from "../build/usage-events.server";
-import {
-	PlaygroundBindings,
-	PlaygroundClock,
-	PlaygroundRequestMetadata,
-} from "../../server/context.server";
+import { StudioBindings, StudioClock, StudioRequestMetadata } from "../../server/context.server";
 import { readBoundedJson, type BoundedJson } from "../../server/request-body.server";
 
 const DEFAULT_JUDGE_MODEL = "openai/gpt-6-sol";
@@ -162,7 +158,7 @@ function browserRunImaging(renderers: CodeModePngRendererNamespace, harnessUrl: 
 }
 
 /** Catalog marks from the Worker's static node-logo assets. */
-function assetCatalogSvgs(assets: PlaygroundAssetsBinding, origin: string) {
+function assetCatalogSvgs(assets: StudioAssetsBinding, origin: string) {
 	return Layer.succeed(IconCatalogSvgs, {
 		load: (slug: string) =>
 			Effect.tryPromise({
@@ -311,8 +307,8 @@ export const drawIconFromBody = Effect.fn("playground.icons.draw")(function* (
 	body: unknown,
 	surface: IconDrawSurface,
 ) {
-	const env = yield* PlaygroundBindings;
-	const metadata = yield* PlaygroundRequestMetadata;
+	const env = yield* StudioBindings;
+	const metadata = yield* StudioRequestMetadata;
 	const done = (
 		result: IconDrawSuccess | IconDrawFailure,
 		retryAfterSeconds?: number,
@@ -380,8 +376,8 @@ class CurrentIconDrawRequest extends Context.Service<
 
 const drawIconRequest = Effect.fnUntraced(function* () {
 	const { bounded, startedAt, usageContext } = yield* CurrentIconDrawRequest;
-	const clock = yield* PlaygroundClock;
-	const usage = yield* PlaygroundCodeModeUsage;
+	const clock = yield* StudioClock;
+	const usage = yield* StudioCodeModeUsage;
 	const requestBody = bounded._tag === "Body" ? requestSummary(bounded.body) : {};
 	const respond = (body: IconDrawSuccess | IconDrawFailure, retryAfterSeconds?: number) =>
 		Effect.gen(function* () {
@@ -441,10 +437,10 @@ export const handleDrawIconRequest = Effect.fn("playground.http.drawIcon")(funct
 	request: Request,
 ) {
 	const context = yield* Effect.context<
-		PlaygroundBindings | PlaygroundClock | PlaygroundCodeModeUsage | PlaygroundRequestMetadata
+		StudioBindings | StudioClock | StudioCodeModeUsage | StudioRequestMetadata
 	>();
-	const usage = Context.get(context, PlaygroundCodeModeUsage);
-	const clock = Context.get(context, PlaygroundClock);
+	const usage = Context.get(context, StudioCodeModeUsage);
+	const clock = Context.get(context, StudioClock);
 	const usageContext = yield* usage.createContext;
 	const startedAt = yield* clock.nowMillis;
 	const bounded = yield* readBoundedJson(request, ICON_DRAW_REQUEST_MAX_BYTES, {

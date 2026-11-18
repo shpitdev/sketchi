@@ -18,7 +18,7 @@ import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { type StudioEnv } from "../../../server/studio-env.server";
-import { runPlaygroundEffect } from "../../../server/runtime.server";
+import { runStudioEffect } from "../../../server/runtime.server";
 import { serveDiagramsApi } from "../../build/http.server";
 
 /** A model's flowchart answer: the flowchart document. */
@@ -110,7 +110,7 @@ function generateRequest(env: StudioEnv, body: unknown): Promise<Response> {
 		headers: { "content-type": "application/json" },
 		body: JSON.stringify(body),
 	});
-	return runPlaygroundEffect(serveDiagramsApi(request), testBoundary(env, request));
+	return runStudioEffect(serveDiagramsApi(request), testBoundary(env, request));
 }
 
 // The published CLI decodes a 200 with exactly these schemas (apps/cli/src/generation.ts), and

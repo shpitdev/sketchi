@@ -17,10 +17,10 @@ import { Deferred, Duration, Effect, Exit, Layer, Schema, Scope, Stream } from "
 import { AgUiSchema, LanguageModel, Response as AiResponse } from "effect/ai";
 import { TestClock } from "effect/testing";
 
-import { runPlaygroundEffect } from "../../../server/runtime.server";
+import { runStudioEffect } from "../../../server/runtime.server";
 import { handleStudioAgentRequest } from "../agent.server";
 import { toAgUiMessages, type ChatMessage } from "../chat-message";
-import { PlaygroundAiModel, STUDIO_MODEL_IDLE_TIMEOUT } from "../model.server";
+import { StudioAiModel, STUDIO_MODEL_IDLE_TIMEOUT } from "../model.server";
 import { makeStudioFlowchartToolExecutor } from "../studio-build-policy.server";
 import { attemptLimitIssue, turnAlreadyAcceptedIssue } from "../studio-build-tool.server";
 import { MAX_CHAT_TOTAL_CHARACTERS, studioChatRequestMessages } from "../studio-chat-request";
@@ -83,7 +83,7 @@ it("keeps the gateway settings, all family contracts and compact build results o
 			messages: [{ id: "u1", role: "user", content: "Draw the release review." }],
 		}),
 	});
-	const response = await runPlaygroundEffect(handleStudioAgentRequest(request), {
+	const response = await runStudioEffect(handleStudioAgentRequest(request), {
 		request,
 		env: { AI: { gateway: () => gateway } },
 		platform: { waitUntilPromise: () => undefined },
@@ -196,7 +196,7 @@ async function runWire(respond: (round: number) => Response, content = "Draw a f
 			messages: [{ id: "user", role: "user", content }],
 		}),
 	});
-	const response = await runPlaygroundEffect(
+	const response = await runStudioEffect(
 		handleStudioAgentRequest(request).pipe(
 			Effect.provideService(ArtifactStorage, { ...storage, write }),
 			Effect.provide(makeWorkersTelemetryLayer({ resource: { serviceName: "studio-test" }, sink })),
@@ -414,7 +414,7 @@ it.each(["request", "response body"])(
 				messages: [{ id: "u", role: "user", content: "Draw a flowchart" }],
 			}),
 		});
-		const response = await runPlaygroundEffect(handleStudioAgentRequest(request), {
+		const response = await runStudioEffect(handleStudioAgentRequest(request), {
 			request,
 			platform: { waitUntilPromise: () => undefined },
 			env: {
@@ -485,7 +485,7 @@ it.each(["response headers", "the next event"])(
 				messages: [{ id: "u", role: "user", content: "Draw a flowchart" }],
 			}),
 		});
-		const response = await runPlaygroundEffect(
+		const response = await runStudioEffect(
 			handleStudioAgentRequest(request).pipe(Effect.provide(clock)),
 			{
 				request,
@@ -595,7 +595,7 @@ describe("chat request boundaries", () => {
 			method: "POST",
 			body: JSON.stringify({ threadId: "studio", runId: "run-1", ...(body as object) }),
 		});
-		return runPlaygroundEffect(handleStudioAgentRequest(request), {
+		return runStudioEffect(handleStudioAgentRequest(request), {
 			env: {},
 			platform: { waitUntilPromise: () => undefined },
 			request,
@@ -690,9 +690,9 @@ describe("Studio build results the model reads", () => {
 				),
 			),
 		});
-		const response = await runPlaygroundEffect(
+		const response = await runStudioEffect(
 			handleStudioAgentRequest(request).pipe(
-				Effect.provideService(PlaygroundAiModel, { model: Effect.succeed(model) }),
+				Effect.provideService(StudioAiModel, { model: Effect.succeed(model) }),
 			),
 			{ env: {}, platform: { waitUntilPromise: () => undefined }, request },
 		);
@@ -759,9 +759,9 @@ describe("Studio build results the model reads", () => {
 			method: "POST",
 			body: JSON.stringify(runInput(toAgUiMessages(studioChatRequestMessages(messages)))),
 		});
-		const response = await runPlaygroundEffect(
+		const response = await runStudioEffect(
 			handleStudioAgentRequest(request).pipe(
-				Effect.provideService(PlaygroundAiModel, { model: Effect.succeed(model) }),
+				Effect.provideService(StudioAiModel, { model: Effect.succeed(model) }),
 			),
 			{ env: {}, platform: { waitUntilPromise: () => undefined }, request },
 		);
@@ -823,9 +823,9 @@ describe("Studio build results the model reads", () => {
 			method: "POST",
 			body: JSON.stringify(runInput(toAgUiMessages(sent))),
 		});
-		const response = await runPlaygroundEffect(
+		const response = await runStudioEffect(
 			handleStudioAgentRequest(request).pipe(
-				Effect.provideService(PlaygroundAiModel, { model: Effect.succeed(model) }),
+				Effect.provideService(StudioAiModel, { model: Effect.succeed(model) }),
 			),
 			{ env: {}, platform: { waitUntilPromise: () => undefined }, request },
 		);

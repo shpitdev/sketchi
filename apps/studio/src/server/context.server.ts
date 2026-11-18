@@ -4,7 +4,7 @@ import { Clock, Context, Effect, Layer } from "effect";
 
 import type { StudioEnv } from "./studio-env.server";
 
-export interface PlaygroundRequestMetadataShape {
+export interface StudioRequestMetadataShape {
 	/** From `x-sketchi-attempt-id`, or created when the request started. */
 	readonly attemptId: string;
 	readonly method: string;
@@ -16,56 +16,56 @@ export interface PlaygroundRequestMetadataShape {
 	readonly traceId: string;
 }
 
-export class PlaygroundBindings extends Context.Service<PlaygroundBindings, StudioEnv>()(
+export class StudioBindings extends Context.Service<StudioBindings, StudioEnv>()(
 	"@sketchi/studio/PlaygroundBindings",
 ) {}
 
-export class PlaygroundRequestMetadata extends Context.Service<
-	PlaygroundRequestMetadata,
-	PlaygroundRequestMetadataShape
+export class StudioRequestMetadata extends Context.Service<
+	StudioRequestMetadata,
+	StudioRequestMetadataShape
 >()("@sketchi/studio/PlaygroundRequestMetadata") {}
 
-export interface PlaygroundPlatformCallbacksShape {
-	readonly waitUntil: (effect: Effect.Effect<void, never, PlaygroundRequestServices>) => void;
+export interface StudioPlatformCallbacksShape {
+	readonly waitUntil: (effect: Effect.Effect<void, never, StudioRequestServices>) => void;
 	readonly waitUntilPromise: (promise: Promise<unknown>) => void;
 }
 
-export interface PlaygroundPlatformBoundaryShape {
+export interface StudioPlatformBoundaryShape {
 	readonly waitUntilPromise: (promise: Promise<unknown>) => void;
 }
 
-export class PlaygroundPlatformCallbacks extends Context.Service<
-	PlaygroundPlatformCallbacks,
-	PlaygroundPlatformCallbacksShape
+export class StudioPlatformCallbacks extends Context.Service<
+	StudioPlatformCallbacks,
+	StudioPlatformCallbacksShape
 >()("@sketchi/studio/PlaygroundPlatformCallbacks") {}
 
-export interface PlaygroundIdsShape {
+export interface StudioIdsShape {
 	readonly create: (prefix: string) => string;
 }
 
-export class PlaygroundIds extends Context.Service<PlaygroundIds, PlaygroundIdsShape>()(
+export class StudioIds extends Context.Service<StudioIds, StudioIdsShape>()(
 	"@sketchi/studio/PlaygroundIds",
 ) {}
 
-export const PlaygroundIdsLive = Layer.succeed(PlaygroundIds, {
+export const StudioIdsLive = Layer.succeed(StudioIds, {
 	create: (prefix) => `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`,
 });
 
-export interface PlaygroundClockShape {
+export interface StudioClockShape {
 	readonly nowMillis: Effect.Effect<number>;
 	readonly nowIso: Effect.Effect<string>;
 }
 
-export class PlaygroundClock extends Context.Service<PlaygroundClock, PlaygroundClockShape>()(
+export class StudioClock extends Context.Service<StudioClock, StudioClockShape>()(
 	"@sketchi/studio/PlaygroundClock",
 ) {}
 
-export const PlaygroundClockLive = Layer.succeed(PlaygroundClock, {
+export const StudioClockLive = Layer.succeed(StudioClock, {
 	nowMillis: Clock.currentTimeMillis,
 	nowIso: Clock.currentTimeMillis.pipe(Effect.map((millis) => new Date(millis).toISOString())),
 });
 
-export type PlaygroundRequestServices =
-	| PlaygroundBindings
-	| PlaygroundPlatformCallbacks
-	| PlaygroundRequestMetadata;
+export type StudioRequestServices =
+	| StudioBindings
+	| StudioPlatformCallbacks
+	| StudioRequestMetadata;

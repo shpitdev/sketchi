@@ -5,7 +5,7 @@ import { type ArtifactFormat, type ArtifactFormatRef } from "@sketchi/drawing/ar
 import { SpanContent } from "@sketchi/observability";
 import { Context, Effect, Layer } from "effect";
 
-import { PlaygroundIds, PlaygroundRequestMetadata } from "../../server/context.server";
+import { StudioIds, StudioRequestMetadata } from "../../server/context.server";
 
 const MAX_ISSUE_DEPTH = 8;
 
@@ -91,27 +91,27 @@ export interface CodeModeUsageEvent {
 	user_agent?: string;
 }
 
-export interface PlaygroundCodeModeUsageShape {
+export interface StudioCodeModeUsageShape {
 	readonly capture: (
 		input: CodeModeUsageCaptureInput,
-	) => Effect.Effect<void, never, PlaygroundRequestMetadata>;
+	) => Effect.Effect<void, never, StudioRequestMetadata>;
 	readonly createContext: Effect.Effect<
 		CodeModeUsageContext,
 		never,
-		PlaygroundIds | PlaygroundRequestMetadata
+		StudioIds | StudioRequestMetadata
 	>;
 }
 
-export class PlaygroundCodeModeUsage extends Context.Service<
-	PlaygroundCodeModeUsage,
-	PlaygroundCodeModeUsageShape
+export class StudioCodeModeUsage extends Context.Service<
+	StudioCodeModeUsage,
+	StudioCodeModeUsageShape
 >()("@sketchi/studio/PlaygroundCodeModeUsage") {}
 
 /** The request's run and attempt, and a new event for this call. */
 const createCodeModeUsageContext = Effect.fn("playground.codeModeUsage.createContext")(
 	function* () {
-		const ids = yield* PlaygroundIds;
-		const metadata = yield* PlaygroundRequestMetadata;
+		const ids = yield* StudioIds;
+		const metadata = yield* StudioRequestMetadata;
 		return {
 			attemptId: metadata.attemptId,
 			eventId: ids.create("event"),
@@ -143,7 +143,7 @@ export function codeModeUsageResponseHeaders(
 const captureCodeModeUsageEvent = Effect.fn("playground.codeModeUsage.capture")(function* (
 	input: CodeModeUsageCaptureInput,
 ) {
-	const metadata = yield* PlaygroundRequestMetadata;
+	const metadata = yield* StudioRequestMetadata;
 	const issues = issueSummariesFrom(input.responseBody);
 	yield* Effect.annotateCurrentSpan({
 		operation: input.operation,
@@ -155,7 +155,7 @@ const captureCodeModeUsageEvent = Effect.fn("playground.codeModeUsage.capture")(
 	});
 });
 
-export const PlaygroundCodeModeUsageLive = Layer.succeed(PlaygroundCodeModeUsage, {
+export const StudioCodeModeUsageLive = Layer.succeed(StudioCodeModeUsage, {
 	capture: captureCodeModeUsageEvent,
 	createContext: createCodeModeUsageContext(),
 });

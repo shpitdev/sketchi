@@ -23,96 +23,90 @@ import {
 import { correlationIdHeader } from "./correlation.server";
 import { RequestBodyReadError } from "./request-body.server";
 import type { StudioEnv } from "./studio-env.server";
-import { PlaygroundAiModelLive } from "../features/chat/model.server";
+import { StudioAiModelLive } from "../features/chat/model.server";
 import { StudioBuildHostLive, StudioBuildRequestLive } from "../features/build/capabilities.server";
-import { PlaygroundGenerationLive } from "../features/generate/service.server";
-import { PlaygroundCodeModeUsageLive } from "../features/build/usage-events.server";
+import { StudioGenerationLive } from "../features/generate/service.server";
+import { StudioCodeModeUsageLive } from "../features/build/usage-events.server";
+import { StudioProjectsHttpLive, StudioLocalBucketLive } from "../features/projects/host.server";
 import {
-	PlaygroundStudioLayer,
-	PlaygroundStudioLocalBucketLive,
-} from "../features/projects/host.server";
-import {
-	PlaygroundBindings,
-	PlaygroundClockLive,
-	PlaygroundIds,
-	PlaygroundIdsLive,
-	PlaygroundPlatformCallbacks,
-	PlaygroundRequestMetadata,
-	type PlaygroundPlatformBoundaryShape,
-	type PlaygroundRequestServices,
+	StudioBindings,
+	StudioClockLive,
+	StudioIds,
+	StudioIdsLive,
+	StudioPlatformCallbacks,
+	StudioRequestMetadata,
+	type StudioPlatformBoundaryShape,
+	type StudioRequestServices,
 } from "./context.server";
-export interface PlaygroundRequestBoundary {
+export interface StudioRequestBoundary {
 	readonly env: StudioEnv;
-	readonly platform: PlaygroundPlatformBoundaryShape;
+	readonly platform: StudioPlatformBoundaryShape;
 	readonly request: Request;
 }
 /** Work one request leaves running: its response stream and callbacks. */
-class PlaygroundCallbackFibers extends Context.Service<
-	PlaygroundCallbackFibers,
+class StudioCallbackFibers extends Context.Service<
+	StudioCallbackFibers,
 	FiberSet.FiberSet<unknown, unknown>
 >()("@sketchi/studio/PlaygroundCallbackFibers") {}
-const PlaygroundTelemetryLive = makeWorkersTelemetryLayer({
+const StudioTelemetryLive = makeWorkersTelemetryLayer({
 	resource: { serviceName: "sketchi-studio" },
 });
-const PlaygroundCoreLive = Layer.mergeAll(
-	PlaygroundClockLive,
-	PlaygroundIdsLive,
-	PlaygroundAiModelLive,
+const StudioCoreLive = Layer.mergeAll(
+	StudioClockLive,
+	StudioIdsLive,
+	StudioAiModelLive,
 	StudioBuildHostLive,
-	PlaygroundCodeModeUsageLive,
-	PlaygroundGenerationLive,
-	PlaygroundTelemetryLive,
+	StudioCodeModeUsageLive,
+	StudioGenerationLive,
+	StudioTelemetryLive,
 );
-export const PlaygroundHostLive = PlaygroundStudioLayer.pipe(
-	Layer.provideMerge(Layer.merge(PlaygroundCoreLive, PlaygroundStudioLocalBucketLive)),
+export const StudioHostLive = StudioProjectsHttpLive.pipe(
+	Layer.provideMerge(Layer.merge(StudioCoreLive, StudioLocalBucketLive)),
 );
-export type PlaygroundHostServices = Layer.Success<typeof PlaygroundHostLive>;
-export type PlaygroundRequestEffect<A, E = never> = Effect.Effect<
+export type StudioHostServices = Layer.Success<typeof StudioHostLive>;
+export type StudioRequestEffect<A, E = never> = Effect.Effect<
 	A,
 	E,
-	| PlaygroundHostServices
-	| BuildRuntimeEnvironment
-	| PlaygroundRequestServices
-	| PlaygroundRequestCallbacks
+	StudioHostServices | BuildRuntimeEnvironment | StudioRequestServices | StudioRequestCallbacks
 >;
-export type PlaygroundCallbackEffect<A, E = never> = Effect.Effect<
+export type StudioCallbackEffect<A, E = never> = Effect.Effect<
 	A,
 	E,
-	PlaygroundHostServices | BuildRuntimeEnvironment | PlaygroundRequestServices
+	StudioHostServices | BuildRuntimeEnvironment | StudioRequestServices
 >;
-export type PlaygroundRequestRunner = <A, E>(effect: PlaygroundCallbackEffect<A, E>) => Promise<A>;
-export interface PlaygroundRequestCallbacksShape {
-	readonly runPromise: PlaygroundRequestRunner;
+export type StudioRequestRunner = <A, E>(effect: StudioCallbackEffect<A, E>) => Promise<A>;
+export interface StudioRequestCallbacksShape {
+	readonly runPromise: StudioRequestRunner;
 }
-export class PlaygroundRequestCallbacks extends Context.Service<
-	PlaygroundRequestCallbacks,
-	PlaygroundRequestCallbacksShape
+export class StudioRequestCallbacks extends Context.Service<
+	StudioRequestCallbacks,
+	StudioRequestCallbacksShape
 >()("@sketchi/studio/PlaygroundRequestCallbacks") {}
-type PlaygroundHttpError = RequestBodyReadError;
-type PlaygroundRequestResult<A, E> =
+type StudioHttpError = RequestBodyReadError;
+type StudioRequestResult<A, E> =
 	| A
-	| (unknown extends E ? Response : E extends PlaygroundHttpError ? Response : never);
-export interface PlaygroundRuntime {
+	| (unknown extends E ? Response : E extends StudioHttpError ? Response : never);
+export interface StudioRuntime {
 	readonly dispose: () => Promise<void>;
 	readonly run: <A, E>(
-		effect: PlaygroundRequestEffect<A, E>,
-		boundary: PlaygroundRequestBoundary,
-	) => Promise<PlaygroundRequestResult<A, E>>;
+		effect: StudioRequestEffect<A, E>,
+		boundary: StudioRequestBoundary,
+	) => Promise<StudioRequestResult<A, E>>;
 }
-function runWithPlaygroundRuntime<A, E>(
-	runtime: ManagedRuntime.ManagedRuntime<PlaygroundHostServices, never>,
-	effect: PlaygroundRequestEffect<A, E>,
-	boundary: PlaygroundRequestBoundary,
-): Promise<PlaygroundRequestResult<A, E>>;
-function runWithPlaygroundRuntime<A, E>(
-	runtime: ManagedRuntime.ManagedRuntime<PlaygroundHostServices, never>,
-	effect: PlaygroundRequestEffect<A, E>,
-	boundary: PlaygroundRequestBoundary,
+function runWithStudioRuntime<A, E>(
+	runtime: ManagedRuntime.ManagedRuntime<StudioHostServices, never>,
+	effect: StudioRequestEffect<A, E>,
+	boundary: StudioRequestBoundary,
+): Promise<StudioRequestResult<A, E>>;
+function runWithStudioRuntime<A, E>(
+	runtime: ManagedRuntime.ManagedRuntime<StudioHostServices, never>,
+	effect: StudioRequestEffect<A, E>,
+	boundary: StudioRequestBoundary,
 ): Promise<A | Response> {
 	const rayId = boundary.request.headers.get("cf-ray") ?? undefined;
 	const program = Effect.gen(function* () {
-		const ids = yield* PlaygroundIds;
-		const callbackFibers = yield* PlaygroundCallbackFibers;
+		const ids = yield* StudioIds;
+		const callbackFibers = yield* StudioCallbackFibers;
 		const url = new URL(boundary.request.url);
 		const traceId =
 			correlationIdHeader(boundary.request, "x-sketchi-trace-id") ?? ids.create("trace");
@@ -136,10 +130,9 @@ function runWithPlaygroundRuntime<A, E>(
 			"url.full": boundary.request.url,
 		});
 		const requestSpan = yield* Effect.currentSpan;
-		const runTrackedEffect =
-			yield* FiberSet.runtimePromise(callbackFibers)<PlaygroundHostServices>();
+		const runTrackedEffect = yield* FiberSet.runtimePromise(callbackFibers)<StudioHostServices>();
 		const withRequestContext = <A2, E2>(
-			callbackEffect: PlaygroundCallbackEffect<A2, E2>,
+			callbackEffect: StudioCallbackEffect<A2, E2>,
 			spanName: string,
 		) =>
 			callbackEffect.pipe(
@@ -149,7 +142,7 @@ function runWithPlaygroundRuntime<A, E>(
 				Effect.annotateLogs(requestAnnotations),
 				(callbackProgram) => withTelemetryCorrelation(callbackProgram, correlation),
 			);
-		const runDeferredEffect: PlaygroundRequestRunner = (callbackEffect) =>
+		const runDeferredEffect: StudioRequestRunner = (callbackEffect) =>
 			runTrackedEffect(withRequestContext(callbackEffect, "playground.request.deferred"));
 		const recordStreamEnd = (recorded: Effect.Effect<void>) =>
 			boundary.platform.waitUntilPromise(
@@ -157,19 +150,19 @@ function runWithPlaygroundRuntime<A, E>(
 					() => undefined,
 				),
 			);
-		const runRequestEffect: PlaygroundRequestRunner = (callbackEffect) =>
+		const runRequestEffect: StudioRequestRunner = (callbackEffect) =>
 			runTrackedEffect(withRequestContext(callbackEffect, "playground.request.callback"), {
 				signal: boundary.request.signal,
 			});
 		const baseRequestContext = pipe(
 			Context.empty(),
-			Context.add(PlaygroundBindings, boundary.env),
-			Context.add(PlaygroundPlatformCallbacks, {
+			Context.add(StudioBindings, boundary.env),
+			Context.add(StudioPlatformCallbacks, {
 				waitUntil: (deferredEffect) =>
 					boundary.platform.waitUntilPromise(runDeferredEffect(deferredEffect)),
 				waitUntilPromise: boundary.platform.waitUntilPromise,
 			}),
-			Context.add(PlaygroundRequestMetadata, {
+			Context.add(StudioRequestMetadata, {
 				attemptId,
 				method: boundary.request.method,
 				origin: url.origin,
@@ -183,7 +176,7 @@ function runWithPlaygroundRuntime<A, E>(
 			Layer.build(StudioBuildRequestLive).pipe(Effect.provide(baseRequestContext)),
 		);
 		const requestContext = Context.merge(baseRequestContext, buildContext);
-		const errorResponse = (tag: PlaygroundHttpError["_tag"], status: number, message: string) =>
+		const errorResponse = (tag: StudioHttpError["_tag"], status: number, message: string) =>
 			Effect.logError("Playground HTTP request failed", {
 				error_tag: tag,
 			}).pipe(
@@ -198,7 +191,7 @@ function runWithPlaygroundRuntime<A, E>(
 			Effect.catchIf(Predicate.isTagged("RequestBodyReadError"), () =>
 				errorResponse("RequestBodyReadError", 400, "The request body could not be read."),
 			),
-			Effect.provideService(PlaygroundRequestCallbacks, {
+			Effect.provideService(StudioRequestCallbacks, {
 				runPromise: runRequestEffect,
 			}),
 			Effect.provide(requestContext),
@@ -236,7 +229,7 @@ function runWithPlaygroundRuntime<A, E>(
 		return yield* program.pipe(
 			withTelemetryExport({ pipeline: boundary.env.TELEMETRY_SPANS, scope }),
 			Effect.withSpan("playground.request"),
-			Effect.provideService(PlaygroundCallbackFibers, callbackFibers),
+			Effect.provideService(StudioCallbackFibers, callbackFibers),
 			Effect.ensuring(
 				Effect.sync(() => boundary.platform.waitUntilPromise(Effect.runPromiseWith(services)(end))),
 			),
@@ -373,12 +366,12 @@ function normalizedRequestRoute(pathname: string): string {
 	]);
 	return staticRoutes.has(pathname) ? pathname : "/unmatched";
 }
-export function makePlaygroundRuntime(): PlaygroundRuntime {
-	const runtime = ManagedRuntime.make(PlaygroundHostLive);
+export function makeStudioRuntime(): StudioRuntime {
+	const runtime = ManagedRuntime.make(StudioHostLive);
 	return {
 		dispose: () => runtime.dispose(),
-		run: (effect, boundary) => runWithPlaygroundRuntime(runtime, effect, boundary),
+		run: (effect, boundary) => runWithStudioRuntime(runtime, effect, boundary),
 	};
 }
-const playgroundRuntime = makePlaygroundRuntime();
-export const runPlaygroundEffect = playgroundRuntime.run;
+const studioRuntime = makeStudioRuntime();
+export const runStudioEffect = studioRuntime.run;

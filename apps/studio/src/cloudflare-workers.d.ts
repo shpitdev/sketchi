@@ -3,11 +3,11 @@ declare module "cloudflare:workers" {
   import type { CloudflareAiGatewayProvider } from "@sketchi/cloudflare/ai-gateway";
   import type { TelemetryPipeline } from "@sketchi/observability";
   import type { CodeModePngRendererNamespace } from "./features/render/browser-renderer.server";
-  import type { PlaygroundAssetsBinding } from "./features/build/icon-catalog.server";
+  import type { StudioAssetsBinding } from "./features/build/icon-catalog.server";
 
   export const env: {
     AI?: CloudflareAiGatewayProvider;
-    ASSETS?: PlaygroundAssetsBinding;
+    ASSETS?: StudioAssetsBinding;
     CODEMODE_PNG_RENDERER?: CodeModePngRendererNamespace;
     LOADER?: import("./features/mcp/sandbox.server").SketchiWorkerLoader;
     SKETCHI_ARTIFACTS?: ArtifactObjectBucket;

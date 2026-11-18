@@ -9,28 +9,24 @@ import {
 } from "@sketchi/diagrams/build";
 import type { ArtifactFormat } from "@sketchi/drawing/artifacts";
 import { Context, Effect, Layer } from "effect";
-import {
-	PlaygroundBindings,
-	PlaygroundIds,
-	PlaygroundRequestMetadata,
-} from "../../server/context.server";
+import { StudioBindings, StudioIds, StudioRequestMetadata } from "../../server/context.server";
 import {
 	DEFAULT_ASSET_ORIGIN,
-	PlaygroundBrowserRendering,
-	PlaygroundBrowserRenderingLive,
+	StudioBrowserRendering,
+	StudioBrowserRenderingLive,
 	type CloudflareBrowserRunRendererOptions,
 } from "../render/browser-renderer.server";
 import { studioCommunityIcons } from "./community-icons.server";
-import { playgroundIconCatalog } from "./icon-catalog.server";
+import { studioIconCatalog } from "./icon-catalog.server";
 
 /** Concrete host capabilities only. Family operations and policy stay in diagrams. */
 export const StudioBuildHostLive = Layer.merge(
-	PlaygroundBrowserRenderingLive,
+	StudioBrowserRenderingLive,
 	Layer.sync(ArtifactStorage, makeMemoryArtifactStorage),
 );
 
 export function artifactStoreForBindings(
-	env: Context.Service.Shape<typeof PlaygroundBindings>,
+	env: Context.Service.Shape<typeof StudioBindings>,
 	localStorage: ArtifactStorageShape,
 ): ArtifactStorageShape {
 	return env.SKETCHI_ARTIFACTS
@@ -51,7 +47,7 @@ function artifactUrl(
 }
 
 export function rendererOptions(
-	env: Context.Service.Shape<typeof PlaygroundBindings>,
+	env: Context.Service.Shape<typeof StudioBindings>,
 	origin: string,
 ): CloudflareBrowserRunRendererOptions {
 	if (env.SKETCHI_RENDER_ASSET_ORIGIN) {
@@ -75,16 +71,16 @@ function isLocalOrigin(origin: string): boolean {
 /** Build once in the HTTP request scope; callbacks receive this same context. */
 export const StudioBuildRequestLive = Layer.effectContext(
 	Effect.gen(function* () {
-		const env = yield* PlaygroundBindings;
-		const ids = yield* PlaygroundIds;
-		const metadata = yield* PlaygroundRequestMetadata;
-		const browserRendering = yield* PlaygroundBrowserRendering;
+		const env = yield* StudioBindings;
+		const ids = yield* StudioIds;
+		const metadata = yield* StudioRequestMetadata;
+		const browserRendering = yield* StudioBrowserRendering;
 		const localStorage = yield* ArtifactStorage;
 		return Context.make(ArtifactStorage, artifactStoreForBindings(env, localStorage)).pipe(
 			Context.add(BuildRuntimeEnvironment, {
 				createId: ids.create,
 				artifactUrl: (input) => artifactUrl(metadata.origin, input),
-				...(env.ASSETS ? { icons: playgroundIconCatalog(env.ASSETS, metadata.origin) } : {}),
+				...(env.ASSETS ? { icons: studioIconCatalog(env.ASSETS, metadata.origin) } : {}),
 				...(env.COMMUNITY_ICONS
 					? { communityIcons: studioCommunityIcons(env.COMMUNITY_ICONS) }
 					: {}),

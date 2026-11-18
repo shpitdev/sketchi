@@ -4,12 +4,12 @@ import { ArtifactStorage, BuildRuntimeEnvironment } from "@sketchi/diagrams/buil
 import { Effect } from "effect";
 import { Tool, Toolkit } from "effect/ai";
 import {
-	PlaygroundBindings,
-	PlaygroundClock,
-	PlaygroundIds,
-	PlaygroundRequestMetadata,
+	StudioBindings,
+	StudioClock,
+	StudioIds,
+	StudioRequestMetadata,
 } from "../../server/context.server";
-import { PlaygroundCodeModeUsage } from "../build/usage-events.server";
+import { StudioCodeModeUsage } from "../build/usage-events.server";
 import {
 	CodeModeDocsRequestSchema,
 	CodeModeDocsResultSchema,
@@ -49,13 +49,13 @@ const Execute = Tool.make("execute", {
 	parameters: ExecuteRequestSchema,
 	success: ExecuteResultSchema,
 	dependencies: [
-		PlaygroundBindings,
-		PlaygroundClock,
-		PlaygroundIds,
-		PlaygroundRequestMetadata,
+		StudioBindings,
+		StudioClock,
+		StudioIds,
+		StudioRequestMetadata,
 		ArtifactStorage,
 		BuildRuntimeEnvironment,
-		PlaygroundCodeModeUsage,
+		StudioCodeModeUsage,
 		CodeModeSandbox,
 	],
 })

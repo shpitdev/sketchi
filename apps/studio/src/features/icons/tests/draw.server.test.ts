@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { StudioEnv } from "../../../server/studio-env.server";
 import type { CodeModePngRendererNamespace } from "../../render/browser-renderer.server";
-import { runPlaygroundEffect } from "../../../server/runtime.server";
+import { runStudioEffect } from "../../../server/runtime.server";
 import { IconDrawBudget } from "../budget-object.server";
 import { handleDrawIconRequest } from "../draw.server";
 
@@ -107,7 +107,7 @@ describe("drawing is bounded per client and per day", () => {
 			},
 			body: JSON.stringify(body),
 		});
-		return runPlaygroundEffect(handleDrawIconRequest(request), {
+		return runStudioEffect(handleDrawIconRequest(request), {
 			env,
 			request,
 			platform: { waitUntilPromise: () => undefined },

@@ -52,7 +52,7 @@ const STARTERS = [
 	},
 ];
 
-export interface ReadyPlaygroundArtifact {
+export interface ReadyStudioArtifact {
 	artifactId: string;
 	exportUrls: {
 		excalidraw: string;
@@ -62,7 +62,7 @@ export interface ReadyPlaygroundArtifact {
 	viewUrl: string;
 }
 
-export function ArtifactActions({ artifact }: { artifact: ReadyPlaygroundArtifact }) {
+export function ArtifactActions({ artifact }: { artifact: ReadyStudioArtifact }) {
 	return (
 		<div className="studio__artifact-actions">
 			<IconActionBar aria-label="Diagram actions">
@@ -279,12 +279,12 @@ export function AssistantFollowUp({ onCompose }: { onCompose: () => void }) {
 }
 
 /** The first-visit heading. */
-export function PlaygroundIntro() {
+export function StudioIntro() {
 	return <h1 className="studio__intro">What should we draw?</h1>;
 }
 
 /** A sample and starter prompts above the empty composer. */
-export function PlaygroundStarters({ onSelect }: { onSelect: (prompt: string) => void }) {
+export function StudioStarters({ onSelect }: { onSelect: (prompt: string) => void }) {
 	return (
 		<div className="studio__starters-wrap">
 			<figure className="studio__sample">
@@ -316,7 +316,7 @@ export function PlaygroundStarters({ onSelect }: { onSelect: (prompt: string) =>
 	);
 }
 
-export function PlaygroundComposer({
+export function StudioComposer({
 	buildMode,
 	composerRef,
 	onSubmit,

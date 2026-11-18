@@ -41,17 +41,17 @@ import { createExcalidrawFile, type ExcalidrawScene } from "@sketchi/drawing/exc
 import { withTelemetryCorrelation } from "@sketchi/observability";
 
 import {
-	type PlaygroundBindings,
-	PlaygroundClock,
-	PlaygroundRequestMetadata,
+	type StudioBindings,
+	StudioClock,
+	StudioRequestMetadata,
 } from "../../server/context.server";
 import { generateDiagram } from "../generate/api.server";
-import { type PlaygroundGeneration } from "../generate/service.server";
+import { type StudioGeneration } from "../generate/service.server";
 import { readJsonBody } from "./json-body.server";
 import {
 	codeModeUsageResponseHeaders,
 	CurrentCodeModeUsage,
-	PlaygroundCodeModeUsage,
+	StudioCodeModeUsage,
 	type CodeModeUsageOperation,
 } from "./usage-events.server";
 
@@ -96,8 +96,8 @@ const answer = Effect.fn("playground.http.answer")(function* <
 	A extends { readonly ok: true },
 	B extends { readonly ok: false; readonly status: FailureStatus },
 >(operation: CodeModeUsageOperation, requestBody: unknown, result: A | B, httpStatus?: number) {
-	const clock = yield* PlaygroundClock;
-	const usage = yield* PlaygroundCodeModeUsage;
+	const clock = yield* StudioClock;
+	const usage = yield* StudioCodeModeUsage;
 	const current = yield* CurrentCodeModeUsage;
 	const status = result.ok ? 200 : (httpStatus ?? FAILURE_HTTP_STATUS[result.status]);
 	const finishedAt = yield* clock.nowMillis;
@@ -146,7 +146,7 @@ const runOperation = Effect.fn("playground.http.operation")(function* <
 		);
 	if (body._tag === "InvalidJson")
 		return yield* answer<A, B | RequestRefusal>(options.operation, {}, notJson);
-	const metadata = yield* PlaygroundRequestMetadata;
+	const metadata = yield* StudioRequestMetadata;
 	const input = options.input ? options.input(body.body) : body.body;
 	const result = yield* withTelemetryCorrelation(options.run(input), {
 		attemptId: metadata.attemptId,
@@ -366,15 +366,15 @@ const diagramsApp = HttpRouter.toWebHandler(
 
 /** Serves one diagrams API request in the request's own context. */
 export const serveDiagramsApi = Effect.fn("playground.http.diagrams")(function* (request: Request) {
-	const ids = yield* PlaygroundCodeModeUsage;
-	const clock = yield* PlaygroundClock;
+	const ids = yield* StudioCodeModeUsage;
+	const clock = yield* StudioClock;
 	const usage = { ...(yield* ids.createContext), startedAt: yield* clock.nowMillis };
 	const context = yield* Effect.context<
-		| PlaygroundBindings
-		| PlaygroundClock
-		| PlaygroundCodeModeUsage
-		| PlaygroundGeneration
-		| PlaygroundRequestMetadata
+		| StudioBindings
+		| StudioClock
+		| StudioCodeModeUsage
+		| StudioGeneration
+		| StudioRequestMetadata
 		| ArtifactStorage
 		| BuildRuntimeEnvironment
 	>();

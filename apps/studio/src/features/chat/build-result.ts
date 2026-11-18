@@ -9,7 +9,7 @@ import {
 
 import { Result, Schema } from "effect";
 import { type ChatMessage } from "@/features/chat/chat-message";
-import { type ReadyPlaygroundArtifact } from "./surface";
+import { type ReadyStudioArtifact } from "./surface";
 
 type MessagePart = ChatMessage["parts"][number];
 
@@ -269,7 +269,7 @@ export function buildResultOf(part: DiagramToolPart): StudioBuildResult | undefi
 	return Result.isSuccess(decoded) ? decoded.success : undefined;
 }
 
-export function artifactFromResponse(result: StudioBuildResult): ReadyPlaygroundArtifact | null {
+export function artifactFromResponse(result: StudioBuildResult): ReadyStudioArtifact | null {
 	if (!result.ok) {
 		return null;
 	}
@@ -303,20 +303,20 @@ export function sceneFromResult(result: StudioBuildResult | undefined): CanvasSp
 	return Result.isSuccess(decoded) ? decoded.success : null;
 }
 
-export interface PlaygroundBuildState {
+export interface StudioBuildState {
 	activePart: DiagramToolPart | undefined;
 	acceptedResult: StudioBuildResult | undefined;
 	displayResult: StudioBuildResult | undefined;
 	buildMode: boolean;
 	scene: CanvasSpec | null;
-	artifact: ReadyPlaygroundArtifact | null;
+	artifact: ReadyStudioArtifact | null;
 	ghostLabels: string[];
 }
 
 export function deriveBuildState(
 	messages: readonly ChatMessage[],
 	busy: boolean,
-): PlaygroundBuildState {
+): StudioBuildState {
 	const toolParts = messages.flatMap((message) => message.parts.filter(isDiagramToolPart));
 	const results = toolParts.map(buildResultOf).filter((result) => result !== undefined);
 	const displayResult = results.at(-1);

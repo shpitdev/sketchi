@@ -15,38 +15,38 @@ import { HttpServerRequest, HttpServerResponse } from "effect/http";
 import { Context, Effect, Layer, Schema, Result } from "effect";
 
 import { artifactStoreForBindings } from "../build/capabilities.server";
-import { PlaygroundBindings, PlaygroundClock, PlaygroundIds } from "../../server/context.server";
+import { StudioBindings, StudioClock, StudioIds } from "../../server/context.server";
 
-export class PlaygroundStudioLocalBucket extends Context.Service<
-	PlaygroundStudioLocalBucket,
+export class StudioLocalBucket extends Context.Service<
+	StudioLocalBucket,
 	MemoryStudioObjectBucket
 >()("@sketchi/studio/PlaygroundStudioLocalBucket") {}
 
-export const PlaygroundStudioLocalBucketLive = Layer.effect(
-	PlaygroundStudioLocalBucket,
+export const StudioLocalBucketLive = Layer.effect(
+	StudioLocalBucket,
 	Effect.sync(() => new MemoryStudioObjectBucket()),
 );
 
-export class PlaygroundStudio extends Context.Service<
-	PlaygroundStudio,
+export class StudioProjectsHttp extends Context.Service<
+	StudioProjectsHttp,
 	{
-		readonly handle: (request: Request) => Effect.Effect<Response, never, PlaygroundBindings>;
+		readonly handle: (request: Request) => Effect.Effect<Response, never, StudioBindings>;
 	}
 >()("@sketchi/studio/ProjectsHttp") {}
 
-export const PlaygroundStudioLayer = Layer.effect(
-	PlaygroundStudio,
+export const StudioProjectsHttpLive = Layer.effect(
+	StudioProjectsHttp,
 	Effect.gen(function* () {
-		const clock = yield* PlaygroundClock;
+		const clock = yield* StudioClock;
 		const localStorage = yield* ArtifactStorage;
-		const ids = yield* PlaygroundIds;
-		const localBucket = yield* PlaygroundStudioLocalBucket;
+		const ids = yield* StudioIds;
+		const localBucket = yield* StudioLocalBucket;
 
 		// These services are stateless. Each request owns its binding-specific layer;
 		// no retained bucket cache or alternate request controller is needed.
-		return PlaygroundStudio.of({
+		return StudioProjectsHttp.of({
 			handle: Effect.fn("studio.projects.http")(function* (request: Request) {
-				const env = yield* PlaygroundBindings;
+				const env = yield* StudioBindings;
 				const storage = artifactStoreForBindings(env, localStorage);
 				const sourceArtifacts = StudioSourceArtifactStore.of({
 					load: Effect.fn("playground.studio.sourceArtifact.load")(function* (artifactId: string) {
@@ -128,6 +128,6 @@ export const PlaygroundStudioLayer = Layer.effect(
 export const handleStudioProjectsRequest = Effect.fn("studio.projects.request")(function* (
 	request: Request,
 ) {
-	const studio = yield* PlaygroundStudio;
+	const studio = yield* StudioProjectsHttp;
 	return yield* studio.handle(request);
 });

@@ -40,8 +40,8 @@ import { type DiagramPatchOperation } from "@sketchi/diagrams/canvas/patch-contr
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { applyDiagramPatch } from "@sketchi/diagrams/canvas/patch";
 import { type JsonBody } from "../build/json-body.server";
-import { PlaygroundBindings, PlaygroundRequestMetadata } from "../../server/context.server";
-import { PlaygroundGeneration } from "./service.server";
+import { StudioBindings, StudioRequestMetadata } from "../../server/context.server";
+import { StudioGeneration } from "./service.server";
 
 const decodeGenerateRequest = Schema.decodeUnknownResult(GenerateRequest, { errors: "all" });
 const GENERATE_REQUEST_COPY = {
@@ -315,9 +315,9 @@ export interface GenerateOutcome {
  * this owns the request's validation, the model call and the build that draws its answer.
  */
 export const generateDiagram = Effect.fn("playground.generate")(function* (bounded: JsonBody) {
-	const generation = yield* PlaygroundGeneration;
-	const env = yield* PlaygroundBindings;
-	const metadata = yield* PlaygroundRequestMetadata;
+	const generation = yield* StudioGeneration;
+	const env = yield* StudioBindings;
+	const metadata = yield* StudioRequestMetadata;
 	const finish = (requestBody: unknown, result: GenerateResult) =>
 		Effect.succeed<GenerateOutcome>({ requestBody, result });
 	if (bounded._tag === "TooLarge") {

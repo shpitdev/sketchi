@@ -69,19 +69,19 @@ export interface CloudflareBrowserRunArtifactRenderer extends ArtifactRenderer {
 	) => Effect.Effect<ArrayBuffer | Uint8Array, BrowserRenderingFailure | BrowserRenderingTimeout>;
 }
 
-export interface PlaygroundBrowserRenderingShape {
+export interface StudioBrowserRenderingShape {
 	readonly renderer: (
 		renderers: CodeModePngRendererNamespace,
 		options?: CloudflareBrowserRunRendererOptions,
 	) => CloudflareBrowserRunArtifactRenderer;
 }
 
-export class PlaygroundBrowserRendering extends Context.Service<
-	PlaygroundBrowserRendering,
-	PlaygroundBrowserRenderingShape
+export class StudioBrowserRendering extends Context.Service<
+	StudioBrowserRendering,
+	StudioBrowserRenderingShape
 >()("@sketchi/studio/PlaygroundBrowserRendering") {}
 
-export const PlaygroundBrowserRenderingLive = Layer.succeed(PlaygroundBrowserRendering, {
+export const StudioBrowserRenderingLive = Layer.succeed(StudioBrowserRendering, {
 	renderer: createCloudflareBrowserRunArtifactRenderer,
 });
 

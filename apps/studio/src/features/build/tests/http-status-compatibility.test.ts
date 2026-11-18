@@ -46,7 +46,7 @@ vi.mock("@sketchi/diagrams/canvas/patch", () => ({
 }));
 
 import { type StudioEnv } from "../../../server/studio-env.server";
-import { runPlaygroundEffect } from "../../../server/runtime.server";
+import { runStudioEffect } from "../../../server/runtime.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
 	return {
@@ -61,7 +61,7 @@ function testBoundary(env: StudioEnv, request: Request) {
 }
 
 function serve(env: StudioEnv, request: Request) {
-	return runPlaygroundEffect(serveDiagramsApi(request), testBoundary(env, request));
+	return runStudioEffect(serveDiagramsApi(request), testBoundary(env, request));
 }
 
 const handleBuildFlowchartRequest = serve;
