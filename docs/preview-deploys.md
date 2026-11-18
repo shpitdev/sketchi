@@ -157,10 +157,13 @@ The workflows run typed `pnpm ops` commands from `tools/ops`; `pnpm ops --help` 
 
 ## Production Worker Deploys
 
-The `app-production-deploy` workflow runs only by manual dispatch, selecting
-all configured Worker apps or one named project. Merging or pushing to `main`
-does not deploy production. A failed deployment leaves the last deployed
-version active until an operator dispatches again. Production deploys pass
+The `app-production-deploy` workflow runs on a push to `main` and by manual
+dispatch. A push deploys only the Worker apps whose `build` inputs it reaches
+from the previous `main` commit (`ops production select --project affected`);
+its path filter skips pushes that cannot reach a Worker build (docs, CI, tooling
+outside the app build inputs). A dispatch deploys all configured Worker apps or
+one named project. A failed deployment leaves the last deployed version active
+until the next push reaching that app or a dispatch. Production deploys pass
 `--no-x-provision`; Workers may bind existing resources, but these deploys do
 not create or discover storage. Domain attachment remains an explicit action.
 

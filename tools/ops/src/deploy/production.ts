@@ -6,9 +6,16 @@ import {
 	type WorkerProjectId,
 } from "../workers";
 
-/** A production dispatch deploys every Worker app or the one it names. */
-export function selectProductionProjects(selection: string): WorkerProjectId[] {
+/**
+ * The Worker apps a production run deploys: every app, one named app, or (for a push) the apps
+ * whose `build` the push reaches.
+ */
+export function selectProductionProjects(
+	selection: string,
+	affected: readonly string[] = [],
+): WorkerProjectId[] {
 	if (selection === "all") return [...workerProjectIds];
+	if (selection === "affected") return workerProjectIds.filter((id) => affected.includes(id));
 	return [workerProjectConfig(selection).projectId];
 }
 

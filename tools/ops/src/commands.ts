@@ -28,7 +28,7 @@ import {
 } from "./deploy/production";
 import { runWithAssetsUploadRetry } from "./deploy/wrangler-retry";
 import { optionalEnv, requiredEnv, writeOutputs } from "./outputs";
-import { attempt, opsError, output, runInherited } from "./process";
+import { attempt, capture, opsError, output, runInherited } from "./process";
 import { DEFAULT_ENDPOINT, runSanity } from "./sanity";
 import { printResources, provision } from "./telemetry/catalog";
 import { openDuckdb } from "./telemetry/db";
@@ -90,6 +90,31 @@ const workerResolve = Command.make("resolve", { project }, (input) =>
 	}),
 ).pipe(Command.withDescription("Write the Worker identity and build paths of one app."));
 
+/** The Nx projects a change from `base` to `head` affects, optionally only through one target. */
+const nxAffected = Effect.fn("ops.nxAffected")(function* (
+	base: string,
+	head: string,
+	target?: string,
+) {
+	const json = yield* output("pnpm", [
+		"--silent",
+		"nx",
+		"show",
+		"projects",
+		"--affected",
+		...(target ? [`--withTarget=${target}`] : []),
+		`--base=${base}`,
+		`--head=${head}`,
+		"--json",
+	]);
+	return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Array(Schema.String)))(
+		json,
+	).pipe(
+		Effect.map((projects) => [...projects]),
+		Effect.mapError(() => opsError(`nx show projects returned ${json}`)),
+	);
+});
+
 const previewSelect = Command.make("select", {}, () =>
 	Effect.gen(function* () {
 		const selection = Option.getOrElse(yield* optionalEnv("PREVIEW_SELECTION"), () => "affected");
@@ -102,22 +127,7 @@ const previewSelect = Command.make("select", {}, () =>
 			changedFiles = (yield* output("git", ["diff", "--name-only", mergeBase, head]))
 				.split("\n")
 				.filter(Boolean);
-			const json = yield* output("pnpm", [
-				"--silent",
-				"nx",
-				"show",
-				"projects",
-				"--affected",
-				`--base=${mergeBase}`,
-				`--head=${head}`,
-				"--json",
-			]);
-			affected = yield* Schema.decodeUnknownEffect(
-				Schema.fromJsonString(Schema.Array(Schema.String)),
-			)(json).pipe(
-				Effect.map((projects) => [...projects]),
-				Effect.mapError(() => opsError(`nx show projects returned ${json}`)),
-			);
+			affected = yield* nxAffected(mergeBase, head);
 		}
 		const projects = yield* attempt(() =>
 			selectPreviewProjects({ selection, affected, changedFiles }),
@@ -194,11 +204,34 @@ const productionSelect = Command.make(
 	{ selection: Flag.String("project").pipe(Flag.withDefault("all")) },
 	(input) =>
 		Effect.gen(function* () {
-			const projects = yield* attempt(() => selectProductionProjects(input.selection));
-			yield* Console.log(`Production projects (${input.selection}): ${projects.join(", ")}`);
+			let selection = input.selection;
+			let affected: string[] = [];
+			if (selection === "affected") {
+				// A push deploys the apps whose `build` inputs it reaches, measured from the previous
+				// main commit; when that commit is unknown, every app.
+				const base = Option.getOrElse(yield* optionalEnv("BASE_SHA"), () => "");
+				const head = yield* requiredEnv("HEAD_SHA");
+				const known =
+					/^[0-9a-f]{7,64}$/i.test(base) &&
+					!/^0+$/.test(base) &&
+					(yield* capture("git", ["cat-file", "-e", `${base}^{commit}`])).code === 0;
+				if (known) affected = yield* nxAffected(base, head, "build");
+				else {
+					yield* Console.log(
+						`Previous main commit ${base || "(none)"} is unknown; deploying every app.`,
+					);
+					selection = "all";
+				}
+			}
+			const projects = yield* attempt(() => selectProductionProjects(selection, affected));
+			yield* Console.log(`Production projects (${selection}): ${projects.join(", ") || "none"}`);
 			yield* writeOutputs({ projects: JSON.stringify(projects) });
 		}),
-).pipe(Command.withDescription("Write the Worker apps this production dispatch deploys."));
+).pipe(
+	Command.withDescription(
+		"Write the Worker apps a production run deploys: all, one app, or affected (BASE_SHA..HEAD_SHA).",
+	),
+);
 
 const productionUrl = Command.make(
 	"url",

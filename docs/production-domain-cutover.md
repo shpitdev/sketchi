@@ -1,9 +1,9 @@
 # Production domain cutover
 
-The domain move is deliberately post-merge. Opt-in PR previews and explicitly
-dispatched production deploys use their configured Cloudflare URLs. Ordinary
-pushes do not deploy production. No workflow attaches a production custom domain
-unless an operator explicitly dispatches `app-production-deploy` with
+The domain move is deliberately post-merge. Opt-in PR previews and production
+deploys use their configured Cloudflare URLs; a push to `main` deploys the
+Worker apps it reaches, without domains. No workflow attaches a production
+custom domain unless an operator explicitly dispatches `app-production-deploy` with
 `domain_action=attach`.
 
 ## Adopted route map
