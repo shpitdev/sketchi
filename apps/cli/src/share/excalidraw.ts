@@ -105,14 +105,24 @@ export const ShareTransportLive = Layer.succeed(ShareTransport, {
 			const response = yield* request(`${EXCALIDRAW_GET_ENDPOINT}${id}`, {
 				method: "GET",
 			});
-			if (response.status === 404) {
-				return yield* shareFailure(
-					"share_link_unavailable",
-					"The Excalidraw share link is unavailable.",
-					"Verify the complete bearer link or ask its sender to export a new link.",
-				);
+			if (!response.ok) {
+				const body = response.body;
+				if (body) {
+					// Release the unread body without replacing the status-based error.
+					yield* Effect.tryPromise({
+						try: () => body.cancel(),
+						catch: transportFailure,
+					}).pipe(Effect.ignore);
+				}
+				if (response.status === 404) {
+					return yield* shareFailure(
+						"share_link_unavailable",
+						"The Excalidraw share link is unavailable.",
+						"Verify the complete bearer link or ask its sender to export a new link.",
+					);
+				}
+				return yield* transportFailure();
 			}
-			if (!response.ok) return yield* transportFailure();
 			return yield* readBoundedBody(response, MAX_SHARE_BODY_BYTES, transportFailure);
 		},
 		Effect.timeoutOrElse({

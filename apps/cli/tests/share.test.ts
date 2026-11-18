@@ -1,5 +1,7 @@
 import { strict as assert } from "node:assert";
+import { once } from "node:events";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -78,6 +80,57 @@ describe("Excalidraw share transport", () => {
 			assert.equal(requestSignal?.aborted, true);
 		}).pipe(Effect.provide(ShareTransportLive)),
 	);
+	for (const [status, code] of [
+		[404, "share_link_unavailable"],
+		[503, "share_transport_failed"],
+	] as const) {
+		it.live(`cancels the unread streaming ${status} download at the server`, () =>
+			Effect.gen(function* () {
+				const disconnected = yield* Deferred.make<boolean>();
+				yield* Effect.acquireUseRelease(
+					Effect.promise(async () => {
+						const server = createServer((_request, response) => {
+							response.writeHead(status);
+							response.write("error chunk\n");
+							const writes = setInterval(() => response.write("error chunk\n"), 50);
+							response.once("close", () => {
+								clearInterval(writes);
+								Deferred.doneUnsafe(disconnected, Effect.succeed(!response.writableEnded));
+							});
+						});
+						server.listen(0, "127.0.0.1");
+						await once(server, "listening");
+						return server;
+					}),
+					(server) =>
+						Effect.gen(function* () {
+							const address = server.address();
+							assert.ok(address && typeof address !== "string");
+							// Redirect only the destination; keep native fetch and retain the response
+							// through the close check so garbage collection cannot release the body.
+							let fetched: Response | undefined;
+							globalThis.fetch = async (_input, init) => {
+								fetched = await originalFetch(`http://127.0.0.1:${address.port}`, init);
+								return fetched;
+							};
+							const transport = yield* ShareTransport;
+							const failure = yield* Effect.flip(transport.download("fixture_id"));
+							assert.equal(failure.code, code);
+							assert.equal(yield* Deferred.await(disconnected), true);
+							assert.equal(fetched?.status, status);
+						}).pipe(Effect.timeout("2 seconds")),
+					(server) =>
+						Effect.promise(() => {
+							const closed = once(server, "close");
+							server.close();
+							server.closeAllConnections();
+							return closed;
+						}),
+				);
+			}).pipe(Effect.provide(ShareTransportLive)),
+		);
+	}
+
 	it.effect("uploads once to the pinned endpoint without redirects", () => {
 		let calls = 0;
 		globalThis.fetch = (input, init) => {
