@@ -48,7 +48,7 @@
 			"dependsOn": ["build"],
 			"options": {
 				"commands": [
-					"node tools/scenarios/dist/cli.js --list",
+					"node tools/scenarios/check-list.mjs",
 					"node tools/scenarios/dist/cli.js --scenario sketchi-onboarding-decision-flow --fixture"
 				],
 				"parallel": false
