@@ -140,9 +140,6 @@
 			"dependsOn": ["^build"],
 			"cache": true
 		},
-		"test-browser": {
-			"inputs": ["default", "^production", "{workspaceRoot}/tools/testing/browserbase.ts"]
-		},
 		"typecheck": {
 			"inputs": ["default", "^production"],
 			"dependsOn": ["^build"],
