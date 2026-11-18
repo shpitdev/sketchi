@@ -3,7 +3,7 @@ import { Effect, Exit } from "effect";
 import { TestClock } from "effect/testing";
 import { expect } from "vitest";
 
-import { priceLogs } from "./gateway";
+import { priceLogs } from "../src/gateway";
 
 const account = { accountId: "acct", token: "token" };
 

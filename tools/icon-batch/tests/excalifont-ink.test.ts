@@ -2,7 +2,7 @@ import { Resvg } from "@resvg/resvg-wasm";
 import { EXCALIFONT_GLYPHS, excalifontInkBox } from "@sketchi/drawing";
 import { describe, expect, it } from "vitest";
 
-import { excalifontOptions, initializeResvg } from "./excalidraw-export";
+import { excalifontOptions, initializeResvg } from "../src/excalidraw-export";
 
 const SIZE = 1000;
 

@@ -68,7 +68,13 @@ export class RunStore {
 		previews: { readonly png28: string; readonly png112: string },
 	): Promise<void> {
 		await mkdir(this.previewsDir, { recursive: true });
-		await writeFile(this.previewPath(slug, attempt, 28), Buffer.from(previews.png28, "base64"));
-		await writeFile(this.previewPath(slug, attempt, 112), Buffer.from(previews.png112, "base64"));
+		for (const [size, png] of [
+			[28, previews.png28],
+			[112, previews.png112],
+		] as const) {
+			const path = this.previewPath(slug, attempt, size);
+			await writeFile(`${path}.tmp`, Buffer.from(png, "base64"));
+			await rename(`${path}.tmp`, path);
+		}
 	}
 }

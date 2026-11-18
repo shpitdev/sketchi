@@ -7,9 +7,9 @@ import { getIconSourceFile } from "@sketchi/icon-catalog/catalog";
 import { previewScene, roundSheet } from "@sketchi/icon-draw";
 import { describe, expect, it } from "vitest";
 
-import { exportScenePng, initializeResvg } from "./excalidraw-export";
-import { httpGateway } from "./gateway";
-import { prepareSvg, reframeSvg } from "./imaging";
+import { exportScenePng, initializeResvg } from "../src/excalidraw-export";
+import { httpGateway } from "../src/gateway";
+import { prepareSvg, reframeSvg } from "../src/imaging";
 
 const catalogSvg = (slug: string) =>
 	readFile(
@@ -120,7 +120,7 @@ describe("httpGateway", () => {
 					return new Response("{}", { headers: { "cf-aig-log-id": "log-1" } });
 				},
 			},
-			(logId) => logs.push(logId),
+			{ onDispatch: () => undefined, onLog: (logId) => logs.push(logId) },
 		).gateway("google-ai-studio");
 		await gateway.run(
 			{

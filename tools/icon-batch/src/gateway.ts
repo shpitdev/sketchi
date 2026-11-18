@@ -27,11 +27,12 @@ export interface GatewayAccess {
  * The Worker's AI binding over HTTPS: the same provider requests, sent to the
  * gateway's provider routes with an authenticated-gateway token, so the
  * gateway answers with the provider keys it stores. Each response's log id
- * goes to `onLog`, so its cost can be read back.
+ * goes to `onLog`, so its cost can be read back. `onDispatch` counts requests
+ * handed to fetch, even if no response or log ID comes back.
  */
 export function httpGateway(
 	access: GatewayAccess,
-	onLog: (logId: string) => void,
+	track: { readonly onDispatch: () => void; readonly onLog: (logId: string) => void },
 ): CloudflareAiGatewayProvider {
 	const send = access.fetch ?? fetch;
 	return {
@@ -55,14 +56,19 @@ export function httpGateway(
 						headers.set("cf-aig-collect-log", String(gateway.collectLog));
 					}
 					if (gateway?.skipCache) headers.set("cf-aig-skip-cache", "true");
+					const body = JSON.stringify(data.query);
+					const signal = options?.signal;
+					signal?.throwIfAborted();
+					track.onDispatch();
 					const response = await send(`${base}/${data.provider}/${data.endpoint}`, {
 						method: "POST",
 						headers,
-						body: JSON.stringify(data.query),
-						...(options?.signal ? { signal: options.signal } : {}),
+						body,
+						redirect: "error", // Do not let fetch replay a paid POST to a redirect target.
+						...(signal ? { signal } : {}),
 					});
 					const logId = response.headers.get("cf-aig-log-id");
-					if (logId) onLog(logId);
+					if (logId) track.onLog(logId);
 					return response;
 				},
 			};

@@ -1,24 +1,27 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { setImmediate } from "node:timers/promises";
 
 import { type IconRecipe } from "@sketchi/drawing";
 import { type SketchiIcon } from "@sketchi/icon-catalog";
 import { type IconAuthorModel } from "@sketchi/icon-draw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { attemptCeilingUsd, type BatchAuthor, drawMark, type MarkAttempt } from "./draw-mark";
-import { initializeResvg, svgPng } from "./excalidraw-export";
-import { verdictLine, writeSheets } from "./sheets";
-import { promote } from "./promote";
-import { runBatch } from "./runner";
-import { marksToDraw } from "./selection";
-import { RunStore } from "./store";
-import { ledgerCsv, summarize, summaryMarkdown } from "./summary";
+import { attemptCeilingUsd, type BatchAuthor, drawMark, type MarkAttempt } from "../src/draw-mark";
+import { initializeResvg, svgPng } from "../src/excalidraw-export";
+import { promote } from "../src/promote";
+import { runBatch } from "../src/runner";
+import { marksToDraw } from "../src/selection";
+import { verdictLine, writeSheets } from "../src/sheets";
+import { RunStore } from "../src/store";
+import { ledgerCsv, summarize, summaryMarkdown } from "../src/summary";
 
 const SONNET: IconAuthorModel = "anthropic/claude-sonnet-5-5";
 const OPUS: IconAuthorModel = "anthropic/claude-opus-5-5";
 const authors = { first: SONNET, retry: OPUS };
+const validSvg =
+	'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" fill="#2496ed"/></svg>';
 
 const icon = (slug: string, collection = "devtools-ci"): SketchiIcon => ({
 	slug,
@@ -220,7 +223,10 @@ describe("runBatch", () => {
 	it("waits for draws in flight to settle before deciding the cap is reached", async () => {
 		const store = new RunStore(root);
 		// Two $0.10 ceilings fill a $0.20 cap, but each draw costs a cent: all five fit.
-		const outcome = await runBatch({
+		const twoStarted = Promise.withResolvers<void>();
+		const release = Promise.withResolvers<void>();
+		let started = 0;
+		const batch = runBatch({
 			marks: ["a", "b", "c", "d", "e"].map((slug) => icon(slug)),
 			store,
 			concurrency: 4,
@@ -228,13 +234,129 @@ describe("runBatch", () => {
 			authors,
 			ceilingUsd: () => 0.1,
 			draw: async (_mark, author) => {
-				await new Promise((resolve) => setTimeout(resolve, 5));
+				if (++started === 2) twoStarted.resolve();
+				await release.promise;
 				return attempt(author, "recognized", 0.01);
 			},
 		});
+		await twoStarted.promise;
+		await setImmediate();
+		const admitted = started;
+		release.resolve();
+		const outcome = await batch;
+		expect(admitted).toBe(2);
+		expect(started).toBe(5);
 		expect(outcome).toMatchObject({ settled: 5, pending: 0, capped: false });
 		expect(outcome.spentUsd).toBeCloseTo(0.05);
 	});
+
+	it.each(["preview", "record"] as const)(
+		"closes admissions on a failed %s write, then drains and charges the live draw",
+		async (step) => {
+			const writing = Promise.withResolvers<void>();
+			const failWrite = Promise.withResolvers<void>();
+			const finishLive = Promise.withResolvers<void>();
+			const liveStarted = Promise.withResolvers<void>();
+			const fail = async () => {
+				writing.resolve();
+				await failWrite.promise;
+			};
+			const store = new RunStore(root);
+			const broken = icon("broken");
+			const { previews: _, ...previous } = attempt(SONNET, "missed", 0.125);
+			const checkpoint = { ...broken, attempts: [previous] };
+			await store.save(checkpoint);
+			const savePreviews = store.savePreviews.bind(store);
+			const save = store.save.bind(store);
+			const write =
+				step === "preview"
+					? vi.spyOn(store, "savePreviews").mockImplementation(async (slug, index, previews) => {
+							if (slug === broken.slug) {
+								await fail();
+								// A directory in place of the PNG blocks its atomic rename.
+								await mkdir(store.previewPath(slug, index, 28), { recursive: true });
+							}
+							await savePreviews(slug, index, previews);
+						})
+					: vi.spyOn(store, "save").mockImplementation(async (record) => {
+							if (record.slug === broken.slug) {
+								await fail();
+								await mkdir(join(store.marksDir, `${broken.slug}.json.tmp`));
+							}
+							await save(record);
+						});
+
+			const draws: string[] = [];
+			const marks = [broken, icon("live"), icon("waiting"), icon("queued")];
+			const options = {
+				store,
+				marks,
+				authors,
+				concurrency: 3,
+				ceilingUsd: () => 1,
+				spendCapUsd: 2.125,
+			};
+			let finished = false;
+			const failure = runBatch({
+				...options,
+				draw: async (mark, author, index) => {
+					draws.push(`${mark.slug}:${index}`);
+					if (mark.slug === "live") {
+						liveStarted.resolve();
+						await finishLive.promise;
+					}
+					return attempt(author, "recognized", mark.slug === "live" ? 0.25 : 0.5);
+				},
+			}).catch((error: unknown) => {
+				finished = true;
+				return error;
+			});
+			await Promise.all([liveStarted.promise, writing.promise]);
+			await setImmediate();
+			const beforeFailure = [...draws];
+			failWrite.resolve();
+			// Read the failure from the actual filesystem before releasing the live draw.
+			await expect(write.mock.results[0]?.value).rejects.toBeDefined();
+			await setImmediate();
+			const finishedBeforeDrain = finished;
+			finishLive.resolve();
+			const error = await failure;
+			expect({ beforeFailure, draws, finishedBeforeDrain }).toEqual({
+				beforeFailure: ["broken:1", "live:0"],
+				draws: ["broken:1", "live:0"],
+				finishedBeforeDrain: false,
+			});
+			expect(error).toMatchObject({ spentUsd: 0.875 });
+			const records = await store.records();
+			expect(records.find((record) => record.slug === "live")).toMatchObject({
+				status: "recognized",
+				attempts: [{ costUsd: 0.25 }],
+			});
+			const saved = records.find((record) => record.slug === "broken");
+			if (step === "record") {
+				expect(saved).toEqual(checkpoint);
+				expect(error).toMatchObject({
+					unwritten: [{ slug: "broken", attempts: [previous, { costUsd: 0.5, logIds: ["log"] }] }],
+				});
+			} else {
+				expect(saved).toMatchObject({
+					status: "recognized",
+					attempts: [previous, { costUsd: 0.5 }],
+				});
+				expect(error).toMatchObject({ unwritten: [] });
+				const resumed: string[] = [];
+				const outcome = await runBatch({
+					...options,
+					draw: async (mark, author) => {
+						resumed.push(mark.slug);
+						return attempt(author, "recognized", 0.125);
+					},
+				});
+				expect(resumed).toEqual(["waiting", "queued"]);
+				expect(outcome).toMatchObject({ settled: 4, spentUsd: 1.125 });
+			}
+		},
+	);
 
 	it("keeps a draw that throws as a failed attempt counted at its ceiling", async () => {
 		const store = new RunStore(root);
@@ -339,10 +461,9 @@ it("charges the failed draw's ceiling when its log never prices and does not rep
 					{
 						slug: mark.slug,
 						name: mark.name,
-						svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" fill="#2496ed"/></svg>',
 						author,
 						traceId: "unpriced-draw",
-						loadCatalogSvg: async () => undefined,
+						loadCatalogSvg: async (slug) => (slug === mark.slug ? validSvg : undefined),
 					},
 				),
 		});
@@ -359,6 +480,46 @@ it("charges the failed draw's ceiling when its log never prices and does not rep
 		vi.useRealTimers();
 	}
 });
+
+it.each(["disconnect", "refusal", "invalid SVG", "missing source"] as const)(
+	"distinguishes an unpriced model POST from pre-dispatch failure: %s",
+	async (failure) => {
+		await initializeResvg();
+		const requests: (string | undefined)[] = [];
+		const fetch: typeof globalThis.fetch = async (_input, init) => {
+			requests.push(init?.method);
+			if (failure === "disconnect") throw new TypeError("connection lost after sending");
+			return Response.json(
+				{ type: "error", error: { type: "invalid_request_error", message: "refused" } },
+				{ status: 400 },
+			);
+		};
+		const mark = await drawMark(
+			{ accountId: "acct", token: "token", fetch },
+			{
+				slug: "source",
+				name: "Source",
+				author: SONNET,
+				traceId: "dispatch-proof",
+				loadCatalogSvg: async (slug) => {
+					if (slug !== "source") return undefined;
+					if (failure === "missing source") throw new Error("source unreadable");
+					return failure === "invalid SVG" ? "not an SVG" : validSvg;
+				},
+			},
+		);
+		const sent = failure === "disconnect" || failure === "refusal";
+		expect({ requests, mark }).toMatchObject({
+			requests: sent ? ["POST"] : [],
+			mark: {
+				outcome: "failed",
+				logIds: [],
+				estimatedCostUsd: sent ? attemptCeilingUsd(SONNET) : 0,
+			},
+		});
+		expect(mark).not.toHaveProperty("costUsd");
+	},
+);
 
 describe("writeSheets", () => {
 	it("puts recognized marks and the rest on separate sheets", async () => {
