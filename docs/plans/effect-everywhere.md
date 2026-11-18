@@ -87,15 +87,20 @@ The installed `@nx/js@24.0.3` library generator was inspected with `pnpm nx list
 
 Nx generation removes our scaffolding ownership; it does not prove generated business code or eliminate every test in a generated package. [Nx generation](https://nx.dev/docs/features/generate-code), [sync generators](https://nx.dev/docs/features/synchronize-code).
 
-## Ownership across all current projects
+## Migration ownership by project
 
-Every current Nx project has an owner below. The native column names an actual host/renderer boundary, not permission to leave the project's application internals unchanged. Each owning slice audits all its source and test cases against the diagnostic and retention rules. Slice 0 gives each behavioral suite one owner; cross-slice fixtures are temporary acceptance inputs, not permanent duplicate suites.
+The table records the slice assignments, including historical project names
+where work began before consolidation. The native column names an actual
+host or renderer boundary, not permission to leave application internals
+unchanged. Each owning slice audits its source and tests against the diagnostic
+and retention rules. Slice 0 gives each behavioral suite one owner; cross-slice
+fixtures are temporary acceptance inputs, not permanent duplicate suites.
 
 | Project | Owning slices | Native boundary that remains |
 | --- | --- | --- |
 | `studio` | 4 HTTP/runtime, 5 MCP, 6b chat, 7 UI/controllers, 8 DO, 9 export | React/TanStack page rendering; Cloudflare loader/browser/binding calls inside typed services |
 | `icons` | 4 APIs, 5 MCP, 6a query atoms, 7 selection/preferences, 8 limits | React/TanStack rendering/navigation; host request/DO callbacks |
-| `excalidraw` | 6a query atoms, 7 editor/controller state | Excalidraw/React rendering and editor callbacks |
+| `editor` (formerly `excalidraw`) | 6a query atoms, 7 editor/controller state | Excalidraw/React rendering and editor callbacks |
 | `web` | 4 replace `surface-urls-rpc`/server API policy, 7 interaction state | Marketing React/SSR/navigation and asset rendering |
 | `sketchi-cli` | 4 generated API clients, 9 commands/I/O/crypto | Node entry callback, actual OS clipboard/browser/raster backends unsupported by Effect |
 | `native-conversion-storybook` | 2 configuration, 7 stateful stories, 10 test review | Storybook/Vite configuration contract and React preview rendering |
@@ -105,7 +110,7 @@ Every current Nx project has an owner below. The native column names an actual h
 | `diagram-agent` | 3a typed domain results, 5 shared tools, 10 consolidation | External sandbox/blob/browser services at explicit adapters |
 | `diagram-generation` | 3a/3b data, 4 typed API, 6c Jev/provider normalization | Credential-free gateway/AI binding transport only |
 | `diagram-scenarios` | 3b deterministic utilities, 9 CLI/browser tooling | Browserbase/Playwright foreign calls and host CLI callbacks; graded evals remain in Frontierclimb |
-| `diagram-ui` | 7 all state/workflows, 3c conversion consumers | React/Excalidraw render and imperative editor boundary |
+| `editor-surface` (formerly `diagram-ui`) | 7 all state/workflows, 3c conversion consumers | React/Excalidraw render and imperative editor boundary |
 | `icon-catalog` | 3b data/algorithms, 9 generated-asset operators | SVG/domain mark data and filesystem generator host callback |
 | `community-icons` | 3a models, 4 API contract, 8 SQL/limits | D1 binding only through upstream SQL or a demonstrated unsupported operation |
 | `icon-draw` | 6c author/judge, 8 job requirements, 3b data | Browser/raster imaging engine and gateway binding transport |

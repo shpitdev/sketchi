@@ -18,7 +18,7 @@ both. Each app imports that file first and adds `@source` for its own
 files; automatic source detection is off. The theme stays the one place for
 colours, radii, shadows and fonts. `icons` takes its dialog, command, menu and
 tooltip primitives from `@sketchi/ui` and styles its own page in plain CSS;
-`excalidraw` still uses the theme with plain CSS only.
+the standalone `editor` app uses the theme with plain CSS only.
 
 ## Rules
 
