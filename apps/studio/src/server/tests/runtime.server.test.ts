@@ -155,6 +155,7 @@ describe("Playground request runtime", () => {
 			const rows: TelemetrySpanRow[] = [];
 			const late: unknown[][] = [];
 			const aborted = new AbortController();
+			const cancelCleanup = Promise.withResolvers<void>();
 			const model =
 				ending === "deadline"
 					? Effect.never.pipe(
@@ -164,7 +165,7 @@ describe("Playground request runtime", () => {
 								orElse: () => Effect.fail(new ModelDeadline()),
 							}),
 						)
-					: Effect.never;
+					: Effect.never.pipe(Effect.ensuring(Effect.promise(() => cancelCleanup.promise)));
 			const handler = Effect.gen(function* () {
 				const { request } = yield* StudioRequestMetadata;
 				const context = yield* Effect.context<never>();
@@ -196,8 +197,17 @@ describe("Playground request runtime", () => {
 				});
 				const reader = response.body!.getReader();
 				await reader.read();
-				if (ending === "cancel") await reader.cancel("client left");
-				else if (ending === "abort") {
+				if (ending === "cancel") {
+					// Stop while the consumer has an outstanding read and model cleanup is still pending.
+					const reading = reader.read();
+					await new Promise<void>((resolve) => setImmediate(resolve));
+					const stopping = reader.cancel("client left");
+					await reading;
+					await new Promise<void>((resolve) => setImmediate(resolve));
+					cancelCleanup.resolve();
+					await stopping;
+				} else if (ending === "abort") {
+					cancelCleanup.resolve();
 					aborted.abort();
 					await reader.read();
 				} else await reader.read().catch(() => undefined);
@@ -216,7 +226,12 @@ describe("Playground request runtime", () => {
 			);
 			if (ending === "deadline")
 				assert.strictEqual(named("test.model.attempt")?.outcome, "interrupted");
-			assert.isDefined(named("playground.response.stream"));
+			const stream = named("playground.response.stream");
+			assert.isDefined(stream);
+			if (ending === "cancel")
+				assert.deepInclude(JSON.parse(stream?.attributes ?? "{}"), {
+					"http.response.body.complete": false,
+				});
 			assert.isDefined(named("playground.request"));
 		}),
 	);
