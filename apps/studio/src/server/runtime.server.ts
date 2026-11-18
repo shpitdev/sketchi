@@ -294,11 +294,17 @@ function recordStreamedBody(
 					controller.error(error);
 				}
 			},
-			// The source's cancel resolves once its work has stopped and ended its spans, so the
-			// request's scope cannot close before them.
-			cancel(reason) {
+			// Give the source time to end its spans, but don't lose the entire request's telemetry
+			// if cleanup stalls. A span that ends after the grace period may be lost.
+			async cancel(reason) {
 				cancelling = true;
-				return reader.cancel(reason).finally(() => end(false));
+				try {
+					await Effect.runPromise(
+						Effect.promise(() => reader.cancel(reason)).pipe(Effect.timeoutOption("1 second")),
+					);
+				} finally {
+					end(false);
+				}
 			},
 		},
 		{ highWaterMark: 0 },

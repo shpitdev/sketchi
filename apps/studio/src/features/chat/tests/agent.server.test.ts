@@ -397,13 +397,15 @@ it("explains exhaustion after the second truncated output-limit call", async () 
 	expect(result.body).not.toContain('"type":"RUN_ERROR"');
 	expect(result.body).not.toContain('"type":"TOOL_CALL_RESULT"');
 });
-it.each(["request", "response body"])(
-	"cancels the gateway stream through %s while awaiting the terminal reason (local cancellation only; deployed Stop is a Preview platform limitation)",
+it.each(["request", "response body", "response body with stalled gateway cleanup"])(
+	"cancels the gateway stream through %s while awaiting the terminal reason",
 	async (boundary) => {
 		const read = Deferred.makeUnsafe<void>();
 		const cancelled = Deferred.makeUnsafe<void>();
+		const gatewayAborted = Promise.withResolvers<void>();
+		const cleanup = Promise.withResolvers<void>();
+		const pending: Promise<unknown>[] = [];
 		const abort = new AbortController();
-		let signal: AbortSignal | undefined;
 		let calls = 0;
 		const request = new Request("https://studio.test/api/studio/chat", {
 			method: "POST",
@@ -416,14 +418,16 @@ it.each(["request", "response body"])(
 		});
 		const response = await runStudioEffect(handleStudioAgentRequest(request), {
 			request,
-			platform: { waitUntilPromise: () => undefined },
+			platform: { waitUntilPromise: (task) => void pending.push(task) },
 			env: {
 				AI: {
 					gateway: () => ({
 						getUrl: async () => "",
 						run: async (_data, options) => {
 							calls++;
-							signal = options?.signal;
+							options?.signal?.addEventListener("abort", () => gatewayAborted.resolve(), {
+								once: true,
+							});
 							const events = toolEvents(partial, 1).map(event);
 							return new Response(
 								new ReadableStream<Uint8Array>({
@@ -437,6 +441,8 @@ it.each(["request", "response body"])(
 									},
 									cancel() {
 										Effect.runSync(Deferred.succeed(cancelled, undefined));
+										if (boundary === "response body with stalled gateway cleanup")
+											return cleanup.promise;
 									},
 								}),
 								{ headers: { "content-type": "text/event-stream" } },
@@ -454,12 +460,19 @@ it.each(["request", "response body"])(
 			}
 		})();
 		await Effect.runPromise(Deferred.await(read));
-		if (boundary === "request") abort.abort();
-		else await reader.cancel();
-		await Effect.runPromise(Deferred.await(cancelled));
-		await body;
-		expect(signal?.aborted).toBe(true);
-		expect(calls).toBe(1);
+		try {
+			const stopping = boundary === "request" ? abort.abort() : reader.cancel();
+			await Effect.runPromise(Deferred.await(cancelled));
+			await body;
+			// Neither the client nor waitUntil should depend on releasing the gateway's cleanup.
+			await stopping;
+			expect(pending.length).toBeGreaterThan(0);
+			await Promise.all(pending);
+			expect(calls).toBe(1);
+		} finally {
+			cleanup.resolve();
+		}
+		await gatewayAborted.promise;
 	},
 );
 
