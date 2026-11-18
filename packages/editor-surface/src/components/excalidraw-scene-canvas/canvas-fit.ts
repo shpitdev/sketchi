@@ -88,11 +88,14 @@ function place(
 	};
 }
 
+// A fitted edge can land a fraction of a pixel below its intended gap after division.
+const isShortOfGap = (start: number, end: number) => start - end < CONTROL_GAP - 1e-6;
+
+const overlapsHorizontally = (a: CanvasRect, b: CanvasRect) =>
+	isShortOfGap(a.left, b.right) && isShortOfGap(b.left, a.right);
+
 const overlaps = (a: CanvasRect, b: CanvasRect) =>
-	a.left < b.right + CONTROL_GAP &&
-	b.left - CONTROL_GAP < a.right &&
-	a.top < b.bottom + CONTROL_GAP &&
-	b.top - CONTROL_GAP < a.bottom;
+	overlapsHorizontally(a, b) && isShortOfGap(a.top, b.bottom) && isShortOfGap(b.top, a.bottom);
 
 const padded = (offsets: Partial<CanvasOffsets>): CanvasOffsets => ({
 	bottom: Math.max(EDGE_PADDING, offsets.bottom ?? 0),
@@ -105,8 +108,9 @@ const padded = (offsets: Partial<CanvasOffsets>): CanvasOffsets => ({
  * The exact fit of a `content`-sized diagram in a canvas: as large as
  * it can be inside a small padding, centred, with none of `controls` drawn over
  * it. When the controls would cover it, the diagram keeps clear of the bands
- * above and below them or of the side they sit on, whichever leaves it larger;
- * at the same size the bands win, as they keep the diagram centred across.
+ * above and below them or of the side they sit on, whichever leaves it larger.
+ * Controls crossing the centre line only reserve vertical space. At the same
+ * size the bands win, as they keep the diagram centred across.
  * When no fit can clear them, the plain fit stands. The zoom is exact: Excalidraw's own fit rounds it down to a tenth, which
  * draws a phone diagram up to a fifth smaller than its canvas allows.
  */
@@ -126,14 +130,17 @@ export function canvasFit(
 	const middleY = viewport.height / 2;
 	const reach = (values: number[]) => (values.length > 0 ? Math.max(...values) + CONTROL_GAP : 0);
 	const sides = {
-		left: reach(controls.filter((c) => c.left < middleX).map((c) => c.right)),
+		left: reach(controls.filter((c) => c.right <= middleX).map((c) => c.right)),
 		right: reach(controls.filter((c) => c.left >= middleX).map((c) => viewport.width - c.left)),
 	};
-	const bands = {
-		top: reach(controls.filter((c) => c.top < middleY).map((c) => c.bottom)),
-		bottom: reach(controls.filter((c) => c.top >= middleY).map((c) => viewport.height - c.top)),
-	};
-	const [best] = [bands, sides, { ...sides, ...bands }]
+	const bandsFor = (blockers: readonly CanvasRect[]) => ({
+		top: reach(blockers.filter((c) => c.top < middleY).map((c) => c.bottom)),
+		bottom: reach(blockers.filter((c) => c.top >= middleY).map((c) => viewport.height - c.top)),
+	});
+	// A centred fit only gets narrower as it insets vertically. Corner controls
+	// outside the plain fit's horizontal span cannot cover it.
+	const centredBands = bandsFor(controls.filter((c) => overlapsHorizontally(plain.rect, c)));
+	const [best] = [centredBands, sides, { ...sides, ...bandsFor(controls) }]
 		.map((offsets) => place(viewport, content, padded(offsets)))
 		.filter(clear)
 		.sort((a, b) => b.zoom - a.zoom);
