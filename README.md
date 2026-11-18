@@ -116,8 +116,8 @@ against production or a preview.
 
 ## Deployment
 
-Production Worker deploys require an explicit `app-production-deploy` workflow
-dispatch; merging to `main` does not deploy production. A pull request gets
+A push to `main` deploys the production Worker apps its changes reach; an
+`app-production-deploy` dispatch deploys every app or one. A pull request gets
 preview Workers when it carries the `preview` label; see
 [preview deployments](docs/preview-deploys.md) and the
 [production domain runbook](docs/production-domain-cutover.md).

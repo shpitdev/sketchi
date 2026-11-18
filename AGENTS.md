@@ -151,8 +151,11 @@ apps it affects on every push (closing the PR deletes them), or dispatch
 stacked PR or a specific app such as `studio`; a dispatch also adds
 the label.
 
-Production Worker deployment requires an explicit `app-production-deploy`
-workflow dispatch. Merging or pushing to main does not deploy production.
+A push to main deploys to production the Worker apps whose build it reaches
+(`app-production-deploy`, filtered to `apps/`, `packages/`, `tools/scenarios/`,
+the `tools/ops` files the app builds import and Nx's shared root inputs). Docs,
+CI and other tooling pushes deploy nothing. Dispatch `app-production-deploy` to
+deploy every app or one, or to attach or detach production domains.
 
 Keep the label off between proof runs: dispatch the project you need, then remove
 the label the dispatch adds. Routing/rendering proof uses the preview MCP (`pr-<N>-sketchi-studio`), relevant scenario replay and a small
