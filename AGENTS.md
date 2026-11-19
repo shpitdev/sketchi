@@ -4,6 +4,7 @@
 
 - Use Nx and Cloudflare Workers. Do not reintroduce Next.js, Convex, Vercel, Bun or Turborepo.
 - Replace obsolete paths rather than adding compatibility layers. Keep package boundaries tested, generation inputs deterministic and the intermediate representation typed.
+- Write Effect code by [Effect conventions](docs/effect-conventions.md); it points to the v4 API guide.
 - Frontierclimb owns `sketchi` and `sketchi-generate`. It calls the `tools/scenarios` CLI for case discovery and deterministic grading. Preserve that contract; do not build a parallel eval system.
 - Measure readability **and** generation cost: tokens, tool calls, retries and wall time. An improvement must account for both.
 - Draw Excalidraw sketches that read at a glance. Prefer fewer elements and standard strokes; size limits are ceilings, not targets.

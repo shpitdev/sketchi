@@ -12,6 +12,10 @@ independent versions; see [the toolchain](effect-toolchain.md). Experimental or 
 status alone is not a reason to reject a supported API. Use current package exports;
 there is no special adapter directory for API maturity.
 
+Most model training data predates v4. For the v4 API, read the guide that ships with
+Effect, `node_modules/effect/AGENTS.md`, and its runnable examples under
+`node_modules/effect/ai-docs/src/`. Where they differ from this file, this file wins.
+
 ## Services and runtime ownership
 
 - Public and nontrivial service operations use `Effect.fn` with stable dotted names.
