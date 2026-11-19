@@ -144,13 +144,30 @@ describe("IconLibrary", () => {
 		fireEvent.change(search(), { target: { value: "icon" } });
 		const selectAll = screen.getByRole("checkbox", { name: "Select 300 of 400 results" });
 		expect(selectAll.parentElement?.textContent).toBe("Select 300");
-		fireEvent.click(selectAll);
+		expect(fireEvent.keyDown(document, { ctrlKey: true, key: "a" })).toBe(false);
 		expect(selectionBar()?.textContent).toContain("300 selected");
 		expect(selectionBar()?.textContent).toContain("Limit 300");
 		expect(screen.getByText("Selected 300, 100 left out at the 300 icon cap.")).toBeTruthy();
 		expect(
 			screen.getByRole("checkbox", { name: "Select all results" }).hasAttribute("disabled"),
 		).toBe(true);
+	});
+
+	it("gives the open command palette the first Escape without clearing the search", async () => {
+		render(<IconLibrary data={fixtureData} />);
+		fireEvent.change(search(), { target: { value: "k8s" } });
+		fireEvent.keyDown(search(), { ctrlKey: true, key: "k" });
+		expect(screen.getByRole("dialog", { name: "Commands" })).toBeTruthy();
+
+		fireEvent.keyDown(screen.getByPlaceholderText("Type a command or collection"), {
+			key: "Escape",
+		});
+		await waitFor(() => {
+			expect(screen.queryByRole("dialog", { name: "Commands" })).toBeNull();
+		});
+		expect(search().value).toBe("k8s");
+		expect(fireEvent.keyDown(document, { key: "Escape" })).toBe(false);
+		expect(search().value).toBe("");
 	});
 
 	it("downloads exactly the selection, including icons the filter hides", async () => {

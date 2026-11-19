@@ -21,7 +21,7 @@
 		"is-ci": "4.1.0",
 		"linkedom": "0.18.15",
 		"pako": "3.0.3",
-		"string-width": "8.3.0",
+		"string-width": "9.0.0",
 		"wrap-ansi": "10.0.2",
 		"@sketchi/community-icons": "workspace:*",
 		"@sketchi/drawing": "workspace:*",

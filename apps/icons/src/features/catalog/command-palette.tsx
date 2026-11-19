@@ -15,7 +15,7 @@ import {
 	DialogTitle,
 } from "@sketchi/ui/components/dialog";
 import { formatCollectionLabel } from "@sketchi/icon-catalog";
-import { formatForDisplay, type Hotkey } from "@tanstack/react-hotkeys";
+import { useFormatForDisplay, type Hotkey } from "@tanstack/react-hotkeys";
 import { Check } from "lucide-react";
 import { useRef } from "react";
 
@@ -63,6 +63,7 @@ export function CommandPalette({
 	open: boolean;
 	options: readonly (readonly [string, number])[];
 }) {
+	const formatForDisplay = useFormatForDisplay();
 	// The palette opens from Mod+K or a header button, never a DialogTrigger, so
 	// Radix has no trigger to hand focus back to. It records whatever had focus
 	// as it opens and puts focus back there on close, unless the chosen command
