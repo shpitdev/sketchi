@@ -9,9 +9,6 @@ a request whose `type` names no family is invalid input.
 
 Each [family](../packages/diagrams/src/families/) owns its document, layout and build.
 
-`tools/tests/diagram-families.test.ts` exercises generated-response ingestion and offline
-document builds without requiring particular source, story or test filenames.
-
 | Stage | Where | Guard |
 | --- | --- | --- |
 | family folder | `packages/diagrams/src/families/<name>/`: `document.ts` (Effect Schema contract and semantic validation), `build.ts` (the `defineBuild` operation: normalize, check, render, counts), `docs.ts`, `rules.ts`, and layout, rendering, readout and fixtures as the family needs them. Follow the shared Effect diagnostic policy. | compile, family tests, generated-response pipeline |
@@ -27,13 +24,13 @@ document builds without requiring particular source, story or test filenames.
 | maintained scenarios | `tools/scenarios`: scenarios with checks scored on the model's own diagram, registered in `diagramScenarios` or the reliability scenarios. | scenario regressions and Frontierclimb |
 | Storybook story | `tools/storybook/families/<name>.stories.tsx`. | Storybook build and review |
 
-The offline-build pipeline parses document JSON through the CLI, builds it with
-Code Mode (which validates its Excalidraw conversion), checks the returned scene
-and file, and reads both artifacts back from storage. The separate generated-response pipeline decodes a
-model-shaped response and renders the decoded diagram. Both paths exercise all
-15 families. These fixture checks do not establish model quality; Frontierclimb
-owns the graded generation catalogs. Family renderer regressions and full fuzz
-targets remain separate requirements when their implementations change.
+The [offline CLI test](../apps/cli/tests/cli.test.ts) creates diagrams from JSON
+and exports a valid Excalidraw file. Family tests check document builds and
+rendering. The [Studio generate API test](../apps/studio/src/features/generate/tests/api.server.test.ts)
+feeds a model reply per family through HTTP and decodes the returned document,
+scene, and Excalidraw file as the CLI would. Frontierclimb owns the graded model
+quality checks. Run the affected family regressions and full fuzz targets when
+changing their implementations.
 
 Groups (labeled regions around related steps) are a flowchart feature, not a
 family; see `docs/flowchart-groups.md`. So are nested architecture zones and

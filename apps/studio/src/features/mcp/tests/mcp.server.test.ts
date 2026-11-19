@@ -66,9 +66,15 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 	it("keeps the served declarations fresh and compilable", () => {
 		const generated = generateCodeModeTypes();
 		expect(SKETCHI_CODE_MODE_TYPES).toBe(generated);
+		// Fixed palettes are not editable through these requests (#386).
+		const consumer = `
+			type Assert<T extends true> = T;
+			type FixedPaletteInputs = keyof BuildMindmapRequest["spec"] | keyof BuildSequenceDiagramRequest["spec"];
+			type NoPaletteInput = Assert<"style" extends FixedPaletteInputs ? false : true>;
+		`;
 		const source = ts.createSourceFile(
 			"code-mode-types.ts",
-			SKETCHI_CODE_MODE_TYPES,
+			`${SKETCHI_CODE_MODE_TYPES}\n${consumer}`,
 			ts.ScriptTarget.Latest,
 			true,
 		);
