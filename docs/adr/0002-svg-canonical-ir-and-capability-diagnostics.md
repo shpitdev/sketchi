@@ -1,7 +1,7 @@
 # ADR 0002: Canonical SVG IR and capability diagnostics
 
 Date: 2026-07-11
-Status: Accepted for Slice 1
+Status: Accepted
 
 ## Context
 
@@ -83,8 +83,7 @@ vector across multiple flattening tolerances. Tests validate parser policy,
 geometry, diagnostics, deterministic output, and warning-only point budgets
 directly rather than comparing generated aggregate evidence.
 
-The affected-only corpus renderer described by ADR 0003 supplies broad drift
-coverage and uploads its complete report from CI without checking it into source.
+For corpus-wide drift checks, run the local `drawing:corpus-renderer` target described in [ADR 0003](0003-svg-native-conversion-and-library-serialization.md).
 
 ## Consequences
 

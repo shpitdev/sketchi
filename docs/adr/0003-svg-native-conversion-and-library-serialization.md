@@ -75,9 +75,8 @@ the outer half of a stroke.
 
 The corpus gate validates per-output exact IoU and symmetric foreground overlap
 with a fixed two-pixel raster tolerance. It writes the complete per-file report
-to `.memory/svg-native-corpus/`. CI runs this target only when
-`svg-excalidraw` or its corpus inputs are affected and uploads the report as a
-workflow artifact; no generated report is checked in or used as a snapshot.
+to `.memory/svg-native-corpus/`. Run `pnpm nx run drawing:corpus-renderer` locally when its inputs change.
+PR CI runs one Nx-affected typecheck, not the corpus renderer.
 
 The native-coverage run classified all 298 baseline blockers by exact blocker
 code set. Nonzero topology was the dominant class at 242 files (228 topology

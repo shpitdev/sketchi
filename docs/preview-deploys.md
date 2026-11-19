@@ -22,9 +22,7 @@ are not branch-isolated environments. We use Previews, not version aliases.
 Workers Builds supports Previews too, but this repo retains GitHub Actions and Nx
 as its build system.
 
-Studio Stop disposition (2026-11-16): closed as a Preview-platform symptom, not a code regression.
-
-Studio chat Stop/cancellation could not be verified on a Preview; the diagnosis attributed this to Previews not delivering the client disconnect to the Worker. A later MCP preview run did see a transport close interrupt the host `execute` spans, so this is not a rule for every Preview request. Chat Stop still needs the production check in the [plan](plans/product-structure.md#studio-stop-disposition--2026-11-16).
+A Preview did not confirm that Studio chat Stop ends the provider call. Closing an MCP transport interrupted the host `execute` spans, but that exercises a different path.
 
 ## Data isolation
 
@@ -43,12 +41,11 @@ reviewed change. Do not copy production secrets into the Preview base.
 
 `pnpm ops preview settings` checks the generated build config before
 upload: Worker identity, explicit runtime bindings, and that `previews` binds every
-production R2 bucket and Pipeline stream binding to a non-production target (the
-R2 target must match the top-level `preview_bucket_name`). Each binding entry may
-only use reviewed keys (Pipelines: `binding`, `stream`, `remote`; R2: `binding`,
-`bucket_name`, `remote`, `jurisdiction`), because Wrangler also forwards the legacy
-Pipelines `pipeline` key. Any other `previews` field, such as KV, D1, or service
-bindings, fails until its isolation is reviewed.
+production R2, D1 and Pipeline binding to a non-production target. When a binding declares `preview_bucket_name` or `preview_database_id`, the preview
+bucket name or database ID must match it.
+Icons Previews share that preview database, not the production database. The
+[validator](../tools/ops/src/deploy/preview.ts) rejects unreviewed binding keys
+and unsupported fields such as KV and service bindings.
 Cloudflare [resources and isolation](https://developers.cloudflare.com/workers/previews/resources/)
 explains that R2 and Pipelines isolation depends on binding separate resources;
 service bindings currently call the target Worker's production deployment.
@@ -106,7 +103,6 @@ the first attempt.
 - GitHub `staging`: `CLOUDFLARE_ACCOUNT_ID` variable or secret and
   `CLOUDFLARE_API_TOKEN` secret with Workers edit/deploy and bound-resource access.
 - GitHub `production`: separate production credentials for production deploys.
-- `CHROMATIC_PROJECT_TOKEN`: staging secret for the CI Storybook gate.
 
 Infisical project `sketchi`, path `/github`, is the source of GitHub environment
 secrets: `staging` maps to GitHub `staging`; `prod` maps to GitHub `production`.
@@ -170,25 +166,14 @@ until the next push reaching that app or a dispatch. Production deploys pass
 `--no-x-provision`; Workers may bind existing resources, but these deploys do
 not create or discover storage. Domain attachment remains an explicit action.
 
-Studio first-production-deploy checklist (2026-11-16): production deployment still
-requires the user's decision.
-
-- [ ] After the first production deploy of Studio, press Stop once on a long prompt and read its gateway log. If the call does not end within a few seconds, roll Studio back.
-
-Those deploys keep `workers_dev` enabled so the app can be verified from
-Cloudflare-owned `workers.dev` URLs before any DNS or registrar cutover.
+Production deploys keep `workers_dev` enabled.
 Production deploy summaries include the same public/internal route policy and
 the custom domains that would be attached by a manual domain dispatch. Internal
 apps report no custom domains.
 
-The Studio Worker binds Code Mode artifacts to R2. Studio binds its spans stream, which also carries Code Mode usage:
-
-| Surface                            | Binding             | Remote target                                  |
-| ---------------------------------- | ------------------- | ---------------------------------------------- |
-| Studio Previews                    | `SKETCHI_ARTIFACTS` | `sketchi-studio-codemode-artifacts-preview`    |
-| Studio production Worker           | `SKETCHI_ARTIFACTS` | `sketchi-studio-codemode-artifacts-production` |
-| Studio Previews                    | `TELEMETRY_SPANS`   | `d3066c58106b4facbc146e9188e383b1`             |
-| Studio production                  | `TELEMETRY_SPANS`   | `e118fdd69a2548258389e82fb1ade1d6`             |
+[Studio's Wrangler config](../apps/studio/wrangler.jsonc) binds `SKETCHI_ARTIFACTS`
+(Code Mode artifacts) and `TELEMETRY_SPANS` (request spans, including Code Mode usage)
+to separate preview and production resources.
 
 `TELEMETRY_SPANS` is not `remote`, so local development writes to a local stream
 rather than production's. Every Preview shares the preview spans stream; the
@@ -221,7 +206,7 @@ Custom domains are a post-merge operator action. The production workflow writes
 a generated `dist/apps/<project>/server/wrangler.domains.json` config from
 `pnpm ops production domains` and deploys that route-bearing
 config only when explicitly dispatched with `domain_action=attach`. Follow
-[Production domain cutover](production-domain-cutover.md); never attach domains
+[Production domains](production-domain-cutover.md); never attach domains
 from a pull request or before the Cloudflare zone is active.
 
 When `domain_action=attach`, the production domain helper attaches

@@ -98,8 +98,8 @@ scenario CLI smoke, typecheck/build/test, root TypeScript references and the
 changes select the native actionlint target. Full gates also run sampled routing.
 
 - Before pushing, run `pnpm ci:local --no-signoff`. `--base <ref>` compares
-  with another verified base; such a gate cannot post `local-ci`, even with
-  `--all`. Documentation-only changes and unchanged patches do not require a
+  with a verified base. To post `local-ci`, that ref must resolve to the same
+  commit as `origin/main`, even with `--all`. Documentation-only changes and unchanged patches do not require a
   duplicate runtime gate.
 - For signoff after the push, run `pnpm ci:local` on the pushed head. It refuses a dirty
   worktree or a HEAD the PR does not have, and on success posts the `local-ci`
@@ -134,7 +134,7 @@ These larger suites remain local proof when their inputs change:
 - `pnpm nx run diagrams:gantt-fuzz` (300 plans per Gantt fuzz; the gate runs 4)
 - `pnpm nx run diagrams:chart-fuzz` (300 chart seeds; the gate runs 1–12 plus decimal seed 27)
 - `pnpm nx run diagrams:mindmap-fuzz` (2,000 mindmap seeds; the gate runs 8)
-- `pnpm nx run diagrams:routing-fuzz` (full flowchart, grouped, state, label and text-fit matrices; the gate samples 4–8 cases, retaining all 30 wrapping cases)
+- `pnpm nx run diagrams:routing-fuzz` (full flowchart, grouped, state, label and text-fit matrices; sample sizes vary by [routing test](packages/diagrams/src/graph/tests/))
 - `pnpm nx run diagrams:er-fuzz` (240 schemas; the gate runs 16)
 - `pnpm nx run diagrams:class-fuzz` (240 models and 120 text-fit rounds; the gate runs 16 and 12)
 - `pnpm nx run diagrams:org-chart-fuzz` (900 random charts across three seeds; the gate runs 6)
@@ -159,12 +159,10 @@ bounded set of inspected PNGs.
 A push to main deploys to production the Worker apps whose build it reaches
 (`app-production-deploy`, filtered to `apps/`, `packages/`, `tools/scenarios/`,
 the `tools/ops` files the app builds import and Nx's shared root inputs). A push
-of only root docs (`docs/`, root Markdown), `.github` or other tooling starts
-nothing. Selection is conservative: any app file outside Nx's `production`
+of only root docs (`docs/`, root Markdown) starts no production deploy. Selection is conservative: any app file outside Nx's `production`
 exclusions (tests, `tests/`, stories, `.storybook/`, snapshots,
 `tsconfig.spec.json`) redeploys that app, its README and test config included,
-and a push mixing app and `tools/ops` changes redeploys every app. Apps deploy
-in parallel and there is no approval gate. Dispatch `app-production-deploy` to
+and a push mixing app and `tools/ops` changes redeploys every app. Studio and Icons share one upload queue with their previews. There is no approval gate. Dispatch `app-production-deploy` to
 deploy every app or one, or to attach or detach production domains.
 
 For UI-affecting changes, verify the changed flow against the real page with
