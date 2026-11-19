@@ -20,9 +20,8 @@ import { describe, expect, it } from "vitest";
  * `themeConsumers()` therefore derives the list from the imports rather than
  * hardcoding it, so a new surface fails here instead of in production.
  *
- * editor declares the face, so it holds the reference copy and serves it to
- * Storybook through `staticDirs`; every surface must match that copy byte for
- * byte.
+ * The shared theme package holds the reference copy; every app surface must
+ * match it byte for byte.
  *
  * The files are also redistributed under the SIL Open Font License 1.1, whose
  * clause 2 requires the copyright notice and licence to travel with every copy.
@@ -114,15 +113,6 @@ describe("vendored Excalifont", () => {
 		expect(licence).toContain("Copyright (c) 2024 by Excalidraw");
 		expect(licence).toContain("SIL Open Font License, Version 1.1");
 		expect(licence).toContain("Excalifont is a trademark of Excalidraw");
-	});
-
-	it("serves the reference copy to Storybook", () => {
-		const storybookConfig = readFileSync(
-			join(repoRoot, THEME_PACKAGE, ".storybook/main.ts"),
-			"utf8",
-		);
-
-		expect(storybookConfig).toMatch(/staticDirs:\s*\["\.\.\/public"\]/u);
 	});
 
 	it("declares an @font-face for every vendored subset", () => {

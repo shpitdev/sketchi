@@ -36,9 +36,6 @@
       "path": "./tools/icon-batch"
     },
     {
-      "path": "./tools/sketchi-generators"
-    },
-    {
       "path": "./apps/cli"
     },
     {

@@ -9,7 +9,7 @@ Convex, Vercel, Bun, or Turborepo stack.
 ## Priorities
 
 - Prefer readable, tested package boundaries over compatibility layers.
-- Treat diagram generation as product-critical infrastructure: deterministic inputs, typed intermediate representation, functional tests, and Storybook coverage.
+- Treat diagram generation as product-critical infrastructure: deterministic inputs, typed intermediate representation, and functional tests. Use the optional diagram family gallery for visual review.
 - Delete obsolete approaches when replacing them. Do not carry parallel systems unless a migration step explicitly requires it.
 - Frontierclimb owns the graded catalogs `sketchi` and `sketchi-generate`, and currently calls Sketchi's scenario CLI for case discovery and deterministic grading from `tools/scenarios`. Preserve that real caller; do not add a parallel eval system or assume the existing graders are already copied to Frontierclimb.
 - Generation cost is product quality. A diagram that reads badly is a failure, and so is one that takes excess tokens, tool calls, retries or wall time to produce. Measure both before claiming an improvement.
@@ -93,9 +93,9 @@ Reuse unchanged proof by identity instead of repeating expensive checks.
 `origin/main`, including staged, unstaged and untracked changes. After a frozen
 install and `nx sync:check`, native Nx affected targets own lint/format, tools
 (including custom-rule, domain and font tests), deployment/process behavior,
-scenario CLI smoke, typecheck/build/test, root TypeScript references and the
-`editor-surface` Storybook build. Checks reuse the native local task cache. Workflow
-changes select the native actionlint target. Full gates also run sampled routing.
+scenario CLI smoke, typecheck/build/test, and root TypeScript references. Checks
+reuse the native local task cache. Workflow changes select the native actionlint
+target. Full gates also run sampled routing.
 
 - Before pushing, run `pnpm ci:local --no-signoff`. `--base <ref>` compares
   with a verified base. To post `local-ci`, that ref must resolve to the same

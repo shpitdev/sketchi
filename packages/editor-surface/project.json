@@ -16,29 +16,6 @@
 				"parallel": false
 			}
 		},
-		"build-storybook": {
-			"outputs": ["{workspaceRoot}/storybook-static/editor-surface"],
-			"options": {
-				"output-dir": "../../storybook-static/editor-surface"
-			}
-		},
-		"chromatic": {
-			"executor": "nx:run-commands",
-			"dependsOn": ["build-storybook"],
-			"options": {
-				"command": "chromatic --storybook-build-dir storybook-static/editor-surface --storybook-config-dir packages/editor-surface/.storybook --storybook-base-dir packages/editor-surface"
-			}
-		},
-		"static-storybook": {
-			"options": {
-				"staticFilePath": "storybook-static/editor-surface"
-			}
-		},
-		"storybook": {
-			"options": {
-				"port": 6006
-			}
-		},
 		"test": {
 			"executor": "nx:run-commands",
 			"outputs": ["{workspaceRoot}/coverage/packages/editor-surface"],
@@ -55,11 +32,6 @@
 				],
 				"parallel": false
 			}
-		},
-		"check-storybook": {
-			"executor": "nx:noop",
-			"inputs": ["default", "^default", "{workspaceRoot}/tools/ops/src/vite/excalidraw-fonts.ts"],
-			"dependsOn": ["build-storybook"]
 		}
 	}
 }

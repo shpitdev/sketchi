@@ -6,7 +6,7 @@ Public SVG search, copy, download, HTTP API, and MCP surface for Sketchi.
 
 `@sketchi/icon-catalog` (`packages/icons/catalog`) owns the icon pipeline
 output, the SVG sources, the generated manifest, and ranked search. Before
-`dev`, `build`, and Storybook, `pnpm nx sync-catalog-assets icons` publishes
+`dev` and `build`, `pnpm nx sync-catalog-assets icons` publishes
 ignored copies into `public/`:
 
 - `public/icons-manifest.json` is the browser contract. It contains only slug,
@@ -153,8 +153,6 @@ pnpm nx dev icons
 pnpm nx test icons
 pnpm nx typecheck icons
 pnpm nx build icons
-pnpm nx storybook icons
-pnpm nx build-storybook icons
 ```
 
 The main Sketchi docs should add a short Icons API section covering the HTTP

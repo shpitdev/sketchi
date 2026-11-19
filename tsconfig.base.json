@@ -22,9 +22,6 @@
     "target": "ES2024",
     "types": ["node"],
     "useDefineForClassFields": true,
-    "paths": {
-      "@sketchi/generators": ["./tools/sketchi-generators/src/index.ts"]
-    },
     "noUncheckedSideEffectImports": false,
     "plugins": [
       {

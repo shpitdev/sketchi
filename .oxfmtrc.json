@@ -22,10 +22,6 @@
 		"**/CHANGELOG.md",
 		"pnpm-lock.yaml",
 		"packages/icons/catalog/src/generated/**",
-		// @nx/js:tsc writes tmp/<project>/<target>/tsconfig.generated.<uuid>.json for the
-		// length of a build (today tmp/tools/sketchi-generators/build/...); check-format
-		// can run in the same Nx invocation and must not scan it.
-		"tmp/**/tsconfig.generated.*.json",
 		// Byte-exact fixtures and frozen compatibility corpora
 		"apps/studio/src/features/build/tests/fixtures/**",
 		// Vendored shadcn and AI Elements registry components

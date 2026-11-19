@@ -14,7 +14,6 @@ flowchart LR
 | ------------------------------- | -------------------------------- |
 | public home and docs routes     | diagram generation runtime       |
 | marketing and product copy UI   | Code Mode MCP/API implementation |
-| app-specific Storybook states   | artifact storage or rendering    |
 | Worker deployment for `sketchi` | Excalidraw nav                   |
 
 ## Commands
@@ -25,8 +24,6 @@ pnpm nx test web
 pnpm nx typecheck web
 pnpm nx build web
 pnpm nx preview web           # serve the build at http://127.0.0.1:6301
-pnpm nx storybook web
-pnpm nx build-storybook web
 pnpm nx run web:social-card    # redraw the link-preview card
 pnpm nx run web:home-diagram   # re-export the home diagram after replacing its scene
 ```

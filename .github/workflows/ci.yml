@@ -1,8 +1,8 @@
 name: ci
 
-# The thin remote check: a typecheck of the Nx-affected graph, which also catches a bad merge
-# with the base. Lint, tests, builds, Storybook and the repository contracts run locally in
-# `pnpm ci:local`, which signs off the PR head as `local-ci` (see AGENTS.md).
+# The remote check typechecks projects affected by the PR head since its merge base.
+# Lint, tests, builds and repository contracts run in `pnpm ci:local`, which signs
+# off the PR head as `local-ci` (see AGENTS.md).
 on:
   pull_request:
 

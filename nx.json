@@ -145,16 +145,6 @@
 			"dependsOn": ["^build"],
 			"cache": true,
 			"outputs": []
-		},
-		"@nx/js:tsc": {
-			"cache": true,
-			"dependsOn": ["^build"],
-			"inputs": ["production", "^production"]
-		},
-		"build-storybook": {
-			"inputs": ["default", "^default", "{workspaceRoot}/tools/ops/src/vite/excalidraw-fonts.ts"],
-			"cache": true,
-			"dependsOn": ["^build"]
 		}
 	},
 	"release": {
@@ -170,17 +160,6 @@
 	"affected": {
 		"legacy": false
 	},
-	"plugins": [
-		{
-			"plugin": "@nx/storybook/plugin",
-			"options": {
-				"buildStorybookTargetName": "build-storybook",
-				"serveStorybookTargetName": "storybook",
-				"staticStorybookTargetName": "static-storybook",
-				"testStorybookTargetName": "test-storybook"
-			}
-		}
-	],
 	"sync": {
 		"globalGenerators": ["@nx/js:typescript-sync"]
 	}

@@ -101,16 +101,6 @@ if (name === "pnpm" && args.includes("-t") && process.env.GATE_NX_FAILURE) proce
 }
 
 describe("ci-local gate", () => {
-	test("includes the Storybook check in a unit gate", () => {
-		const fixture = gateFixture();
-		const result = fixture.run(["--no-signoff", "--base", fixture.unitBase]);
-		expect(result.status, result.stderr).toBe(0);
-		const [nx] = result.nx;
-		expect(nx?.args).toContain(
-			"typecheck,build,test,check-scenario,check-storybook,test-timeline,test-graph,check-workflows,routing-sample",
-		);
-	});
-
 	test("posts local-ci for the PR head only when signing off", () => {
 		const fixture = gateFixture();
 		const unsigned = fixture.run(["--no-signoff"]);

@@ -1,17 +1,15 @@
-# Native conversion Storybook
+# Diagram family gallery
 
-Unified Chromatic surface for the SVG native-conversion vertical and the diagram
-family stories in `tools/storybook/families`. It publishes:
+Review all 15 diagram families in Studio's `GenerationWorkspace`, plus the shared
+Excalidraw canvas and the Editor's SVG-to-native workspace. Family fixtures live
+in `tools/storybook/families/`. The gallery serves Excalifont from the shared
+editor-surface package.
 
-- Icons supported, warned, blocked, and original capability states;
-- editor (`apps/editor`) editable and blocked SVG workspace states;
-- the shared native editable-element canvas story;
-- one story per diagram family.
-
-The Nx project depends on `editor`, `editor-surface`, `icons`, and `studio`, so
-changes to those projects mark this Storybook as affected.
+From the repository root:
 
 ```sh
-pnpm nx build-storybook native-conversion-storybook
-pnpm nx chromatic native-conversion-storybook
+pnpm storybook        # http://127.0.0.1:6010
+pnpm build-storybook  # storybook-static/native-conversion/
 ```
+
+The gallery is optional. It does not run in CI or deploy to a Worker.
