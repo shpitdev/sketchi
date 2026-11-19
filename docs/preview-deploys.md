@@ -69,7 +69,10 @@ choices come from the workflow ref; the build and selectors come from the PR hea
 The workflow resolves the PR head SHA before checkout; that SHA appears in deploy
 metadata and comments. It also adds the `preview` label before anything uploads,
 so closing the PR cleans up even if no Preview comment exists yet, and later
-pushes keep the PR's affected Previews current.
+pushes keep the PR's affected Previews current. For a proof run, dispatch only the
+project you need, then remove the label between runs to avoid deploying on each push.
+For routing or rendering changes, replay the relevant scenarios against the Studio
+preview MCP (`pr-<number>-sketchi-studio`) and inspect a small set of exported PNGs.
 
 - The shared mise setup uses the repository's exact Node/pnpm pins and a frozen lockfile.
 - Each build writes assets to `dist/apps/<project>/client` and the deploy snapshot
