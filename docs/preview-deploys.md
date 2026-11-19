@@ -53,10 +53,9 @@ service bindings currently call the target Worker's production deployment.
 ## Workflow and comments
 
 Previews are opt-in. A same-repository pull request to `main` with the `preview`
-label deploys the apps it affects (`nx show projects --affected` between the PR's
-merge base and head) on every push; a change to the preview tooling itself
-(`app-preview.yml`, the shared setup action, `tools/ops/src/deploy/` and the ops command entry)
-deploys all four. Unlabelled PRs deploy nothing, and adding another label runs
+label deploys affected Worker builds on every push (`nx show projects --affected
+--withTarget=build` from the PR's merge base to its head). A change to
+[preview tooling](../tools/ops/src/deploy/preview.ts) selects all four Workers. Unlabelled PRs deploy nothing, and adding another label runs
 nothing. Forks are excluded. Closing a same-repository PR deletes all four
 Previews when one can exist: the PR carries the `preview` label or a preview
 comment, however the Preview was deployed (including before previews were
@@ -155,13 +154,12 @@ The workflows run typed `pnpm ops` commands from `tools/ops`; `pnpm ops --help` 
 ## Production Worker Deploys
 
 The `app-production-deploy` workflow runs on a push to `main` and by manual
-dispatch. A push deploys only the Worker apps whose `build` inputs it reaches
-from the previous `main` commit (`ops production select --project affected`);
-its path filter skips pushes of only root docs (`docs/`, root Markdown),
-`.github` or tooling outside the app build inputs. Selection follows Nx build
-inputs, so it is conservative: an app's own README or test config redeploys
-that app, and a push that also touches `tools/ops` redeploys every app. The
-`production` environment has no approval gate. A dispatch deploys all configured Worker apps or
+dispatch. The [push filter](../.github/workflows/app-production-deploy.yml) covers
+`apps/`, `packages/`, `tools/scenarios/`, `tools/build-config/` and shared root build inputs.
+Project READMEs, test directories, Vitest configs and `tsconfig.spec.json` alone do not trigger it.
+Nx then selects affected Worker builds from the previous `main` commit to the pushed head.
+Unlike previews, changes to deploy commands do not select extra Workers.
+The `production` environment has no approval gate. A dispatch deploys all configured Worker apps or
 one named project. A failed deployment leaves the last deployed version active
 until the next push reaching that app or a dispatch. Production deploys pass
 `--no-x-provision`; Workers may bind existing resources, but these deploys do
