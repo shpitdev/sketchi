@@ -8,9 +8,11 @@ import { localInspectorPort, localViteCacheDir } from "../../tools/local-dev-por
 import { workerProjectConfig } from "../../tools/ops/src/workers";
 
 const workerProject = workerProjectConfig("icons");
+const devPort = 6203;
 
 export default defineConfig({
 	root: new URL(".", import.meta.url).pathname,
+	server: { host: "127.0.0.1", port: devPort, strictPort: true },
 	build: {
 		emptyOutDir: true,
 		outDir: new URL(`../../${workerProject.buildOutputPath}`, import.meta.url).pathname,
@@ -20,7 +22,7 @@ export default defineConfig({
 	plugins: [
 		cloudflare({
 			configPath: new URL("./wrangler.jsonc", import.meta.url).pathname,
-			inspectorPort: localInspectorPort(6203),
+			inspectorPort: localInspectorPort(devPort),
 			viteEnvironment: {
 				name: "ssr",
 			},

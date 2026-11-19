@@ -24,7 +24,7 @@ flowchart LR
 ## Commands
 
 ```sh
-pnpm nx dev editor          # https://editor.sketchi.localhost
+pnpm nx dev editor          # http://127.0.0.1:6202
 pnpm nx test editor
 pnpm nx typecheck editor
 pnpm nx build editor

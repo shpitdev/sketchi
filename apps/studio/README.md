@@ -23,7 +23,7 @@ flowchart LR
 ## Commands
 
 ```sh
-pnpm nx dev studio          # https://studio.sketchi.localhost
+pnpm nx dev studio          # http://127.0.0.1:6210
 pnpm nx test studio
 pnpm nx typecheck studio
 pnpm nx build studio

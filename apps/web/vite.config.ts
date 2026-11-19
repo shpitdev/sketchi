@@ -9,9 +9,11 @@ import { excalidrawFonts } from "../../tools/ops/src/vite/excalidraw-fonts";
 import { workerProjectConfig } from "../../tools/ops/src/workers";
 
 const workerProject = workerProjectConfig("web");
+const devPort = 6201;
 
 export default defineConfig({
 	root: new URL(".", import.meta.url).pathname,
+	server: { host: "127.0.0.1", port: devPort, strictPort: true },
 	build: {
 		emptyOutDir: true,
 		outDir: new URL(`../../${workerProject.buildOutputPath}`, import.meta.url).pathname,
@@ -23,7 +25,7 @@ export default defineConfig({
 		excalidrawFonts(),
 		cloudflare({
 			configPath: new URL("./wrangler.jsonc", import.meta.url).pathname,
-			inspectorPort: localInspectorPort(6201),
+			inspectorPort: localInspectorPort(devPort),
 			viteEnvironment: {
 				name: "ssr",
 			},
