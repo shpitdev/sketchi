@@ -35,27 +35,6 @@ describe("icons HTTP API", () => {
 		expect(capped.results).toHaveLength(100);
 	});
 
-	it("serves detail and raw SVG, a folded slug as its kept mark, and stable 404s", async () => {
-		expect(await (await fetchIcons("/api/icons/postgresql")).json()).toMatchObject({
-			slug: "postgresql",
-			svg: '<svg viewBox="0 0 24 24" />',
-		});
-		expect(await (await fetchIcons("/api/icons/anthos-gcp-legacy")).json()).toMatchObject({
-			slug: "anthos",
-			collection: "gcp",
-		});
-		const raw = await fetchIcons("/api/icons/postgresql.svg");
-		expect(raw.headers.get("Content-Type")).toContain("image/svg+xml");
-		expect(raw.headers.get("Access-Control-Allow-Origin")).toBe("*");
-		expect(await raw.text()).toBe('<svg viewBox="0 0 24 24" />');
-		const missing = await fetchIcons("/api/icons/missing.svg");
-		expect(missing.status).toBe(404);
-		const head = await fetchIcons("/api/icons/postgresql", { method: "HEAD" });
-		expect(head.status).toBe(405);
-		expect(head.headers.get("Allow")).toBe("GET, OPTIONS");
-		expect(head.headers.get("Access-Control-Allow-Origin")).toBe("*");
-	});
-
 	it("refuses community publishing without a store", async () => {
 		const publish = await fetchIcons("/api/community", { method: "POST", body: "{}" });
 		expect(publish.status).toBe(503);

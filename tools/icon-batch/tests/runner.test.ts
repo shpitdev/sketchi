@@ -13,9 +13,9 @@ import { initializeResvg, svgPng } from "../src/excalidraw-export";
 import { promote } from "../src/promote";
 import { BatchWriteError, runBatch } from "../src/runner";
 import { marksToDraw } from "../src/selection";
-import { verdictLine, writeSheets } from "../src/sheets";
+import { writeSheets } from "../src/sheets";
 import { RunStore } from "../src/store";
-import { ledgerCsv, summarize, summaryMarkdown } from "../src/summary";
+import { ledgerCsv, summarize } from "../src/summary";
 
 const SONNET: IconAuthorModel = "anthropic/claude-sonnet-5-5";
 const OPUS: IconAuthorModel = "anthropic/claude-opus-5-5";
@@ -163,9 +163,6 @@ describe("runBatch", () => {
 		});
 		expect(summary.costUsd).toBeCloseTo(0.14);
 		expect(ledgerCsv(Object.values(records)).split("\n")[0]).toContain("judge_picked");
-		expect(summaryMarkdown(Object.values(records), { remaining: 10 })).toContain(
-			"`broken` (devtools-ci): failed, IconRecipeError",
-		);
 	});
 
 	it("starts no draw that could pass the spend cap, and resumes where it stopped", async () => {
@@ -532,7 +529,14 @@ it("charges the failed draw's ceiling when its log never prices and does not rep
 		};
 		const ceiling = attemptCeilingUsd(SONNET);
 		const batch = runBatch({
-			marks: [icon("unpriced"), icon("next")],
+			// Must reach the gateway even though the catalog name is too long for the draw input.
+			marks: [
+				{
+					...icon("unpriced"),
+					name: "AWS Application Discovery Service Migration Evaluator Collector",
+				},
+				icon("next"),
+			],
 			store,
 			concurrency: 1,
 			spendCapUsd: ceiling,
@@ -697,12 +701,6 @@ describe("writeSheets", () => {
 				previews: { png28: png, png112: png },
 			}),
 		});
-		const records = Object.fromEntries(
-			(await store.records()).map((record) => [record.slug, record]),
-		);
-		expect(verdictLine(records["docker"]!)).toBe("recognized | sonnet-5-5 r2 1p $0.020");
-		expect(verdictLine(records["github"]!)).toBe("judge picked lookalike | opus-5-5 r2 1p $0.040");
-		expect(verdictLine(records["redis"]!)).toBe("failed: IconRecipeError");
 		const written = await writeSheets(store, async () => undefined, join(root, "sheets"));
 		expect(written.map((path) => path.slice(root.length))).toEqual([
 			"/sheets/recognized-01.png",

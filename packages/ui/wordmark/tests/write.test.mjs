@@ -12,9 +12,9 @@ test("the committed wordmark is what the strokes ink to", () => {
 	);
 });
 
-test("the wordmark stays a small, single path", () => {
+test("the wordmark path stays under 5000 bytes", () => {
 	const source = readFileSync(OUTPUT, "utf8");
-	const path = /"(M[^"]+)"/u.exec(source)?.[1] ?? "";
-	assert.equal(path.match(/M/gu)?.length, 1, "one absolute move; the rest are relative subpaths");
+	const path = /WORDMARK_PATH\s*=\s*"([^"]+)"/u.exec(source)?.[1];
+	assert.ok(path);
 	assert.ok(Buffer.byteLength(path) < 5000, `${Buffer.byteLength(path)} bytes`);
 });

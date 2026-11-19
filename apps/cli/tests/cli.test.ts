@@ -3,6 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { join, resolve } from "node:path";
 
 import { afterEach, assert, describe, it } from "@effect/vitest";
+import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
+import { Schema } from "effect";
 
 import { clipboardTool } from "../src/terminal/clipboard";
 
@@ -172,7 +174,8 @@ describe("sketchi offline command flow", () => {
 		);
 		const excalidraw = run(["export", "launch-map", "--format", "excalidraw", "--dest", "-"]);
 		assert.strictEqual(excalidraw.status, 0, excalidraw.stderr);
-		assert.strictEqual(JSON.parse(excalidraw.stdout).type, "excalidraw");
+		const file = Schema.decodeUnknownSync(ExcalidrawFile)(JSON.parse(excalidraw.stdout));
+		assert.isAbove(file.elements.length, 0);
 
 		assert.strictEqual(json(3, ["create", "--json", "{}"]).error.code, "invalid_document");
 		assert.strictEqual(json(5, ["show", "missing-diagram"]).error.code, "diagram_not_found");

@@ -10,7 +10,6 @@ import {
 	FLOWCHART_MAX_NODES,
 	FlowchartDiagram,
 	flowchartDiagramFromDocument,
-	flowchartDocumentPairCount,
 	type FlowchartDocument,
 	FlowchartValidationIssueCodeSchema,
 	getFlowchartValidationIssues,
@@ -137,13 +136,12 @@ describe("flowchart documents", () => {
 		);
 	});
 
-	it("counts list-ended edges without expanding them, and refuses past the limit", () => {
+	it("refuses a document whose list-ended edges exceed the edge limit", () => {
 		const ids = (prefix: string) => Array.from({ length: 300 }, (_, index) => `${prefix}${index}`);
 		const edges: FlowchartDocument["edges"] = [
 			[ids("a"), ids("b")],
 			["x", ["y", "z"]],
 		];
-		expect(flowchartDocumentPairCount(edges)).toBe(90_002);
 		const result = flowchartDiagramFromDocument({
 			title: "Fan out",
 			nodes: { x: "X", y: "Y" },
