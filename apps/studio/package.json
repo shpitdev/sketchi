@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"dependencies": {
-		"@cloudflare/playwright": "1.3.6",
+		"@cloudflare/playwright": "1.4.0",
 		"@effect/ai-openai": "catalog:",
 		"@effect/atom-react": "catalog:",
 		"@effect/platform-browser": "catalog:",
