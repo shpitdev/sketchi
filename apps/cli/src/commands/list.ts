@@ -11,13 +11,14 @@ import { rootCommand } from "./root";
 
 const DEFAULT_LIST_LIMIT = 20;
 const LIST_TITLE_WIDTH = 48;
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 function fitWidth(value: string, width: number): string {
 	if (stringWidth(value) <= width) return value;
 	let fitted = "";
-	for (const character of value) {
-		if (stringWidth(`${fitted}${character}…`) > width) break;
-		fitted += character;
+	for (const { segment } of graphemes.segment(value)) {
+		if (stringWidth(`${fitted}${segment}…`) > width) break;
+		fitted += segment;
 	}
 	return `${fitted}…`;
 }

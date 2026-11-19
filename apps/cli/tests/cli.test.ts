@@ -143,7 +143,13 @@ describe("sketchi offline command flow", () => {
 			"invalid_document",
 		);
 
-		json(0, ["create", "--file", "-"], `${JSON.stringify(mindmap)}\n`);
+		const titlePrefix = `${"界".repeat(22)}a`;
+		const conjunctTitle = `${titlePrefix}ष्ट्र Extra`;
+		json(0, ["create", "--file", "-"], `${JSON.stringify(retitled(mindmap, conjunctTitle))}\n`);
+		const list = run(["list"]);
+		assert.strictEqual(list.status, 0, list.stderr);
+		const truncated = list.stdout.split("\n").find((line) => line.startsWith("launch-map"));
+		assert.include(truncated ?? "", `${titlePrefix}…`);
 		json(0, [
 			"edit",
 			"launch-map",
