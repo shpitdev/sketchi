@@ -26,7 +26,6 @@ import {
 	productionSummary,
 	selectProductionProjects,
 } from "./deploy/production";
-import { runWithAssetsUploadRetry } from "./deploy/wrangler-retry";
 import { optionalEnv, requiredEnv, writeOutputs } from "./outputs";
 import { attempt, capture, opsError, output, runInherited } from "./process";
 import { DEFAULT_ENDPOINT, runSanity } from "./sanity";
@@ -326,21 +325,6 @@ const production = Command.make("production").pipe(
 	]),
 );
 
-const wranglerRetry = Command.make(
-	"wrangler-retry",
-	{ command: Argument.String("command").pipe(Argument.variadic({ min: 1 })) },
-	(input) =>
-		Effect.gen(function* () {
-			const [file, ...args] = input.command;
-			if (!file) return yield* opsError("Usage: ops wrangler-retry -- <command> [args...]");
-			return yield* exitWith(yield* runWithAssetsUploadRetry(file, args));
-		}),
-).pipe(
-	Command.withDescription(
-		"Run a deploy command, retrying Cloudflare's assets-upload-session 10013 failure.",
-	),
-);
-
 const dryRun = Command.make("dry-run", {}, () =>
 	Effect.gen(function* () {
 		const fs = yield* FileSystem.FileSystem;
@@ -415,17 +399,7 @@ const worker = Command.make("worker").pipe(
 
 export const ops = Command.make("ops").pipe(
 	Command.withDescription("Sketchi operator commands."),
-	Command.withSubcommands([
-		ciLocal,
-		worker,
-		preview,
-		production,
-		wranglerRetry,
-		dryRun,
-		sanity,
-		db,
-		telemetry,
-	]),
+	Command.withSubcommands([ciLocal, worker, preview, production, dryRun, sanity, db, telemetry]),
 );
 
 export { GateFailed };

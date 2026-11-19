@@ -92,12 +92,10 @@ Pipeline-bound Studio and Icons uploads share
 jobs without cancelling active uploads; other apps retain their per-app/per-PR
 concurrency policies.
 
-Preview and production uploads run through `pnpm ops wrangler-retry`. It retries
-only Cloudflare's `assets-upload-session` failure with code 10013, twice, after
-30s and then 60s
-([cloudflare/workers-sdk#16447](https://github.com/cloudflare/workers-sdk/issues/16447)).
-Cloudflare returns it before any asset is uploaded. Every other error fails on
-the first attempt.
+Wrangler retries transient `assets-upload-session` failures, including HTTP 500
+with code 10013, up to three total attempts. This retries the session request,
+not the deployment command
+([cloudflare/workers-sdk#16562](https://github.com/cloudflare/workers-sdk/pull/16562)).
 
 ## Required configuration
 
@@ -150,7 +148,6 @@ The workflows run typed `pnpm ops` commands from `tools/ops`; `pnpm ops --help` 
 - `preview delete`: delete this PR's Preview of one Worker and confirm its URL stopped serving.
 - `production domains`: require the active zone and prepare an explicitly requested production domain config.
 - `production detach`: detach only the app's approved domains that still point at its Worker.
-- `wrangler-retry`: run a Wrangler upload, retrying only the 10013 assets-upload-session error.
 
 ## Production Worker Deploys
 
