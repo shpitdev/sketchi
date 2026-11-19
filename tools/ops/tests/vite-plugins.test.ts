@@ -1,4 +1,4 @@
-// The build plugins the Worker apps load from tools/ops/src/vite, and the font files and cache
+// The build plugins the Worker apps load from tools/build-config, and the font files and cache
 // headers they ship.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -6,14 +6,14 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { clientServerBoundary } from "../src/vite/client-server-boundary";
+import { clientServerBoundary } from "../../build-config/client-server-boundary";
 import {
 	excalidrawFontFiles,
 	excalidrawFontHeaders,
 	excalidrawFonts,
 	excalidrawFontsDirectory,
-} from "../src/vite/excalidraw-fonts";
-import { workerProjectConfig, workerProjectIds } from "../src/workers";
+} from "../../build-config/excalidraw-fonts";
+import { workerProjectConfig, workerProjectIds } from "../../build-config/workers";
 import { repoRoot, scratch } from "./harness";
 
 type Hook = (this: unknown, ...args: unknown[]) => unknown;

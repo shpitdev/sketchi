@@ -8,7 +8,10 @@
 		"typecheck": {
 			"executor": "nx:run-commands",
 			"cache": true,
-			"inputs": ["default"],
+			"inputs": [
+				"default",
+				"{workspaceRoot}/tools/build-config/{client-server-boundary,excalidraw-fonts,workers}.ts"
+			],
 			"outputs": [],
 			"options": {
 				"command": "effect-tsgo tsc@7.0.2 -p tools/ops/tsconfig.app.json --noEmit"
@@ -18,8 +21,14 @@
 			"executor": "nx:run-commands",
 			"cache": true,
 			"inputs": [
-				"workspaceFiles",
+				"default",
 				"testEnvironment",
+				"{workspaceRoot}/tools/build-config/{client-server-boundary,excalidraw-fonts,workers}.ts",
+				"{workspaceRoot}/.github/{actions,workflows}/**/*",
+				"{workspaceRoot}/{apps,packages,tools}/**/package.json",
+				"{workspaceRoot}/apps/{editor,icons,studio,web}/wrangler.jsonc",
+				"{workspaceRoot}/apps/{editor,studio,web}/public/_headers",
+				"{workspaceRoot}/packages/editor-surface/public/fonts/Excalifont/**/*",
 				{
 					"env": "PATH"
 				},
@@ -62,10 +71,39 @@
 		"check-tools": {
 			"executor": "nx:run-commands",
 			"cache": true,
-			"inputs": ["workspaceFiles", "testEnvironment"],
+			"inputs": [
+				"sharedGlobals",
+				"testEnvironment",
+				"{workspaceRoot}/tools/*.{ts,mts}",
+				"{workspaceRoot}/tools/tsconfig.json",
+				"{workspaceRoot}/tools/{build-config,oxlint,tests}/**/*",
+				"{workspaceRoot}/tools/storybook/**/*.tsx",
+				"{workspaceRoot}/apps/*/src/styles/app.css",
+				"{workspaceRoot}/apps/*/public/fonts/Excalifont/**/*",
+				{
+					"input": "production",
+					"projects": [
+						"cloudflare",
+						"community-icons",
+						"diagram-scenarios",
+						"diagrams",
+						"drawing",
+						"editor-surface",
+						"icon-catalog",
+						"icon-draw",
+						"observability",
+						"studio",
+						"ui"
+					]
+				}
+			],
 			"outputs": [],
 			"options": {
-				"command": "pnpm run test:tools"
+				"commands": [
+					"effect-tsgo tsc@7.0.2 -p tools/tsconfig.json --noEmit",
+					"vitest run --config tools/vitest.config.mts"
+				],
+				"parallel": false
 			},
 			"dependsOn": [
 				{
@@ -77,7 +115,7 @@
 		"check-references": {
 			"executor": "nx:run-commands",
 			"cache": true,
-			"inputs": ["workspaceFiles"],
+			"inputs": ["workspaceFiles", "!{workspaceRoot}/.oxlintrc.json"],
 			"outputs": [],
 			"options": {
 				"command": "effect-tsgo tsc@7.0.2 -b --pretty false"

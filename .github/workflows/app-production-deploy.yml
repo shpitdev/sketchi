@@ -6,22 +6,27 @@ on:
     branches:
       - main
     # What a Worker build reads: every project in the Worker apps' build graph (apps, packages,
-    # Studio's tools/scenarios dependency), the tools/ops files their Vite configs import, and the
-    # root files in Nx's sharedGlobals. The rest of tools/ops is deploy tooling no bundle contains,
-    # so a push of only that, root docs or .github starts nothing.
+    # Studio's tools/scenarios dependency), Vite's shared helpers, and the root build inputs.
+    # Nx narrows these paths to the affected Worker build targets.
     paths:
       - "apps/**"
       - "packages/**"
       - "tools/scenarios/**"
-      - "tools/ops/src/vite/**"
-      - "tools/ops/src/workers.ts"
-      - "tools/local-dev-ports.ts"
+      - "tools/build-config/**"
+      - "!apps/*/README.md"
+      - "!packages/*/README.md"
+      - "!packages/icons/*/README.md"
+      - "!tools/scenarios/README.md"
+      - "!apps/*/vitest*.config.ts"
+      - "!apps/*/vitest*.config.mts"
+      - "!apps/**/tests/**"
+      - "!packages/**/tests/**"
+      - "!tools/scenarios/**/tests/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "nx.json"
       - "tsconfig.base.json"
-      - ".oxlintrc.json"
       - "mise.toml"
   workflow_dispatch:
     inputs:

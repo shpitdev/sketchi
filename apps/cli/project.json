@@ -8,6 +8,7 @@
 		"build": {
 			"executor": "nx:run-commands",
 			"dependsOn": ["^build"],
+			"inputs": ["runtime", "^production"],
 			"outputs": ["{projectRoot}/dist"],
 			"options": {
 				"command": "node apps/cli/scripts/build.mjs"

@@ -1,6 +1,9 @@
 @import "../../../../packages/ui/src/styles.css";
 
 @source "../";
+@source not "../**/tests/**";
+@source not "../**/*.{spec,test}.{js,jsx,ts,tsx}";
+@source not "../**/*.stories.tsx";
 
 :root {
 	--icons-shell: 1360px;

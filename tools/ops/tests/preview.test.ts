@@ -9,7 +9,7 @@ import { TestClock } from "effect/testing";
 import { unstable_readConfig } from "wrangler";
 import { describe, expect } from "vitest";
 
-import { workerProjectConfig, workerProjectIds } from "../src/workers";
+import { workerProjectConfig, workerProjectIds } from "../../build-config/workers";
 import { command, failure, type Recorded } from "./command";
 import { repoRoot, scratch } from "./harness";
 

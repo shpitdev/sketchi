@@ -1,6 +1,6 @@
 import type { Plugin } from "vite";
 
-import { workerProjectConfig } from "../workers";
+import { workerProjectConfig } from "./workers";
 
 /**
  * Bundled module ids that are server-only source of the project: anything under `src/server/`,

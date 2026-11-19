@@ -34,7 +34,7 @@ properties in `style`; other inline style properties are rejected.
 
 ## Enforcement
 
-`pnpm run lint` runs [`@shadcn/lint`](https://github.com/shadcn-ui/lint) and
+`pnpm nx run ops:check-lint` runs [`@shadcn/lint`](https://github.com/shadcn-ui/lint) and
 [`eslint-plugin-better-tailwindcss`](https://github.com/schoero/eslint-plugin-better-tailwindcss)
 as Oxlint JS plugins, configured in `tools/oxlint/ui-style-policy.json`:
 

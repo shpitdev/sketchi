@@ -26,7 +26,7 @@ The four Worker projects are `web`, `studio`, `editor`, and `icons`. `studio`
 deploys as `sketchi-studio` and owns chat, the HTTP build and artifact APIs, MCP,
 Browser Rendering, and Studio persistence. The internal `editor` app deploys as
 `sketchi-excalidraw`; the reusable drawing surface in `packages/editor-surface` is the
-separate `editor-surface` project. The Worker map in `tools/ops/src/workers.ts`
+separate `editor-surface` project. The Worker map in `tools/build-config/workers.ts`
 resolves project IDs to deployed identities; `tools/ops/src/deploy/` owns
 Preview and production route policy. Operator commands (`pnpm ops`, `pnpm ci:local`,
 `pnpm db`, `pnpm sanity`) are typed Effect in `tools/ops`.
@@ -209,9 +209,10 @@ to the Cloudflare execution context where required.
 
 ## Workspace enforcement and proof
 
-Nx and type-aware Oxlint enforce dependency direction, including imports from
-configuration and the optional diagram gallery stories. Existing schema, Promise misuse and React
-synchronization restrictions remain. Effect diagnostics and their exceptions are
+Nx and type-aware Oxlint enforce dependency direction for Nx projects, including imports
+from their configuration files. The gallery stories under `tools/storybook/families`
+are outside an Nx project, so the module-boundary rule does not cover them.
+Schema, Promise misuse and React synchronization restrictions remain. Effect diagnostics and their exceptions are
 described in the Diagnostics section of [Effect conventions](effect-conventions.md).
 The local gate and the checks each change needs are in
 [AGENTS.md](../AGENTS.md#proof). The [local gallery](../tools/storybook/native-conversion/README.md)

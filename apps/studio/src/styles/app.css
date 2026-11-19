@@ -3,6 +3,11 @@
 @import "katex/dist/katex.min.css";
 
 @source "../";
+@source not "../**/tests/**";
+@source not "../**/*.{spec,test}.{js,jsx,ts,tsx}";
+@source not "../**/*.stories.tsx";
+/* Preserve the shipped utilities without scanning test files for candidates. */
+@source inline("container rounded");
 
 /* Studio follows the system preference, including shared AI Elements utilities. */
 @custom-variant dark {

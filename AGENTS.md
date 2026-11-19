@@ -94,7 +94,9 @@ Reuse unchanged proof by identity instead of repeating expensive checks.
 install and `nx sync:check`, native Nx affected targets own lint/format, tools
 (including custom-rule, domain and font tests), deployment/process behavior,
 scenario CLI smoke, typecheck/build/test, and root TypeScript references. Checks
-reuse the native local task cache. Workflow changes select the native actionlint
+reuse the native local task cache. To run the workspace lint, format or tools check
+alone, use `pnpm nx run ops:check-lint`, `ops:check-format` or `ops:check-tools`
+respectively. Workflow changes select the native actionlint
 target. Full gates also run sampled routing.
 
 - Before pushing, run `pnpm ci:local --no-signoff`. `--base <ref>` compares
@@ -158,11 +160,11 @@ bounded set of inspected PNGs.
 
 A push to main deploys to production the Worker apps whose build it reaches
 (`app-production-deploy`, filtered to `apps/`, `packages/`, `tools/scenarios/`,
-the `tools/ops` files the app builds import and Nx's shared root inputs). A push
-of only root docs (`docs/`, root Markdown) starts no production deploy. Selection is conservative: any app file outside Nx's `production`
-exclusions (tests, `tests/`, stories, `.storybook/`, snapshots,
-`tsconfig.spec.json`) redeploys that app, its README and test config included,
-and a push mixing app and `tools/ops` changes redeploys every app. Studio and Icons share one upload queue with their previews. There is no approval gate. Dispatch `app-production-deploy` to
+`tools/build-config/` and Nx's shared root inputs). Nx checks which build
+targets those changes reach. Test files, stories, project READMEs, Vitest
+configs, snapshots, and `tsconfig.spec.json` are not Worker build inputs.
+Changes to deploy commands alone do not select production builds; previews
+still select all apps when preview tooling changes. Studio and Icons share one upload queue with their previews. There is no approval gate. Dispatch `app-production-deploy` to
 deploy every app or one, or to attach or detach production domains.
 
 For UI-affecting changes, verify the changed flow against the real page with
