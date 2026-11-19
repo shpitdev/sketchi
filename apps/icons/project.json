@@ -4,16 +4,17 @@
 	"sourceRoot": "apps/icons/src",
 	"projectType": "application",
 	"tags": ["scope:app", "type:app"],
+	"namedInputs": {
+		"workerBuildConfig": [
+			"{workspaceRoot}/tools/build-config/workers.ts",
+			"{workspaceRoot}/tools/build-config/local-dev-ports.ts",
+			"{workspaceRoot}/packages/editor-surface/src/theme.css"
+		]
+	},
 	"targets": {
 		"build": {
 			"executor": "nx:run-commands",
-			"inputs": [
-				"production",
-				"^production",
-				"{workspaceRoot}/tools/build-config/workers.ts",
-				"{workspaceRoot}/tools/build-config/local-dev-ports.ts",
-				"{workspaceRoot}/packages/editor-surface/src/theme.css"
-			],
+			"inputs": ["production", "^production", "workerBuildConfig"],
 			"dependsOn": ["sync-catalog-assets"],
 			"outputs": ["{workspaceRoot}/dist/apps/icons", "{projectRoot}/.wrangler/deploy/config.json"],
 			"options": {
@@ -66,6 +67,7 @@
 		},
 		"test": {
 			"executor": "nx:run-commands",
+			"inputs": ["default", "^production", "testEnvironment", "workerBuildConfig"],
 			"dependsOn": ["build"],
 			"options": {
 				"command": "vitest run --config apps/icons/vitest.config.ts"
