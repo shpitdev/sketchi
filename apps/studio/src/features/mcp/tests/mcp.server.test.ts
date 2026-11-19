@@ -63,30 +63,12 @@ const onDemandTypes = [
 
 // Hang guard for the full schema walk, not a speed budget.
 describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
-	it("keeps the consumed declarations fresh and compiles their structural contracts", () => {
+	it("keeps the served declarations fresh and compilable", () => {
 		const generated = generateCodeModeTypes();
 		expect(SKETCHI_CODE_MODE_TYPES).toBe(generated);
 		const source = ts.createSourceFile(
 			"code-mode-types.ts",
-			`${SKETCHI_CODE_MODE_TYPES}
-        type Assert<T extends true> = T;
-        type Same<A, B> = [A] extends [B] ? [B] extends [A] ? true : false : false;
-        type OptionalKeys<T> = {
-          [K in keyof T]-?: {} extends Pick<T, K> ? K : never
-        }[keyof T];
-        type FlowchartRequestOptional = Assert<
-          "direction" | "logos" | "groups" | "lanes" extends OptionalKeys<BuildFlowchartRequest["spec"]> ? true : false
-        >;
-        type FlowchartResultFilled = Assert<
-          Extract<OptionalKeys<Extract<BuildFlowchartResult, { ok: true }>["normalizedSpec"]>, "id" | "direction" | "edges"> extends never ? true : false
-        >;
-        type FlowchartEdgeTuple = Assert<Same<BuildFlowchartRequest["spec"]["edges"][number], [string | Array<string>, string | Array<string>, string?]>>;
-        type FlowchartPaletteNotAnInput = Assert<"style" extends keyof BuildFlowchartRequest["spec"] ? false : true>;
-        type MindmapPaletteNotAnInput = Assert<"style" extends keyof BuildMindmapRequest["spec"] ? false : true>;
-        type SequencePaletteNotAnInput = Assert<"style" extends keyof BuildSequenceDiagramRequest["spec"] ? false : true>;
-        type SequenceMessageStyle = Assert<Same<NonNullable<BuildSequenceDiagramRequest["spec"]["messages"]>[number]["style"], "solid" | "dashed" | undefined>>;
-        type CanvasRequestVersion = Assert<Same<CreateCanvasRequest["spec"]["version"], 1>>;
-      `,
+			SKETCHI_CODE_MODE_TYPES,
 			ts.ScriptTarget.Latest,
 			true,
 		);

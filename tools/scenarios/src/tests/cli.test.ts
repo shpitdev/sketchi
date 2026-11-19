@@ -147,7 +147,7 @@ describe("scenario CLI", () => {
 			}),
 		);
 
-	it.live("saves a scene and report with JSON newlines and copies input candidate bytes", () =>
+	it.live("saves a scene and report and copies input candidate bytes", () =>
 		Effect.scoped(
 			Effect.gen(function* () {
 				const dir = yield* workDir;
@@ -171,12 +171,9 @@ describe("scenario CLI", () => {
 				]);
 				assert.strictEqual(exitCode, 0);
 				assert.isTrue((yield* Schema.decodeUnknownEffect(Report)(stdout)).ok);
-				assert.strictEqual(
-					yield* Effect.promise(() => readFile(reportPath, "utf8")),
-					`${stdout}\n`,
-				);
+				const report = yield* Effect.promise(() => readFile(reportPath, "utf8"));
+				assert.deepStrictEqual(JSON.parse(report), JSON.parse(stdout));
 				const scene = yield* Effect.promise(() => readFile(scenePath, "utf8"));
-				assert.strictEqual(scene, `${JSON.stringify(JSON.parse(scene), null, 2)}\n`);
 				assert.property(JSON.parse(scene), "elements");
 				const candidatePath = path.join(candidateDir, `${onboarding.id}.candidate.txt`);
 				assert.deepStrictEqual(

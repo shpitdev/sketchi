@@ -1,4 +1,4 @@
-import { execFileSync, spawn, spawnSync, type SpawnOptions } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -27,11 +27,6 @@ export function runOps(
 		env: { ...process.env, ...options.env },
 	});
 	return { status: result.status, stdout: result.stdout, stderr: result.stderr };
-}
-
-/** Starts the real `ops` entrypoint without waiting for it. */
-export function startOps(args: readonly string[], options: SpawnOptions = {}) {
-	return spawn(jiti, [opsMain, ...args], { stdio: ["ignore", "pipe", "pipe"], ...options });
 }
 
 /** A temporary Git repository that reads no developer-global config. */

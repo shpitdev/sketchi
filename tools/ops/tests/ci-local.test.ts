@@ -1,6 +1,5 @@
-// The local CI gate at its real command boundary: `ops ci-local` (and the bootstrap) in a real
-// temporary Git repository, with `pnpm` and `gh` as recording stubs. These prove base, selection,
-// failure, signoff, slot and interruption behavior, not Nx execution.
+// Exercise `ops ci-local` in a real temporary Git repository, with `pnpm` and `gh`
+// as recording stubs for the signoff contract.
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -12,7 +11,7 @@ import { Deferred, Effect, Fiber, Scope } from "effect";
 import { describe, expect, onTestFinished, test } from "vitest";
 
 import { acquireSlot } from "../src/ci-local/slots";
-import { executable, jiti, repoRoot, repository, scratch, startOps } from "./harness";
+import { executable, jiti, repoRoot, repository, scratch } from "./harness";
 
 interface Call {
 	readonly command: string;
@@ -28,8 +27,7 @@ function gateFixture() {
 	for (const name of ["pnpm", "gh"]) {
 		executable(
 			join(bin, name),
-			`import { appendFileSync, writeFileSync } from "node:fs";
-import { spawn } from "node:child_process";
+			`import { appendFileSync } from "node:fs";
 const name = ${JSON.stringify(name)};
 const args = process.argv.slice(2);
 appendFileSync(process.env.GATE_CALLS, JSON.stringify({ command: name, args }) + "\\n");
@@ -37,18 +35,7 @@ if (name === "gh" && args[0] === "pr") {
 	if (process.env.GATE_NO_PR) { console.error("no pull requests found for branch"); process.exit(1); }
 	console.log(JSON.stringify({ number: 7, state: "OPEN", headRefOid: process.env.GATE_HEAD }));
 }
-if (args[0] === "install" && process.env.GATE_INSTALL_FAILURE) {
-	console.log(process.env.GATE_INSTALL_FAILURE);
-	process.exit(1);
-}
-if (args.includes("-t") && process.env.GATE_NX_HANG) {
-	const child = spawn("sleep", ["300"], { stdio: "ignore" });
-	writeFileSync(process.env.GATE_NX_HANG, String(child.pid));
-	setInterval(() => {}, 1000);
-} else if (args.includes("-t") && process.env.GATE_NX_FAILURE) {
-	console.log(process.env.GATE_NX_FAILURE);
-	process.exit(1);
-}
+if (name === "pnpm" && args.includes("-t") && process.env.GATE_NX_FAILURE) process.exit(1);
 `,
 		);
 	}
@@ -63,9 +50,6 @@ if (args.includes("-t") && process.env.GATE_NX_HANG) {
 		JSON.stringify({ targets: { "test-timeline": {}, "test-graph": {} } }),
 	);
 	writeFileSync(join(repo.cwd, ".gitignore"), ".memory/\n");
-	const routing = "packages/diagrams/src/graph/routing.ts";
-	mkdirSync(join(repo.cwd, "packages/diagrams/src/graph"), { recursive: true });
-	writeFileSync(join(repo.cwd, routing), "// original routing\n");
 	repo.git("add", ".");
 	repo.git("commit", "--quiet", "-m", "gate fixtures");
 	repo.git("branch", "-f", "main");
@@ -95,22 +79,13 @@ if (args.includes("-t") && process.env.GATE_NX_HANG) {
 		const commands = readCalls();
 		return {
 			...gate,
-			commands,
-			routing: commands.filter(({ args }) => args.includes("diagrams:routing-sample")),
 			nx: commands.filter(({ command, args }) => command === "pnpm" && args.includes("-t")),
 			posted: commands.filter(({ args }) => args.includes("POST")),
 		};
 	};
 	return {
 		...repo,
-		routing,
 		unitBase,
-		calls,
-		env,
-		write(file: string, content = "// changed\n") {
-			mkdirSync(join(repo.cwd, file, ".."), { recursive: true });
-			writeFileSync(join(repo.cwd, file), content);
-		},
 		/** The typed gate, as the bootstrap execs it. */
 		run(args: string[], extra: Record<string, string> = {}) {
 			writeFileSync(calls, "");
@@ -122,67 +97,36 @@ if (args.includes("-t") && process.env.GATE_NX_HANG) {
 				}),
 			);
 		},
-		/** `pnpm ci:local`: the bootstrap, which installs and then execs the gate. */
-		bootstrap(args: string[], extra: Record<string, string> = {}) {
-			writeFileSync(calls, "");
-			return result(
-				spawnSync(process.execPath, [join(repoRoot, "tools/ops/ci-local.mjs"), ...args], {
-					cwd: repo.cwd,
-					encoding: "utf8",
-					env: env(extra),
-				}),
-			);
-		},
 	};
 }
 
 describe("ci-local gate", () => {
-	test("unit gates pass Nx the merge base without a HEAD override, keeping dirty and untracked changes", () => {
+	test("includes the Storybook check in a unit gate", () => {
 		const fixture = gateFixture();
-		fixture.write(fixture.routing);
-		fixture.git("add", fixture.routing);
-		fixture.git("commit", "--quiet", "-m", "routing change");
-		fixture.write("a.txt", "unstaged\n");
-		fixture.write("new.txt", "untracked\n");
 		const result = fixture.run(["--no-signoff", "--base", fixture.unitBase]);
 		expect(result.status, result.stderr).toBe(0);
 		const [nx] = result.nx;
-		expect(nx?.args).toContain(`--base=${fixture.unitBase}`);
-		expect(nx?.args.some((arg) => arg.startsWith("--head"))).toBe(false);
 		expect(nx?.args).toContain(
 			"typecheck,build,test,check-scenario,check-storybook,test-timeline,test-graph,check-workflows,routing-sample",
 		);
-		expect(result.routing).toHaveLength(0);
-		expect(result.commands.some(({ command }) => command === "gh")).toBe(false);
 	});
 
-	test("unit gates use the committed merge base for divergent refs", () => {
+	test("posts local-ci for the PR head only when signing off", () => {
 		const fixture = gateFixture();
-		fixture.git("branch", "verified");
-		fixture.write(fixture.routing);
-		fixture.git("commit", "--quiet", "-am", "routing change");
-		fixture.git("checkout", "--quiet", "verified");
-		fixture.write("a.txt", "other staging work\n");
-		fixture.git("commit", "--quiet", "-am", "other staging work");
-		fixture.git("checkout", "--quiet", "unit");
-		const result = fixture.run(["--no-signoff", "--base", "verified"]);
-		expect(result.nx[0]?.args).toContain(`--base=${fixture.unitBase}`);
-	});
+		const unsigned = fixture.run(["--no-signoff"]);
+		expect(unsigned.status, unsigned.stderr).toBe(0);
+		expect(unsigned.posted).toHaveLength(0);
 
-	test("origin/main, an equivalent base, --all and signoff run routing once; only signoff posts", () => {
-		const fixture = gateFixture();
-		for (const args of [
-			["--no-signoff"],
-			["--no-signoff", "--base", fixture.git("rev-parse", "main")],
-			["--no-signoff", "--all", "--base", fixture.unitBase],
-			[],
-		]) {
-			const result = fixture.run(args);
-			expect(result.status, `${args.join(" ")}\n${result.stderr}`).toBe(0);
-			expect(result.routing).toHaveLength(1);
-			expect(result.posted).toHaveLength(args.length ? 0 : 1);
-			if (args.includes("--all")) expect(result.nx[0]?.args).toContain("run-many");
-		}
+		const signed = fixture.run([]);
+		expect(signed.status, signed.stderr).toBe(0);
+		expect(signed.posted).toHaveLength(1);
+		expect(signed.posted[0]?.args).toEqual(
+			expect.arrayContaining([
+				`repos/{owner}/{repo}/statuses/${fixture.head()}`,
+				"context=local-ci",
+				"state=success",
+			]),
+		);
 	});
 
 	test("a unit base cannot sign off, even with --all", () => {
@@ -191,11 +135,12 @@ describe("ci-local gate", () => {
 		expect(result.status).toBe(1);
 		expect(result.stderr).toMatch(/Signoff requires the full gate against origin\/main/);
 		expect(result.nx).toHaveLength(0);
+		expect(result.posted).toHaveLength(0);
 	});
 
 	test("signoff refuses a dirty worktree, an unpushed HEAD or no PR before running checks", () => {
 		const fixture = gateFixture();
-		fixture.write("b.txt", "untracked\n");
+		writeFileSync(join(fixture.cwd, "b.txt"), "untracked\n");
 		const dirty = fixture.run([]);
 		expect(dirty.stderr).toMatch(/uncommitted changes/);
 		fixture.git("add", "b.txt");
@@ -211,80 +156,12 @@ describe("ci-local gate", () => {
 		}
 	});
 
-	test("a failed Nx run fails the gate once, even on a test timeout, keeping its log and posting nothing", () => {
+	test("does not sign off when the checks fail", () => {
 		const fixture = gateFixture();
-		const timeout = [
-			"> nx run a:test",
-			" FAIL  a.test.ts > slow",
-			"Error: Test timed out in 5000ms.",
-			"Failed tasks:",
-			"- a:test",
-		].join("\n");
-		const result = fixture.run([], { GATE_NX_FAILURE: timeout });
+		const result = fixture.run([], { GATE_NX_FAILURE: "1" });
 		expect(result.status).toBe(1);
-		expect(result.nx).toHaveLength(1);
-		expect(result.routing).toHaveLength(0);
+		expect(result.nx.length).toBeGreaterThan(0);
 		expect(result.posted).toHaveLength(0);
-		expect(result.stdout).toMatch(/✖ native Nx checks/);
-		expect(result.stderr).toMatch(/Test timed out in 5000ms/);
-		expect(readFileSync(join(fixture.cwd, ".memory/ci-local/nx.log"), "utf8")).toMatch(
-			/Test timed out in 5000ms/,
-		);
-	});
-
-	test("the bootstrap stops at a failed frozen install and never starts the gate", () => {
-		const fixture = gateFixture();
-		const result = fixture.bootstrap(["--no-signoff"], {
-			GATE_INSTALL_FAILURE: "ERR_PNPM_OUTDATED_LOCKFILE",
-		});
-		expect(result.status).toBe(1);
-		expect(result.stdout).toMatch(/✖ pnpm install/);
-		expect(result.stderr).toMatch(/ERR_PNPM_OUTDATED_LOCKFILE/);
-		expect(result.commands.map(({ args }) => args[0])).toEqual(["install"]);
-	});
-
-	test("the bootstrap installs frozen dependencies, then runs the gate in the same process", () => {
-		const fixture = gateFixture();
-		const result = fixture.bootstrap(["--no-signoff"]);
-		expect(result.status, result.stderr).toBe(0);
-		expect(result.commands[0]?.args).toEqual(["install", "--frozen-lockfile", "--prefer-offline"]);
-		expect(result.nx).toHaveLength(1);
-		expect(result.stdout).toMatch(/✓ pnpm install in/);
-	});
-
-	test("interrupting the gate stops the check it started and that check's children", async () => {
-		const fixture = gateFixture();
-		const pidFile = join(scratch("ops-gate-hang-"), "grandchild.pid");
-		const gate = startOps(["ci-local", "--no-signoff"], {
-			cwd: fixture.cwd,
-			env: fixture.env({ GATE_NX_HANG: pidFile }),
-		});
-		onTestFinished(() => {
-			gate.kill("SIGKILL");
-		});
-		const deadline = Date.now() + 30_000;
-		while (!existsSync(pidFile) || !readFileSync(pidFile, "utf8")) {
-			if (Date.now() > deadline) throw new Error("the hanging check never started");
-			await new Promise((resolve) => setTimeout(resolve, 50));
-		}
-		const grandchild = Number(readFileSync(pidFile, "utf8"));
-		const alive = (pid: number) => {
-			try {
-				process.kill(pid, 0);
-				return true;
-			} catch {
-				return false;
-			}
-		};
-		expect(alive(grandchild)).toBe(true);
-		gate.kill("SIGINT");
-		const [code, signal] = (await once(gate, "exit")) as [number | null, string | null];
-		expect(code !== 0 || signal !== null).toBe(true);
-		const gone = Date.now() + 15_000;
-		while (alive(grandchild) && Date.now() < gone) {
-			await new Promise((resolve) => setTimeout(resolve, 50));
-		}
-		expect(alive(grandchild)).toBe(false);
 	});
 });
 

@@ -117,7 +117,7 @@ describe("built icons Worker", () => {
 		if (localDirectory) await rm(localDirectory, { recursive: true, force: true });
 	});
 
-	it("serves detail, raw SVG, HEAD, and CORS through the assets binding", async () => {
+	it("serves icon detail, SVG, and HTTP method responses through the Worker", async () => {
 		const detail = await fetch(`${origin}/api/icons/kubernetes`);
 		expect(detail.status).toBe(200);
 		expect(detail.headers.get("Access-Control-Allow-Origin")).toBe("*");
@@ -126,6 +126,18 @@ describe("built icons Worker", () => {
 			slug: "kubernetes",
 			svg: expect.stringContaining("<svg"),
 		});
+
+		const folded = await fetch(`${origin}/api/icons/anthos-gcp-legacy`);
+		expect(folded.status).toBe(200);
+		await expect(folded.json()).resolves.toMatchObject({ slug: "anthos", collection: "gcp" });
+
+		const missing = await fetch(`${origin}/api/icons/missing.svg`);
+		expect(missing.status).toBe(404);
+
+		const detailHead = await fetch(`${origin}/api/icons/kubernetes`, { method: "HEAD" });
+		expect(detailHead.status).toBe(405);
+		expect(detailHead.headers.get("Allow")).toBe("GET, OPTIONS");
+		expect(detailHead.headers.get("Access-Control-Allow-Origin")).toBe("*");
 
 		const raw = await fetch(`${origin}/api/icons/react.svg`);
 		expect(raw.status).toBe(200);

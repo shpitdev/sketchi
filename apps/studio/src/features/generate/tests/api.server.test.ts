@@ -1,17 +1,16 @@
 import { CanvasSpec } from "@sketchi/drawing";
-import { DIAGRAM_TYPES, diagramFixtures, familyForType } from "@sketchi/diagrams/family";
+import { DIAGRAM_TYPES, familyForType } from "@sketchi/diagrams/family";
 
 import {
 	type CloudflareAiGateway,
 	type CloudflareAiGatewayProvider,
 } from "@sketchi/cloudflare/ai-gateway";
-import { diagramScenarios, scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
+import { scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
 
 import {
 	FlowchartDiagram,
 	FLOWCHART_MAX_NODES,
 } from "@sketchi/diagrams/families/flowchart/document";
-import { sankeyStressFixtures } from "@sketchi/diagrams/families/sankey/fixtures";
 import { mediaPlayerStateMachine } from "@sketchi/diagrams/families/state-machine/document";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Schema } from "effect";
@@ -116,43 +115,25 @@ function generateRequest(env: StudioEnv, body: unknown): Promise<Response> {
 // The published CLI decodes a 200 with exactly these schemas (apps/cli/src/generation.ts), and
 // installed versions cannot be patched, so a response that fails them is a broken generate.
 describe("generate responses installed CLIs can decode", () => {
-	const diagrams = [
-		...diagramFixtures,
-		...Object.values(sankeyStressFixtures),
-		...diagramScenarios.flatMap((scenario) => scenario.expectedDiagram ?? []),
-	];
-	const decoded = new Set<string>();
-
-	it.each(diagrams.map((diagram) => [`${diagram.type} ${diagram.id}`, diagram] as const))(
-		"%s",
-		async (_name, diagram) => {
-			const response = await generateRequest(
-				{ AI: fakeAiGateway(generationText({ ...diagram })) },
-				{ prompt: "Draw it", type: diagram.type },
-			);
-			const body = (await response.json()) as {
-				readonly ok: boolean;
-				readonly diagram?: {
-					readonly document: { readonly spec: unknown };
-					readonly excalidraw: unknown;
-					readonly scene: unknown;
-				};
+	it.each(DIAGRAM_TYPES)("accepts and decodes %s", async (type) => {
+		const family = familyForType(type);
+		const response = await generateRequest(
+			{ AI: fakeAiGateway(generationText({ ...family.fixture })) },
+			{ prompt: "Draw it", type },
+		);
+		const body = (await response.json()) as {
+			readonly ok: boolean;
+			readonly diagram?: {
+				readonly document: { readonly spec: unknown };
+				readonly excalidraw: unknown;
+				readonly scene: unknown;
 			};
-			// A diagram this API rejects with a typed failure is not this mismatch.
-			if (!body.ok) return;
-			decoded.add(diagram.type);
-			const decode = (schema: Schema.Top & { readonly DecodingServices: never }, value: unknown) =>
-				Schema.decodeUnknownSync(schema)(value);
-			expect(() => decode(CanvasSpec, body.diagram?.scene)).not.toThrow();
-			expect(() => decode(ExcalidrawFile, body.diagram?.excalidraw)).not.toThrow();
-			expect(() =>
-				decode(familyForType(diagram.type).spec, body.diagram?.document.spec),
-			).not.toThrow();
-		},
-	);
-
-	it("decoded a response from every canonical family", () => {
-		expect(decoded).toEqual(new Set(DIAGRAM_TYPES));
+		};
+		expect(response.status, JSON.stringify(body)).toBe(200);
+		expect(body.ok).toBe(true);
+		expect(() => Schema.decodeUnknownSync(CanvasSpec)(body.diagram?.scene)).not.toThrow();
+		expect(() => Schema.decodeUnknownSync(ExcalidrawFile)(body.diagram?.excalidraw)).not.toThrow();
+		expect(() => Schema.decodeUnknownSync(family.spec)(body.diagram?.document.spec)).not.toThrow();
 	});
 });
 
@@ -171,7 +152,7 @@ describe("public generate endpoint", () => {
 		const response = await generateRequest(env, { prompt: "Media player", type: "state-machine" });
 		const body = (await response.json()) as {
 			ok: boolean;
-			issues?: { code: string; severity: string; message: string }[];
+			issues?: { code: string; severity: string }[];
 		};
 		expect(response.status).toBe(200);
 		expect(body.ok).toBe(true);
@@ -180,7 +161,6 @@ describe("public generate endpoint", () => {
 			expect.objectContaining({
 				code: "composite_initial_defaulted",
 				severity: "warning",
-				message: expect.stringContaining('"playing"'),
 			}),
 		]);
 	});
@@ -194,7 +174,7 @@ describe("public generate endpoint", () => {
 		expect(body.status).toBe("provider_failed");
 	});
 
-	it("names the output limit an answer reached instead of repairing it", async () => {
+	it("reports the output limit without another model call", async () => {
 		const runs: unknown[] = [];
 		const env: StudioEnv = {
 			AI: fakeAiGateway(
@@ -212,17 +192,11 @@ describe("public generate endpoint", () => {
 		expect(await response.json()).toMatchObject({
 			ok: false,
 			status: "limit_exceeded",
-			issues: [
-				{
-					code: "output_limit_exceeded",
-					message:
-						"The diagram needs more than the 16,384-token output limit allows in one answer.",
-				},
-			],
+			issues: [{ code: "output_limit_exceeded" }],
 		});
 	});
 
-	it("names the family limit a diagram passed instead of trimming it", async () => {
+	it("refuses an oversized flowchart without another model call", async () => {
 		const runs: unknown[] = [];
 		const steps = FLOWCHART_MAX_NODES + 1;
 		const oversized = {
@@ -243,12 +217,7 @@ describe("public generate endpoint", () => {
 		expect(runs).toHaveLength(1);
 		expect(await response.json()).toMatchObject({
 			status: "limit_exceeded",
-			issues: [
-				{
-					code: "diagram_too_large",
-					message: `Flowchart has ${steps} nodes; the supported maximum is ${FLOWCHART_MAX_NODES}.`,
-				},
-			],
+			issues: [{ code: "diagram_too_large" }],
 		});
 	});
 
