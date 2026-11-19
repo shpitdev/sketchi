@@ -180,8 +180,9 @@ month, and R2 storage is billed as usual.
 
 `pnpm db` opens the DuckDB release pinned in `mise.toml` with
 `tools/ops/src/telemetry/duckdb-init.sql` and the views in `duckdb-views.sql`. It attaches the
-spans catalog with a read-only `R2_DATA_READ_TOKEN`, which it takes from
-Infisical when the variable is unset. `pnpm db --preview` reads the preview
+spans catalog using `CLOUDFLARE_ACCOUNT_ID` and a read-only `R2_DATA_READ_TOKEN`.
+If the token is unset, export `INFISICAL_PROJECT_ID` to load the project's `prod`
+environment. The account ID must be exported locally or supplied by Infisical. `pnpm db --preview` reads the preview
 spans catalog, and DuckDB arguments pass
 through, for example `pnpm db -c "FROM generations LIMIT 5"`. It defines these
 views:

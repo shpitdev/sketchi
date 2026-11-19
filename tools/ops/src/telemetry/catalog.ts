@@ -3,10 +3,10 @@
 // missing and applies catalog maintenance.
 import { Config, Console, Effect, Option, Redacted } from "effect";
 
-import { optionalEnv } from "../outputs";
+import { requiredEnv } from "../outputs";
 import { capture, opsError } from "../process";
 
-export const ACCOUNT_ID = "75f9660f39e4dafe8b95980b87e7399a";
+const accountId = requiredEnv("CLOUDFLARE_ACCOUNT_ID");
 const PROJECT = "sketchi";
 const NAMESPACE = "observability";
 const TABLE = "spans";
@@ -21,7 +21,7 @@ const CATALOG_TOKEN_ENV = "WRANGLER_R2_SQL_AUTH_TOKEN";
 const SCHEMA_FILE = new URL("../../../../packages/observability/spans.schema.json", import.meta.url)
 	.pathname;
 
-export function telemetryTarget(environment: TelemetryEnvironment, accountId = ACCOUNT_ID) {
+export function telemetryTarget(environment: TelemetryEnvironment, accountId: string) {
 	const bucket = `${PROJECT}-telemetry-${environment}`;
 	const stream = `${PROJECT}_telemetry_spans_${environment}`;
 	const sink = `${stream}_catalog`;
@@ -152,8 +152,7 @@ export function wranglerFailure(args: readonly string[], status: number | string
 }
 
 const wranglerEnv = Effect.gen(function* () {
-	const accountId = yield* optionalEnv("CLOUDFLARE_ACCOUNT_ID");
-	return { CLOUDFLARE_ACCOUNT_ID: Option.getOrElse(accountId, () => ACCOUNT_ID) };
+	return { CLOUDFLARE_ACCOUNT_ID: yield* accountId };
 });
 
 export const wrangler = Effect.fn("ops.telemetry.wrangler")(function* (args: readonly string[]) {
@@ -211,9 +210,10 @@ export function telemetryEnvironments(environment: string) {
 
 export const printResources = Effect.fn("ops.telemetry.resources")(function* (environment: string) {
 	const environments = yield* telemetryEnvironments(environment);
+	const id = yield* accountId;
 	yield* Console.log(
 		// @effect-diagnostics-next-line globalJsonInEffect:off -- The catalog command writes the existing resource inventory JSON format.
-		JSON.stringify({ resources: environments.map((env) => telemetryTarget(env)) }, null, 2),
+		JSON.stringify({ resources: environments.map((env) => telemetryTarget(env, id)) }, null, 2),
 	);
 });
 
@@ -225,7 +225,8 @@ export const provision = Effect.fn("ops.telemetry.provision")(function* (environ
 			`${CATALOG_TOKEN_ENV} must hold a token with Basin Catalog admin access.`,
 		);
 	}
-	const targets = environments.map((env) => telemetryTarget(env));
+	const id = yield* accountId;
+	const targets = environments.map((env) => telemetryTarget(env, id));
 	const state = yield* existingState(targets);
 	for (const target of targets) {
 		for (const step of provisionSteps(target, catalogToken.value)) {

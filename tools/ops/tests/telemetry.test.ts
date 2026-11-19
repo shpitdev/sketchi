@@ -29,7 +29,11 @@ if (${JSON.stringify(name)} === "pnpm") {
 		);
 	}
 	return {
-		env: { PATH: `${bin}:${process.env["PATH"]}` },
+		env: {
+			CLOUDFLARE_ACCOUNT_ID: "test-account",
+			INFISICAL_PROJECT_ID: "test-project",
+			PATH: `${bin}:${process.env["PATH"]}`,
+		},
 		calls: () =>
 			readFileSync(calls, "utf8")
 				.trim()
@@ -58,36 +62,42 @@ describe("telemetry", () => {
 
 	test("pnpm db runs DuckDB on the init file directly with a token, and through Infisical without", () => {
 		const stub = stubs();
-		const direct = runOps(["db", "--", "--preview", "-c", "FROM spans"], {
+		const direct = runOps(["db", "--", "--preview", "-c", "SELECT 1"], {
 			env: { ...stub.env, R2_DATA_READ_TOKEN: "read-token" },
 		});
 		expect(direct.status, direct.stderr).toBe(0);
-		const viaInfisical = runOps(["db", "--"], { env: { ...stub.env, R2_DATA_READ_TOKEN: "" } });
+		const viaInfisical = runOps(["db", "--", "-c", "SELECT 1"], {
+			env: { ...stub.env, R2_DATA_READ_TOKEN: "" },
+		});
 		expect(viaInfisical.status, viaInfisical.stderr).toBe(0);
 		const opening = (environment: string) => [
 			"-init",
 			INIT_SQL,
 			"-cmd",
-			expect.stringContaining(`_sketchi-telemetry-${environment}' AS telemetry`),
+			expect.stringContaining(`test-account_sketchi-telemetry-${environment}' AS telemetry`),
+			"-cmd",
+			expect.stringContaining("' AS codemode_history"),
 			"-cmd",
 			`.read "${VIEWS_SQL}"`,
 		];
 		expect(stub.calls()).toEqual([
-			{ name: "duckdb", args: [...opening("preview"), "-c", "FROM spans"], env: "preview" },
+			{ name: "duckdb", args: [...opening("preview"), "-c", "SELECT 1"], env: "preview" },
 			{
 				name: "infisical",
 				args: [
 					"run",
 					"--projectId",
-					"bb3fe729-e290-4740-84d4-304752f0d719",
+					"test-project",
 					"--env",
 					"prod",
 					"--silent",
 					"--",
-					"duckdb",
-					...opening("production"),
+					"pnpm",
+					"db",
+					"-c",
+					"SELECT 1",
 				],
-				env: "production",
+				env: null,
 			},
 		]);
 	});
