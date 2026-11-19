@@ -3,9 +3,9 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-import { localInspectorPort, localViteCacheDir } from "../../tools/local-dev-ports";
-import { excalidrawFonts } from "../../tools/ops/src/vite/excalidraw-fonts";
-import { workerProjectConfig } from "../../tools/ops/src/workers";
+import { excalidrawFonts } from "../../tools/build-config/excalidraw-fonts";
+import { localInspectorPort, localViteCacheDir } from "../../tools/build-config/local-dev-ports";
+import { workerProjectConfig } from "../../tools/build-config/workers";
 
 const workerProject = workerProjectConfig("editor");
 const devPort = 6202;

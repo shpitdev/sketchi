@@ -7,7 +7,7 @@ import { it } from "@effect/vitest";
 import { Effect, Exit } from "effect";
 import { describe, expect, test } from "vitest";
 
-import { workerProjectConfig, workerProjectIds } from "../src/workers";
+import { workerProjectConfig, workerProjectIds } from "../../build-config/workers";
 import { command, failure } from "./command";
 import { repoRoot, scratch } from "./harness";
 

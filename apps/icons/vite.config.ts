@@ -4,8 +4,8 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-import { localInspectorPort, localViteCacheDir } from "../../tools/local-dev-ports";
-import { workerProjectConfig } from "../../tools/ops/src/workers";
+import { localInspectorPort, localViteCacheDir } from "../../tools/build-config/local-dev-ports";
+import { workerProjectConfig } from "../../tools/build-config/workers";
 
 const workerProject = workerProjectConfig("icons");
 const devPort = 6203;

@@ -5,6 +5,9 @@
 @import "../../../../packages/ui/src/styles.css";
 
 @source "../";
+@source not "../**/tests/**";
+@source not "../**/*.{spec,test}.{js,jsx,ts,tsx}";
+@source not "../**/*.stories.tsx";
 
 /* Above this width the header shows its links inline instead of a menu. */
 @theme {

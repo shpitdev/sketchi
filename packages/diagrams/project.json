@@ -4,6 +4,15 @@
 	"sourceRoot": "packages/diagrams/src",
 	"projectType": "library",
 	"tags": ["scope:package", "type:runtime", "domain:diagrams"],
+	"namedInputs": {
+		"registryFuzz": [
+			"diagramTestShared",
+			"testEnvironment",
+			"{projectRoot}/src/families/*/*.ts",
+			"{projectRoot}/src/families/*/fixtures/**/*",
+			"{projectRoot}/src/graph/*.ts"
+		]
+	},
 	"targets": {
 		"build": {
 			"executor": "nx:run-commands",
@@ -406,7 +415,11 @@
 			"options": {
 				"command": "ER_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/er/tests/er-fuzz.test.ts"
 			},
-			"inputs": ["default", "^production", "testEnvironment"],
+			"inputs": [
+				"registryFuzz",
+				"^production",
+				"{projectRoot}/src/families/er/tests/er-fuzz.test.ts"
+			],
 			"dependsOn": ["^build"],
 			"cache": true,
 			"outputs": []
@@ -416,7 +429,11 @@
 			"options": {
 				"command": "CLASS_FUZZ=full vitest run --config packages/diagrams/vitest.family.config.ts packages/diagrams/src/families/class/tests/class-fuzz.test.ts"
 			},
-			"inputs": ["default", "^production", "testEnvironment"],
+			"inputs": [
+				"registryFuzz",
+				"^production",
+				"{projectRoot}/src/families/class/tests/class-fuzz.test.ts"
+			],
 			"dependsOn": ["^build"],
 			"cache": true,
 			"outputs": []

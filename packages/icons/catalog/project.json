@@ -14,26 +14,14 @@
 		},
 		"generate-catalog": {
 			"executor": "nx:run-commands",
-			"inputs": [
-				"{projectRoot}/pipeline-output/review/review-data.json",
-				"{projectRoot}/svg/**/*",
-				"{projectRoot}/src/color-mode.ts",
-				"{projectRoot}/src/icon-color-render.ts"
-			],
-			"outputs": ["{projectRoot}/src/generated/icon-catalog.json"],
+			"cache": false,
 			"options": {
 				"command": "jiti packages/icons/catalog/scripts/generate-catalog.ts"
 			}
 		},
 		"generate-look-alikes": {
 			"executor": "nx:run-commands",
-			"inputs": [
-				"{projectRoot}/svg/**/*",
-				"{projectRoot}/src/generated/icon-catalog.json",
-				"{projectRoot}/src/mark-features.ts",
-				"{projectRoot}/src/svg-input.ts"
-			],
-			"outputs": ["{projectRoot}/src/generated/look-alikes.json"],
+			"cache": false,
 			"options": {
 				"command": "jiti packages/icons/catalog/scripts/generate-look-alikes.ts"
 			}

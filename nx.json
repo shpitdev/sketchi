@@ -2,7 +2,8 @@
 	"$schema": "./node_modules/nx/schemas/nx-schema.json",
 	"namedInputs": {
 		"default": ["{projectRoot}/**/*", "sharedGlobals"],
-		"production": [
+		"production": ["runtime", "!{projectRoot}/README.md"],
+		"runtime": [
 			"default",
 			"!{projectRoot}/**/*.test.ts",
 			"!{projectRoot}/**/*.test.tsx",
@@ -10,10 +11,10 @@
 			"!{projectRoot}/**/*.stories.tsx",
 			"!{projectRoot}/.storybook/**/*",
 			"!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)",
-			"!{projectRoot}/tsconfig.spec.json"
+			"!{projectRoot}/tsconfig.spec.json",
+			"!{projectRoot}/vitest*.config.{ts,mts}"
 		],
 		"sharedGlobals": [
-			"{workspaceRoot}/.oxlintrc.json",
 			"{workspaceRoot}/nx.json",
 			"{workspaceRoot}/tsconfig.base.json",
 			"{workspaceRoot}/package.json",
@@ -92,9 +93,6 @@
 				"env": "PRINT_ROUTING"
 			},
 			{
-				"env": "PRINT_CROSSINGS"
-			},
-			{
 				"env": "TZ"
 			},
 			{
@@ -145,15 +143,6 @@
 			"dependsOn": ["^build"],
 			"cache": true,
 			"outputs": []
-		}
-	},
-	"release": {
-		"projects": ["sketchi-cli"],
-		"changelog": {
-			"workspaceChangelog": false
-		},
-		"releaseTag": {
-			"pattern": "cli-v{version}"
 		}
 	},
 	"analytics": false,

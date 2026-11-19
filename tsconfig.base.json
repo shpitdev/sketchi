@@ -360,7 +360,7 @@
           },
           // Build scripts and configs run on Node at build time, where Node modules, fetch and promises are the host.
           {
-            "include": ["**/scripts/**/*", "**/*.mjs", "**/*.config.*"],
+            "include": ["**/scripts/**/*", "**/*.mjs", "**/*.config.*", "tools/build-config/**/*"],
             "options": {
               "diagnosticSeverity": {
                 "globalFetch": "off",

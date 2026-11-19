@@ -10,8 +10,9 @@
 			"inputs": [
 				"production",
 				"^production",
-				"{workspaceRoot}/tools/ops/src/workers.ts",
-				"{workspaceRoot}/tools/local-dev-ports.ts"
+				"{workspaceRoot}/tools/build-config/workers.ts",
+				"{workspaceRoot}/tools/build-config/local-dev-ports.ts",
+				"{workspaceRoot}/packages/editor-surface/src/theme.css"
 			],
 			"dependsOn": ["sync-catalog-assets"],
 			"outputs": ["{workspaceRoot}/dist/apps/icons", "{projectRoot}/.wrangler/deploy/config.json"],

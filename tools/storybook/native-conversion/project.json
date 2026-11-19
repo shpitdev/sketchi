@@ -26,7 +26,7 @@
 						"ui"
 					]
 				},
-				"{workspaceRoot}/tools/ops/src/vite/excalidraw-fonts.ts",
+				"{workspaceRoot}/tools/build-config/excalidraw-fonts.ts",
 				"{workspaceRoot}/tools/storybook/families/*.stories.tsx",
 				"{workspaceRoot}/apps/editor/package.json",
 				"{workspaceRoot}/apps/editor/src/components/svg-icon-workspace/**/*",

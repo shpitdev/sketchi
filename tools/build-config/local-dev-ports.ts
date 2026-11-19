@@ -3,5 +3,5 @@ export function localInspectorPort(appPort: number): number {
 }
 
 export function localViteCacheDir(appName: string): string {
-	return new URL(`../node_modules/.vite/apps/${appName}`, import.meta.url).pathname;
+	return new URL(`../../node_modules/.vite/apps/${appName}`, import.meta.url).pathname;
 }

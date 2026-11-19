@@ -1,5 +1,5 @@
 // Sketchi's single lint gate: type-aware Oxlint over the whole repository.
-// `pnpm run lint` builds package declarations first, because type-aware rules
+// `pnpm nx run ops:check-lint` builds package declarations first, because type-aware rules
 // resolve workspace packages through their built `dist` types (as typecheck does).
 {
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
@@ -232,7 +232,13 @@
 		},
 		{
 			// Build scripts, configs and tests run on Node and drive the host directly.
-			"files": ["**/scripts/**", "**/*.mjs", "**/*.config.*", "**/tests/**"],
+			"files": [
+				"**/scripts/**",
+				"**/*.mjs",
+				"**/*.config.*",
+				"**/tests/**",
+				"tools/build-config/**"
+			],
 			"rules": {
 				"effecttsgo/global-fetch": "off",
 				"effecttsgo/new-promise": "off",
@@ -269,10 +275,9 @@
 						"allow": [
 							// Storybook composes the Studio-owned workspace and its stylesheet.
 							"^@sketchi/studio/styles\\.css$",
-							"^\\.\\./\\.\\./tools/ops/src/vite/client-server-boundary$",
-							"^\\.\\./\\.\\./tools/ops/src/workers$",
-							"^(\\.\\./){2,4}tools/ops/src/vite/excalidraw-fonts$",
-							"^\\.\\./\\.\\./tools/local-dev-ports$"
+							"^\\.\\./\\.\\./tools/build-config/(client-server-boundary|excalidraw-fonts|local-dev-ports|workers)$",
+							"^\\.\\./\\.\\./\\.\\./build-config/(excalidraw-fonts|workers)$",
+							"^\\.\\./\\.\\./build-config/(client-server-boundary|excalidraw-fonts|workers)$"
 						],
 						"depConstraints": [
 							{

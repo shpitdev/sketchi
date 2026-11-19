@@ -2,6 +2,8 @@
 import { Console, Effect, FileSystem, Option, Path, Schema } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 
+import { workerProjectConfig, workerProjectIds } from "../../build-config/workers";
+
 import { GateFailed, HELP, runGate } from "./ci-local/gate";
 import {
 	cloudflareCredentials,
@@ -31,7 +33,6 @@ import { attempt, capture, opsError, output, runInherited } from "./process";
 import { DEFAULT_ENDPOINT, runSanity } from "./sanity";
 import { printResources, provision } from "./telemetry/catalog";
 import { openDuckdb } from "./telemetry/db";
-import { workerProjectConfig, workerProjectIds } from "./workers";
 
 /** Sets the exit code a command reports without failing it. */
 export class ExitCode extends Schema.TaggedError<ExitCode, { readonly brand: unique symbol }>()(
@@ -89,11 +90,10 @@ const workerResolve = Command.make("resolve", { project }, (input) =>
 	}),
 ).pipe(Command.withDescription("Write the Worker identity and build paths of one app."));
 
-/** The Nx projects a change from `base` to `head` affects, optionally only through one target. */
-const nxAffected = Effect.fn("ops.nxAffected")(function* (
+/** The Nx build projects a change from `base` to `head` affects. */
+const affectedBuildProjects = Effect.fn("ops.affectedBuildProjects")(function* (
 	base: string,
 	head: string,
-	target?: string,
 ) {
 	const json = yield* output("pnpm", [
 		"--silent",
@@ -101,7 +101,7 @@ const nxAffected = Effect.fn("ops.nxAffected")(function* (
 		"show",
 		"projects",
 		"--affected",
-		...(target ? [`--withTarget=${target}`] : []),
+		"--withTarget=build",
 		`--base=${base}`,
 		`--head=${head}`,
 		"--json",
@@ -126,7 +126,7 @@ const previewSelect = Command.make("select", {}, () =>
 			changedFiles = (yield* output("git", ["diff", "--name-only", mergeBase, head]))
 				.split("\n")
 				.filter(Boolean);
-			affected = yield* nxAffected(mergeBase, head);
+			affected = yield* affectedBuildProjects(mergeBase, head);
 		}
 		const projects = yield* attempt(() =>
 			selectPreviewProjects({ selection, affected, changedFiles }),
@@ -214,7 +214,7 @@ const productionSelect = Command.make(
 					/^[0-9a-f]{7,64}$/i.test(base) &&
 					!/^0+$/.test(base) &&
 					(yield* capture("git", ["cat-file", "-e", `${base}^{commit}`])).code === 0;
-				if (known) affected = yield* nxAffected(base, head, "build");
+				if (known) affected = yield* affectedBuildProjects(base, head);
 				else {
 					yield* Console.log(
 						`Previous main commit ${base || "(none)"} is unknown; deploying every app.`,

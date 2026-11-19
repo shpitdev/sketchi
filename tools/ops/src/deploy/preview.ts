@@ -4,11 +4,11 @@ import {
 	workerProjectConfig,
 	workerProjectIds,
 	type WorkerProjectId,
-} from "../workers";
+} from "../../../build-config/workers";
 
 // Preview tooling that belongs to no Nx project's build. A change to it previews every app.
 const PREVIEW_TOOLING =
-	/^(?:\.github\/workflows\/app-preview\.yml$|\.github\/actions\/|tools\/ops\/src\/(?:main|process|outputs|workers|commands)\.ts$|tools\/ops\/src\/deploy\/)/;
+	/^(?:\.github\/workflows\/app-preview\.yml$|\.github\/actions\/|tools\/ops\/src\/(?:main|process|outputs|commands)\.ts$|tools\/ops\/src\/deploy\/)/;
 
 /**
  * The Worker apps a preview run deploys: every app, one named app, or the apps the PR affects

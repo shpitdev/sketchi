@@ -15,6 +15,9 @@
 @import "../../editor-surface/src/theme.css" layer(base);
 
 @source "./components";
+@source not "./components/**/tests/**";
+@source not "./components/**/*.{spec,test}.{js,jsx,ts,tsx}";
+@source not "./components/**/*.stories.tsx";
 
 @custom-variant dark (&:is(.dark *));
 

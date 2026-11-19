@@ -4,7 +4,7 @@ import {
 	workerProjectConfig,
 	workerProjectIds,
 	type WorkerProjectId,
-} from "../workers";
+} from "../../../build-config/workers";
 
 /**
  * The Worker apps a production run deploys: every app, one named app, or (for a push) the apps
