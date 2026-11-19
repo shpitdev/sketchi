@@ -43,7 +43,7 @@
 			"executor": "nx:run-commands",
 			"dependsOn": ["sync-catalog-assets"],
 			"options": {
-				"command": "PORTLESS_PORT=443 portless run --name icons.sketchi vite dev --config apps/icons/vite.config.ts"
+				"command": "vite dev --config apps/icons/vite.config.ts"
 			}
 		},
 		"preview": {

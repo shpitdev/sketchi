@@ -96,9 +96,22 @@ Every app except the CLI is a Cloudflare Worker. See the
 ```sh
 mise trust && mise install
 pnpm install
-pnpm dev                    # every app, through Portless
-pnpm nx dev studio          # one app (apps/studio)
+pnpm dev                    # all four Worker apps
+pnpm nx dev studio          # one app
 ```
+
+| App    | Local URL             |
+| ------ | --------------------- |
+| Web    | http://127.0.0.1:6201 |
+| Editor | http://127.0.0.1:6202 |
+| Icons  | http://127.0.0.1:6203 |
+| Studio | http://127.0.0.1:6210 |
+
+The dev servers use fixed ports and fail if a port is in use. Icons and Studio
+use remote Cloudflare bindings. If your Cloudflare login can access multiple
+accounts, set `CLOUDFLARE_ACCOUNT_ID` to the Sketchi account before starting dev.
+To make Web link to local Icons and Studio, see
+[Web's local setup](apps/web/README.md#local-sibling-links).
 
 `pnpm ci:local` is the gate: lint and format, typecheck with the native
 TypeScript 7 compiler, build and test for every project the change

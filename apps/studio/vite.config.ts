@@ -10,9 +10,11 @@ import { clientServerBoundary } from "../../tools/ops/src/vite/client-server-bou
 import { workerProjectConfig } from "../../tools/ops/src/workers";
 
 const workerProject = workerProjectConfig("studio");
+const devPort = 6210;
 
 export default defineConfig({
 	root: new URL(".", import.meta.url).pathname,
+	server: { host: "127.0.0.1", port: devPort, strictPort: true },
 	build: {
 		emptyOutDir: true,
 		outDir: new URL(`../../${workerProject.buildOutputPath}`, import.meta.url).pathname,
@@ -33,7 +35,7 @@ export default defineConfig({
 		clientServerBoundary(workerProject.projectId),
 		cloudflare({
 			configPath: new URL("./wrangler.jsonc", import.meta.url).pathname,
-			inspectorPort: localInspectorPort(6210),
+			inspectorPort: localInspectorPort(devPort),
 			viteEnvironment: {
 				name: "ssr",
 			},

@@ -353,9 +353,6 @@ importers:
       oxlint-tsgolint:
         specifier: 7.0.2007
         version: 7.0.2007
-      portless:
-        specifier: 0.15.12
-        version: 0.15.12
       storybook:
         specifier: 10.6.5
         version: 10.6.5(@types/react@19.3.0)(prettier@3.9.9)(react@19.3.1)
@@ -8540,12 +8537,6 @@ packages:
   portfinder@1.0.38:
     resolution: {integrity: sha512-rEwq/ZHlJIKw++XtLAO8PPuOQA/zaPJOZJ37BVuN97nLpMJeuDVLVGRwbFoBgLudgdTMP2hdRJP++H+8QOA3vg==}
     engines: {node: '>= 10.12'}
-
-  portless@0.15.12:
-    resolution: {integrity: sha512-Lbz85zLboOMkvq2unXYfJ/YMpsvFZYQgrwGEbinZErp045y9fLm4obm7E77V2BI2Om0Mh6tX/2w2ftFqRs5kfQ==}
-    engines: {node: '>=24'}
-    os: [darwin, linux, win32]
-    hasBin: true
 
   postcss@8.5.32:
     resolution: {integrity: sha512-LJlKCCAUFKOuZxipUdYw1NzIITEsPcgyOG9LkvRJvuKj/bRzbuRY0ARXvL0pWGpsZvn8jku+LMep2eU0seHp8g==}
@@ -17773,8 +17764,6 @@ snapshots:
       debug: 4.4.3(supports-color@10.2.2)
     transitivePeerDependencies:
       - supports-color
-
-  portless@0.15.12: {}
 
   postcss@8.5.32:
     dependencies:

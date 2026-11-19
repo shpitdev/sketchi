@@ -41,7 +41,7 @@
 		"dev": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "PORTLESS_PORT=443 portless run --name editor.sketchi vite dev --config apps/editor/vite.config.ts"
+				"command": "vite dev --config apps/editor/vite.config.ts"
 			}
 		},
 		"preview": {

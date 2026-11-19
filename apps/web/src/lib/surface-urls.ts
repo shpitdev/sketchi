@@ -14,11 +14,6 @@ export const PRODUCT_SURFACE_HOSTS = {
 	playground: "playground.sketchi.app",
 } as const;
 
-export const LOCAL_WEB_SURFACE_URLS: WebSurfaceUrls = {
-	icons: "http://localhost:6203",
-	playground: "http://localhost:6310",
-};
-
 // Worker hostnames are an implementation detail and must never reach a user.
 // The defaults are the public product hosts; a PR preview is the one place a
 // Worker hostname is the correct link target, and it only ever arrives through
@@ -68,12 +63,4 @@ export function resolveWebSurfaceUrls(env: WebSurfaceEnv = {}): WebSurfaceUrls {
 		icons: cleanHttpUrl(env.SKETCHI_ICONS_URL, DEFAULT_WEB_SURFACE_URLS.icons),
 		playground: cleanPublicPlaygroundUrl(env.SKETCHI_PLAYGROUND_URL),
 	};
-}
-
-export function surfaceLinkLabel(href: string, fallback: string): string {
-	try {
-		return new URL(href).host;
-	} catch {
-		return fallback;
-	}
 }
