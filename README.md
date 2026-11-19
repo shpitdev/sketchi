@@ -109,7 +109,8 @@ pnpm nx dev studio          # one app
 
 The dev servers use fixed ports and fail if a port is in use. Icons and Studio
 use remote Cloudflare bindings. If your Cloudflare login can access multiple
-accounts, set `CLOUDFLARE_ACCOUNT_ID` to the Sketchi account before starting dev.
+accounts, set `CLOUDFLARE_ACCOUNT_ID` to the Sketchi account before starting dev, e.g. in a
+gitignored `mise.local.toml` `[env]` table alongside `INFISICAL_PROJECT_ID`.
 To make Web link to local Icons and Studio, see
 [Web's local setup](apps/web/README.md#local-sibling-links).
 

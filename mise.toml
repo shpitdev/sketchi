@@ -3,6 +3,7 @@
 node = "26.13.0"
 "aqua:pnpm/pnpm" = "12.16.1"
 duckdb = "1.5.5"
+actionlint = "1.7.12"
 
 [settings]
 # Keep the selected tools ahead of inherited global launchers.

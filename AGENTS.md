@@ -60,4 +60,4 @@ Keep family tests beside the source in `tests/`: at most `<name>.test.ts`, `<nam
 - On `main`, `.changeset/` changes run `changesets.yml`, which merges and dispatches `release.yml` only if there is a Version Packages PR.
 - Changing `apps/cli/package.json` on `main` triggers `release.yml` directly. It submits `npm publish` only for an untagged, unpublished CLI version; npm may require 2FA approval.
 
-Keep temporary notes, logs and screenshots in `.memory/`. Git ignores it; `.ignore` keeps notes searchable.
+Keep temporary notes, logs and screenshots in `.memory/`. Git ignores it; `.ignore` keeps notes searchable. Never copy checkouts, snapshots or `node_modules` into it; retire worktrees with `git worktree remove`.
