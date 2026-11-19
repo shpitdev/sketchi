@@ -59,7 +59,23 @@ describe("SVG handoff", () => {
 		).toMatchObject({ kind: "valid" });
 	});
 
+	it("accepts the exact local Icons origin only in development", () => {
+		const svg = "http://127.0.0.1:6203/output/upload-ready/svg/auth-identity/workos.svg";
+		try {
+			vi.stubEnv("DEV", true);
+			expect(parseSvgHandoff({ svg })).toMatchObject({ kind: "valid" });
+			vi.stubEnv("DEV", false);
+			expect(parseSvgHandoff({ svg })).toMatchObject({ kind: "invalid" });
+		} finally {
+			vi.unstubAllEnvs();
+		}
+	});
+
 	it.each([
+		"http://127.0.0.1:6204/output/upload-ready/svg/auth/workos.svg",
+		"http://localhost:6203/output/upload-ready/svg/auth/workos.svg",
+		"http://user@127.0.0.1:6203/output/upload-ready/svg/auth/workos.svg",
+		"http://127.0.0.1:6203/output/review/private.svg",
 		"https://example.com/output/upload-ready/svg/auth/workos.svg",
 		"https://sketchi-icons.attacker.workers.dev/output/upload-ready/svg/auth/workos.svg",
 		"https://evil-sketchi-icons.dimethyl.workers.dev/output/upload-ready/svg/auth/workos.svg",

@@ -20,8 +20,7 @@ function isAllowedIconHost(hostname: string): boolean {
 		// sketchi-allow-workers-dev: PR Previews of the Icons Worker have no
 		// custom domain, so handoff from a preview must keep working. Matched,
 		// never rendered — production links use the public host above.
-		/^(?:pr-\d+-)?sketchi-icons\.dimethyl\.workers\.dev$/.test(hostname) ||
-		/^(?:[a-z0-9-]+\.)*icons\.sketchi\.localhost$/.test(hostname)
+		/^(?:pr-\d+-)?sketchi-icons\.dimethyl\.workers\.dev$/.test(hostname)
 	);
 }
 
@@ -67,13 +66,14 @@ export function parseSvgHandoff(search: SvgHandoffSearch): SvgHandoffResult {
 	} catch {
 		return { kind: "invalid", message: "The icon source URL is invalid." };
 	}
+	const isLocalIcons = import.meta.env.DEV && source.origin === "http://127.0.0.1:6203";
+	const isPublicIcons =
+		source.protocol === "https:" && source.port === "" && isAllowedIconHost(source.hostname);
 	if (
-		source.protocol !== "https:" ||
-		!isAllowedIconHost(source.hostname) ||
+		!(isLocalIcons || isPublicIcons) ||
 		!isAllowedIconPath(source.pathname) ||
 		source.username.length > 0 ||
 		source.password.length > 0 ||
-		source.port.length > 0 ||
 		source.search.length > 0 ||
 		source.hash.length > 0
 	) {
