@@ -49,6 +49,7 @@ Keep family tests beside the source in `tests/`: at most `<name>.test.ts`, `<nam
 - Restacks and retargets carry `local-ci` only for an unchanged patch. A changed patch needs fresh relevant proof and a full gate before signoff.
 - Skip duplicate runtime gates for docs-only or unchanged patches. Keep heavy and timing-sensitive suites local; PR CI typechecks the affected head.
 - For layout, drawing or graph changes, retain artifact identity, affected fuzz results and timing. The `*-fuzz` targets on `diagrams` are the full local suites; list them with `pnpm nx show project diagrams`.
+- For a single workspace check, run `pnpm nx run ops:check-lint`, `pnpm nx run ops:check-format` or `pnpm nx run ops:check-tools`.
 - Declare external fixtures and environment inputs on the target. Do not clear or relocate the shared Nx cache for routine gates.
 - Run `pnpm nx run drawing:corpus-renderer` when its inputs change. Build all four Workers before `pnpm run test:wrangler-dry-runs`.
 - Verify rendering at the product entrypoint. For UI changes use headless `agent-browser` on the PR preview or production; never open a visible browser. See [Worker previews](docs/preview-deploys.md) for routing and rendering proof.
