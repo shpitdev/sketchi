@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
@@ -204,9 +205,27 @@ try {
 			archivedNotices.stdout.includes(Buffer.from("is-ci 4.1.0")) &&
 			archivedNotices.stdout.includes(Buffer.from("pako 3.0.3")) &&
 			archivedNotices.stdout.includes(Buffer.from("Vitaly Puzrin and Andrei Tuputcyn")) &&
-			archivedNotices.stdout.includes(Buffer.from("linkedom 0.18.14")) &&
 			archivedNotices.stdout.includes(Buffer.from("htmlparser2 10.1.0")),
 		"Packaged third-party notices omit a bundled dependency license.",
+	);
+	for (const attribution of [
+		"@clack/prompts 1.9.0",
+		"@clack/core 1.6.0",
+		"sisteransi 2.0.0",
+		"linkedom 0.18.15",
+		"cssomnom 0.1.12",
+	]) {
+		assert(
+			archivedNotices.stdout.includes(Buffer.from(attribution)),
+			`Packaged third-party notices omit ${attribution}.`,
+		);
+	}
+	const linkedomManifest = createRequire(import.meta.url).resolve("linkedom/package.json");
+	const cssomnomEntry = createRequire(linkedomManifest).resolve("cssomnom");
+	const cssomnomLicense = await readFile(resolve(dirname(cssomnomEntry), "../LICENSE"));
+	assert(
+		archivedNotices.stdout.includes(cssomnomLicense),
+		"Packaged third-party notices omit cssomnom's complete Apache-2.0 license.",
 	);
 	const installRoot = resolve(runRoot, "install");
 	const homeRoot = resolve(runRoot, "home");
