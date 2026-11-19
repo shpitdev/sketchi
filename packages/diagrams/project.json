@@ -14,7 +14,6 @@
 		},
 		"test": {
 			"executor": "nx:run-commands",
-			"outputs": ["{workspaceRoot}/coverage/packages/diagrams"],
 			"options": {
 				"command": "vitest run --config packages/diagrams/vitest.config.ts"
 			},

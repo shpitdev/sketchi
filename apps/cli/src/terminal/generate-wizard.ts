@@ -189,18 +189,6 @@ export const GenerateWizardLive = Layer.succeed(GenerateWizard, {
 	activity,
 });
 
-export function makeGenerateWizardTestLayer(
-	answers: GenerateWizardAnswers,
-	events: Array<string> = [],
-) {
-	return Layer.succeed(GenerateWizard, {
-		ask: () => Effect.succeed(answers),
-		activity: Effect.succeed({
-			succeed: (message: string) => Effect.sync(() => events.push(`success:${message}`)),
-		}),
-	});
-}
-
 export interface GenerateWizardEnvironment {
 	readonly stdinIsTTY: boolean;
 	readonly stdoutIsTTY: boolean;

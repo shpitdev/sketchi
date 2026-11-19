@@ -1133,21 +1133,3 @@ export function enforceCandidateRequestRequirements(
 			}
 		: input;
 }
-
-export function summarizeGenerationCandidate(
-	candidate: DiagramGenerationCandidate,
-): DiagramGenerationCandidateSummary {
-	return {
-		diagnostics: candidate.diagnostics,
-		...(candidate.warnings?.length ? { warnings: candidate.warnings } : {}),
-		...(candidate.diagram ? { diagramText: JSON.stringify(candidate.diagram, null, 2) } : {}),
-		diagramValid: Boolean(candidate.diagram) && !candidate.error,
-		model: candidate.model,
-		provider: candidate.provider,
-		text: candidate.text,
-		...(candidate.attempts !== undefined ? { attempts: candidate.attempts } : {}),
-		...(candidate.durationMs !== undefined ? { durationMs: candidate.durationMs } : {}),
-		...(candidate.error ? { error: candidate.error } : {}),
-		...(candidate.usage ? { usage: candidate.usage } : {}),
-	};
-}

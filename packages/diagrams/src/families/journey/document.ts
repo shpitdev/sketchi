@@ -187,17 +187,6 @@ export function journeyStepActors(actor: string, declared: readonly string[] = [
 	return actors;
 }
 
-/** The actors a journey names: its declared list, or every step's actors in first-use order. */
-export function journeyActors(diagram: Pick<JourneyDiagram, "actors" | "stages">): string[] {
-	if (diagram.actors !== undefined) return Arr.map(diagram.actors, (actor) => Str.trim(actor));
-	const actors: string[] = [];
-	for (const stage of diagram.stages)
-		for (const step of stage.steps)
-			for (const actor of journeyStepActors(step.actor ?? ""))
-				if (!Arr.some(actors, (known) => sameName(known) === sameName(actor))) actors.push(actor);
-	return actors;
-}
-
 /** The stage a pain point or opportunity written apart from every stage, and naming none, lands in. */
 export const JOURNEY_UNPLACED_STAGE = "(no stage)";
 

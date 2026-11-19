@@ -14,7 +14,6 @@
 		},
 		"test": {
 			"executor": "nx:run-commands",
-			"outputs": ["{workspaceRoot}/coverage/packages/social-card"],
 			"options": {
 				"command": "vitest run --config packages/social-card/vitest.config.mts"
 			}

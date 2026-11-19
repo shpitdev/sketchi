@@ -14,7 +14,6 @@
 		},
 		"test": {
 			"executor": "nx:run-commands",
-			"outputs": ["{workspaceRoot}/coverage/packages/icons/draw"],
 			"options": {
 				"command": "vitest run --config packages/icons/draw/vitest.config.mts"
 			}

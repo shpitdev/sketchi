@@ -21,7 +21,6 @@
 		"@sketchi/diagram-scenarios",
 		"@sketchi/editor-surface",
 		"@sketchi/observability",
-		"@sketchi/studio-projects",
 		"@sketchi/generators",
 		"@sketchi/diagrams",
 		"@sketchi/cloudflare"

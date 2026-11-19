@@ -40,7 +40,6 @@
 		},
 		"test": {
 			"executor": "nx:run-commands",
-			"outputs": ["{workspaceRoot}/coverage/packages/icons/catalog"],
 			"options": {
 				"command": "vitest run --config packages/icons/catalog/vitest.config.ts"
 			}

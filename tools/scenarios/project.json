@@ -25,7 +25,6 @@
 		},
 		"test": {
 			"executor": "nx:run-commands",
-			"outputs": ["{workspaceRoot}/coverage/tools/scenarios"],
 			"options": {
 				"command": "vitest run --config tools/scenarios/vitest.config.mts"
 			}

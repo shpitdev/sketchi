@@ -76,13 +76,6 @@ export function buildResultFromMcp(
 	return isRecord(receipt) ? receipt : (returned ?? value);
 }
 
-/** Extract the build spec from a build, execute payload, or MCP tool result. */
-export function normalizedSpecFrom(value: unknown): unknown {
-	if (!isRecord(value)) return undefined;
-	const build = buildResultFromMcp(value);
-	return isRecord(build.normalizedSpec) ? build.normalizedSpec : undefined;
-}
-
 /**
  * Groups take no authored logo. A build draws one before a group whose label
  * names it and notes that as an `icon_filled` issue on the group (see

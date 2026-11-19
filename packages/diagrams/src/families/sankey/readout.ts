@@ -243,11 +243,6 @@ export function sankeyCrossingPairs(scene: CanvasSpec): SankeyCrossingPair[] {
 	return pairs;
 }
 
-/** How many pairs of bands cross, gap by gap. */
-export function sankeyCrossings(scene: CanvasSpec): number {
-	return sankeyCrossingPairs(scene).length;
-}
-
 /**
  * How much crossing a reader sees: the sum over crossing pairs of the
  * product of their weights, by default their drawn widths. Pass each band's

@@ -95,10 +95,6 @@
 			"types": "./dist/families/flowchart/fixtures/group-fixtures.d.ts",
 			"default": "./dist/families/flowchart/fixtures/group-fixtures.js"
 		},
-		"./families/flowchart/fixtures/label-fixtures": {
-			"types": "./dist/families/flowchart/fixtures/label-fixtures.d.ts",
-			"default": "./dist/families/flowchart/fixtures/label-fixtures.js"
-		},
 		"./families/flowchart/fixtures/lane-fixtures": {
 			"types": "./dist/families/flowchart/fixtures/lane-fixtures.d.ts",
 			"default": "./dist/families/flowchart/fixtures/lane-fixtures.js"
@@ -414,7 +410,6 @@
 		"@sketchi/cloudflare": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/observability": "workspace:*",
-		"@standard-schema/spec": "1.1.0",
 		"@effect/ai-openai-compat": "catalog:",
 		"@effect/ai-typesafe": "catalog:"
 	}

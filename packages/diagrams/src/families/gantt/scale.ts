@@ -1,6 +1,5 @@
 // @effect-diagnostics globalDate:off -- UTC calendar arithmetic uses an explicit epoch value, not the host clock.
 import { estimateTextWidth } from "@sketchi/drawing";
-import { formatGanttDay } from "./document";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -210,9 +209,4 @@ export function ganttBandLabels(band: GanttAxisCell): readonly string[] {
 	const month = /^([A-Z][a-z]{2}) \d{4}$/u.exec(band.label);
 	if (month) return [band.label, month[1]!];
 	return /^\d{4}$/u.test(band.label) ? [band.label, `’${band.label.slice(2)}`] : [band.label];
-}
-
-/** Every tick boundary as `YYYY-MM-DD`, start of each cell then the axis end. */
-export function ganttAxisBoundaries(axis: GanttAxis): string[] {
-	return [...axis.cells.map((cell) => cell.start), axis.end].map(formatGanttDay);
 }
