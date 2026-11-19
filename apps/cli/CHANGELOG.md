@@ -1,5 +1,13 @@
 # @sketchi/cli
 
+## 0.42.4
+
+### Patch Changes
+
+- [#865](https://github.com/shpitdev/sketchi/pull/865) [`6141113`](https://github.com/shpitdev/sketchi/commit/6141113908e464ff56b00c3abed925fc9a6d4a89) Thanks [@anandpant](https://github.com/anandpant)! - `sketchi generate` and `sketchi revise` now fail on HTTP 421 instead of silently resending a paid generation request.
+
+- [#862](https://github.com/shpitdev/sketchi/pull/862) [`4f19fe3`](https://github.com/shpitdev/sketchi/commit/4f19fe3376e2717e9c9f1211bf7ae097e665233b) Thanks [@anandpant](https://github.com/anandpant)! - `sketchi icon draw` sends each paid draw request once. An HTTP 421 from the server can no longer make Node resend the request body and pay for a second draw; the command still retries only a refused-for-capacity 429 with a short `Retry-After`. Requests and responses follow the same contract Studio serves.
+
 ## 0.42.3
 
 ### Patch Changes
