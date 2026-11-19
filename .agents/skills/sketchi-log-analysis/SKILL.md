@@ -5,7 +5,7 @@ description: "Investigate Sketchi generations and Code Mode calls in the span te
 
 # Sketchi log analysis
 
-Every Sketchi Worker request records its spans, including full prompts and outputs, in an R2 Data Catalog table. `pnpm db` opens DuckDB on that table from the repository root. Keep the work read-only.
+The R2 Data Catalog stores Worker spans, including recorded prompts and outputs. `pnpm db` opens DuckDB on that table from the repository root. Keep the work read-only.
 
 ## Open the data
 
@@ -15,7 +15,7 @@ pnpm db --preview                       # PR previews
 pnpm db -c "FROM generations LIMIT 5"   # one query
 ```
 
-It needs a read-only `R2_DATA_READ_TOKEN`; when the variable is unset, `pnpm db` gets one from Infisical. A request's rows arrive about a minute after it ends.
+It needs a read-only `R2_DATA_READ_TOKEN`; when the variable is unset, `pnpm db` gets one from Infisical. Allow about a minute after a request ends for its rows to arrive. A failed send or lost isolate can leave no rows.
 
 ## Views
 
@@ -31,7 +31,7 @@ It needs a read-only `R2_DATA_READ_TOKEN`; when the variable is unset, `pnpm db`
 1. Find the runs. Filter `generations` by `start_time`, `outcome`, `diagram_type` or `prompt ILIKE '%…%'`, or `usage_events` by `operation`, `status` or `harness`. Requests from a test harness carry their `client` and `scenario_id`.
 2. Read the cost beside the result: `model_calls`, `repairs`, `total_tokens` and `duration_ms`. A pass that needed repairs still costs more than one that did not.
 3. Open the trace with `span_tree(trace_id)` to see the order of model calls, repairs and coverage checks.
-4. Read the model's answer in `output`. Generate calls `anthropic/claude-haiku-5-5` through Cloudflare AI Gateway. A flowchart comes back as its document, `{ title, diagram: { type: "flowchart", nodes: { id: label | { label, … } }, edges: [[from, to, label?]], groups?, lanes? } }`. Compare it with the prompt, then read `diagnostics` and `coverage_issues` for what Sketchi caught.
+4. Read the model's answer in `output`. Read `generations.model` for the run; `anthropic/claude-haiku-5-5` is the default. A flowchart comes back as its document, `{ title, diagram: { type: "flowchart", nodes: { id: label | { label, … } }, edges: [[from, to, label?]], groups?, lanes? } }`. Compare it with the prompt, then read `diagnostics` and `coverage_issues` for what Sketchi caught.
 5. Classify each failure and name the follow-up:
    - model: valid output that misses or invents something the prompt states. Add an eval case, and a prompt rule if it recurs.
    - contract: the output fails the schema or validation. Check whether the prompt states the rule it broke.

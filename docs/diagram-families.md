@@ -7,10 +7,7 @@ path. Swimlanes and architecture diagrams are
 flowchart features. A prompt for anything else generates the closest family, and
 a request whose `type` names no family is invalid input.
 
-Family work follows the [product structure](plans/product-structure.md).
-Each family owns its document, layout and build under
-`packages/diagrams/src/families/<name>/`. The former generic node/edge scaffold
-is retired.
+Each [family](../packages/diagrams/src/families/) owns its document, layout and build.
 
 `tools/tests/diagram-families.test.ts` exercises generated-response ingestion and offline
 document builds without requiring particular source, story or test filenames.
@@ -20,7 +17,7 @@ document builds without requiring particular source, story or test filenames.
 | family folder | `packages/diagrams/src/families/<name>/`: `document.ts` (Effect Schema contract and semantic validation), `build.ts` (the `defineBuild` operation: normalize, check, render, counts), `docs.ts`, `rules.ts`, and layout, rendering, readout and fixtures as the family needs them. Follow the shared Effect diagnostic policy. | compile, family tests, generated-response pipeline |
 | registry | A descriptor in `families` (`packages/diagrams/src/family.ts`) with the operation, label, HTTP path, build, fixture, docs and any canvas roles. `DIAGRAM_TYPES`, `CanonicalDiagramSchema`, `diagramFixtures` and `renderDiagram` derive from it. Export the bound build from `build/builds.ts` and add the family to `canonicalDocumentFromDiagram` (`build/documents.ts`). | compile, offline-build pipeline |
 | family docs | `families/<name>/docs.ts`: the CLI wizard choice, the MCP catalog entry and examples, and the Studio chat tool name and description. MCP docs, the CLI wizard (`GENERATION_TYPE_OPTIONS` in `apps/cli/src/generation-types.ts`) and Studio chat tools loop over it. | compile, MCP tool list |
-| family tests | `families/<name>/tests/`: at most `<name>.test.ts`, `<name>-fuzz.test.ts` and `regressions.test.ts` (see the Tests section of `AGENTS.md`). Add a `test-<name>` target, and a `<name>-fuzz` target for a fuzz test, in `packages/diagrams/project.json`. | the family's own tests |
+| family tests | `families/<name>/tests/`: at most `<name>.test.ts`, `<name>-fuzz.test.ts` and `regressions.test.ts` (see the Tests section of `AGENTS.md`). Use `test-<name>` for the family suite. Timeline fuzz runs in `test-timeline`; families with larger fuzz runs have separate targets in `packages/diagrams/project.json`. | the family's own tests |
 | Excalidraw conversion | `packages/drawing`. Any new renderer role must convert and validate (`src/scene.ts`). | offline-build pipeline |
 | generation prompt | The family's entries in `IR_INSTRUCTIONS` and `FAMILY_EXAMPLES` (`packages/diagrams/src/generate/messages.ts`) and in `FAMILY_OPTIONS` (`family-questions.ts`). | compile, generate tests; generated quality in Frontierclimb |
 | generation output parsing | The `parsers` entry and validation-error mapping in `generate/candidates.ts`. Diagnostics should carry repair hints. | compile, generated-response pipeline |

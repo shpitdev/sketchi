@@ -1,7 +1,7 @@
 # ADR 0001: Native Excalidraw filled-geometry representation
 
 Date: 2026-07-11
-Status: Accepted for Slice 0; product integration remains blocked
+Status: Accepted. [ADR 0003](0003-svg-native-conversion-and-library-serialization.md) records the product integration.
 
 ## Context
 

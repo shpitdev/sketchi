@@ -100,8 +100,8 @@ pnpm dev                    # every app, through Portless
 pnpm nx dev studio          # one app (apps/studio)
 ```
 
-`pnpm ci:local` is the gate: lint and format, typecheck (TypeScript 6 and the
-native TypeScript 7 compiler), build and test for every project the change
+`pnpm ci:local` is the gate: lint and format, typecheck with the native
+TypeScript 7 compiler, build and test for every project the change
 affects, plus the tooling, deploy and Storybook checks. Remote CI on a pull
 request is one Nx-affected typecheck. [AGENTS.md](AGENTS.md#proof) explains
 unit gates against a verified staging base, the full gate required for signoff,
@@ -120,7 +120,7 @@ A push to `main` deploys the production Worker apps its changes reach; an
 `app-production-deploy` dispatch deploys every app or one. A pull request gets
 preview Workers when it carries the `preview` label; see
 [preview deployments](docs/preview-deploys.md) and the
-[production domain runbook](docs/production-domain-cutover.md).
+[production domain map and procedures](docs/production-domain-cutover.md).
 
 ## License
 

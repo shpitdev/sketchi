@@ -1,6 +1,6 @@
 # ADR 0004: Effect v4 on Cloudflare Workers
 
-- Status: accepted; revised by the Effect-everywhere plan
+- Status: accepted
 - Original decision: 2026-07-20
 - Policy revision: 2026-11-14
 
@@ -54,11 +54,7 @@ The upstream diagnostics do not detect every Promise or outer runtime expression
 review host ownership and test actual resource/cancellation/isolation behavior rather
 than preserving a syntax census. A green lint result is not lifecycle proof.
 
-This policy revision changes enforcement and documentation, not application behavior
-or domain models. Follow the [accepted implementation sequence](../plans/effect-everywhere.md):
-correctness repairs, domain/family migrations, runtime proofs and Nx reference/generator
-work keep their separate owners. No gate passes by downgrading correctness or blanket
-suppression. Temporary diagnostic counts and removed-title receipts stay in `.memory/`.
+See the [Effect toolchain](../effect-toolchain.md) for the compiler, lint and Nx reference checks.
 
 ## Consequences
 

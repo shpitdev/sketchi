@@ -170,11 +170,6 @@ harness behavior remain OpenCode concerns.
 - Codex installs plugins with `codex plugin add`, not `codex plugin install`.
 - If a newly installed Claude Code plugin is missing from an existing session,
   run `/reload-plugins` or start a new session.
-- If you installed the removed Agy plugin from an earlier checkout, clean up its
-  stale registration once with
-  `agy plugin uninstall sketchi-code-mode-antigravity`. The message
-  `Uninstalled plugin "sketchi-code-mode-antigravity"` confirms the cleanup. Do
-  not reinstall it; use the portable skill and `.agents/mcp_config.json` above.
 - Do not run an MCP login command for Sketchi. The endpoint is public and the
   plugin MCP configs contain no credentials.
 - Do not install Chrome, Playwright, or another browser for PNG output. Rendering
