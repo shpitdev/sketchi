@@ -274,8 +274,9 @@ jobs:
           if [ "$PROJECT_ID" = web ] && [ -n "$STUDIO_PREVIEW_URL" ]; then
             preview_args+=(--var "SKETCHI_PLAYGROUND_URL:${STUDIO_PREVIEW_URL}")
           fi
-          # The retry wrapper clears WRANGLER_OUTPUT_FILE_PATH before each attempt.
-          pnpm --silent ops wrangler-retry -- pnpm exec wrangler preview \
+          # Wrangler appends to this file; only read output from this deployment.
+          rm -f "$WRANGLER_OUTPUT_FILE_PATH"
+          pnpm exec wrangler preview \
             --config "${{ steps.worker-app.outputs.worker_config_path }}" \
             --name "${{ steps.preview-settings.outputs.preview_name }}" \
             --ignore-base-config \
