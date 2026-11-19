@@ -22,7 +22,7 @@ Each [family](../packages/diagrams/src/families/) owns its document, layout and 
 | CLI | `sketchi create`, `generate --type` and the offline builder read the registry. Add a changeset for `@sketchi/cli`. | offline-build pipeline, CLI behavior tests |
 | generate API request | `POST /api/v1/generate` decodes `GenerateRequest` (`packages/diagrams/src/generate/contract.ts`), whose `type` is any of `DIAGRAM_TYPES`, in `apps/studio/src/features/generate/api.server.ts`. | request schema |
 | maintained scenarios | `tools/scenarios`: scenarios with checks scored on the model's own diagram, registered in `diagramScenarios` or the reliability scenarios. | scenario regressions and Frontierclimb |
-| Storybook story | `tools/storybook/families/<name>.stories.tsx`. | Storybook build and review |
+| Gallery story | `tools/storybook/families/<name>.stories.tsx`. | Local visual review with `pnpm storybook` |
 
 The [offline CLI test](../apps/cli/tests/cli.test.ts) creates diagrams from JSON
 and exports a valid Excalidraw file. Family tests check document builds and
@@ -62,4 +62,5 @@ optional `icon` support through the shared `DiagramIconRef` when a family's
 elements represent named technologies.
 
 Verify with `pnpm ci:local --no-signoff` (includes the affected family and shared
-test targets, tools, typechecks and editor Storybook).
+test targets, tools, and typechecks). The [diagram family gallery](../tools/storybook/native-conversion/README.md)
+is optional and runs separately from the gate.

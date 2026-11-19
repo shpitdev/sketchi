@@ -210,11 +210,13 @@ to the Cloudflare execution context where required.
 ## Workspace enforcement and proof
 
 Nx and type-aware Oxlint enforce dependency direction, including imports from
-configuration and Storybook files. Existing schema, Promise misuse and React
+configuration and the optional diagram gallery stories. Existing schema, Promise misuse and React
 synchronization restrictions remain. Effect diagnostics and their exceptions are
 described in the Diagnostics section of [Effect conventions](effect-conventions.md).
 The local gate and the checks each change needs are in
-[AGENTS.md](../AGENTS.md#proof).
+[AGENTS.md](../AGENTS.md#proof). The [local gallery](../tools/storybook/native-conversion/README.md)
+renders the diagram families with Studio's workspace and shared Excalidraw canvas;
+it is not a deployed surface or a CI gate.
 
 ## Deployment map
 

@@ -84,7 +84,8 @@ pushes keep the PR's affected Previews current.
   they point at production. These overrides affect only the Preview.
 
 `web`, `studio`, and `icons` are public product surfaces. `editor` remains
-internal and is not linked from public navigation.
+internal and is not linked from public navigation. The [diagram family gallery](../tools/storybook/native-conversion/README.md)
+is for local visual review, not Worker Preview or deployment verification.
 
 Pipeline-bound Studio and Icons uploads share
 `cloudflare-pipeline-bound-upload` with production. `queue: max` queues pending

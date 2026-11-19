@@ -4,35 +4,51 @@
 	"sourceRoot": "tools/storybook/native-conversion",
 	"projectType": "application",
 	"tags": ["scope:composition", "type:composition"],
-	"implicitDependencies": ["editor", "editor-surface", "icons", "studio"],
+	"implicitDependencies": ["editor"],
 	"targets": {
 		"build-storybook": {
+			"executor": "nx:run-commands",
+			"cache": true,
+			"dependsOn": ["cloudflare:build", "icon-catalog:build", "observability:build"],
 			"outputs": ["{workspaceRoot}/storybook-static/native-conversion"],
-			"options": {
-				"output-dir": "../../../storybook-static/native-conversion"
-			},
 			"inputs": [
 				"default",
-				"^default",
+				{
+					"input": "production",
+					"projects": [
+						"cloudflare",
+						"diagram-scenarios",
+						"diagrams",
+						"drawing",
+						"editor-surface",
+						"icon-catalog",
+						"observability",
+						"ui"
+					]
+				},
 				"{workspaceRoot}/tools/ops/src/vite/excalidraw-fonts.ts",
-				"{workspaceRoot}/tools/storybook/families/**/*"
-			]
-		},
-		"chromatic": {
-			"executor": "nx:run-commands",
-			"dependsOn": ["build-storybook"],
+				"{workspaceRoot}/tools/storybook/families/*.stories.tsx",
+				"{workspaceRoot}/apps/editor/package.json",
+				"{workspaceRoot}/apps/editor/src/components/svg-icon-workspace/**/*",
+				"{workspaceRoot}/apps/editor/src/components/workspace-top-bar/**/*",
+				"{workspaceRoot}/apps/editor/src/lib/svg-{handoff,source-atom}.ts",
+				"{workspaceRoot}/apps/editor/src/styles/app.css",
+				"{workspaceRoot}/apps/studio/package.json",
+				"{workspaceRoot}/apps/studio/src/**/*",
+				"{workspaceRoot}/packages/editor-surface/src/components/excalidraw-scene-canvas/*.stories.tsx"
+			],
 			"options": {
-				"command": "chromatic --storybook-build-dir storybook-static/native-conversion --storybook-config-dir tools/storybook/native-conversion/.storybook --storybook-base-dir tools/storybook/native-conversion"
-			}
-		},
-		"static-storybook": {
-			"options": {
-				"staticFilePath": "storybook-static/native-conversion"
+				"cwd": "tools/storybook/native-conversion",
+				"command": "storybook build --disable-telemetry --output-dir ../../../storybook-static/native-conversion"
 			}
 		},
 		"storybook": {
+			"executor": "nx:run-commands",
+			"continuous": true,
+			"dependsOn": ["cloudflare:build", "icon-catalog:build", "observability:build"],
 			"options": {
-				"port": 6010
+				"cwd": "tools/storybook/native-conversion",
+				"command": "storybook dev --ci --disable-telemetry --host 127.0.0.1 --port 6010"
 			}
 		}
 	}

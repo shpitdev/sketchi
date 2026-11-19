@@ -6,11 +6,9 @@ const config: StorybookConfig = {
 	stories: [
 		"../../families/*.stories.tsx",
 		"../../../../packages/editor-surface/src/components/excalidraw-scene-canvas/*.stories.tsx",
-		"../../../../apps/icons/src/components/icon-conversion-preview/*.stories.tsx",
 		"../../../../apps/editor/src/components/svg-icon-workspace/*.stories.tsx",
 	],
-	staticDirs: ["../../../../apps/icons/public"],
-	addons: ["@storybook/addon-mcp"],
+	staticDirs: ["../../../../packages/editor-surface/public"],
 	framework: {
 		name: "@storybook/react-vite",
 		options: {

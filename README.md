@@ -115,10 +115,14 @@ To make Web link to local Icons and Studio, see
 
 `pnpm ci:local` is the gate: lint and format, typecheck with the native
 TypeScript 7 compiler, build and test for every project the change
-affects, plus the tooling, deploy and Storybook checks. Remote CI on a pull
+affects, plus the tooling and deploy checks. Remote CI on a pull
 request is one Nx-affected typecheck. [AGENTS.md](AGENTS.md#proof) explains
 unit gates against a verified staging base, the full gate required for signoff,
 and additional checks when their inputs change.
+
+For optional visual review, `pnpm storybook` starts the
+[diagram family gallery](tools/storybook/native-conversion/README.md) and
+`pnpm build-storybook` builds it locally.
 
 A CLI change that should ship gets a changeset (`pnpm changeset`); merging the
 Version Packages pull request publishes it.

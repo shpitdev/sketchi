@@ -23,8 +23,8 @@ export class GateFailed extends Schema.TaggedError<GateFailed, { readonly brand:
 
 export const HELP = `Installs frozen dependencies, checks Nx reference sync, and runs native Nx affected checks:
 lint/format, scenario CLI smoke, deployment/process and domain/font tests, typecheck/build/test,
-root TypeScript references and the editor Storybook. Full origin/main and --all gates also run
-sampled routing; unit gates select routing from its native target inputs.
+and root TypeScript references. Full origin/main and --all gates also run sampled routing;
+unit gates select routing from its native target inputs.
 Changes include committed, staged, unstaged and untracked files. Logs go to .memory/ci-local/.
 Nx reuses its native local task cache across worktrees. For caller-selected fuzz diagnostic
 outputs, run the Nx target with --skip-nx-cache.
@@ -219,7 +219,6 @@ export const runGate = Effect.fn("ops.ciLocal.gate")(function* (options: GateOpt
 		"build",
 		"test",
 		"check-scenario",
-		"check-storybook",
 		...(yield* targetNames(path.join(cwd, "packages/diagrams/project.json"))).filter((name) =>
 			name.startsWith("test-"),
 		),

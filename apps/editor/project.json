@@ -19,12 +19,6 @@
 				"command": "vite build --config apps/editor/vite.config.ts"
 			}
 		},
-		"build-storybook": {
-			"outputs": ["{workspaceRoot}/storybook-static/editor"],
-			"options": {
-				"output-dir": "../../storybook-static/editor"
-			}
-		},
 		"cf-typegen": {
 			"executor": "nx:run-commands",
 			"options": {
@@ -48,16 +42,6 @@
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "vite preview --config apps/editor/vite.config.ts --host 127.0.0.1 --port 6302"
-			}
-		},
-		"static-storybook": {
-			"options": {
-				"staticFilePath": "storybook-static/editor"
-			}
-		},
-		"storybook": {
-			"options": {
-				"port": 6008
 			}
 		},
 		"test": {

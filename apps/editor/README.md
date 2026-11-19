@@ -28,8 +28,6 @@ pnpm nx dev editor          # http://127.0.0.1:6202
 pnpm nx test editor
 pnpm nx typecheck editor
 pnpm nx build editor
-pnpm nx storybook editor
-pnpm nx build-storybook editor
 ```
 
 ## Usage
