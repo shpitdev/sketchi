@@ -28,3 +28,6 @@ apps/icons/public/packs/
 apps/icons/public/output/
 apps/studio/public/node-logos/
 .vitest
+
+# Local operator env (INFISICAL_PROJECT_ID, CLOUDFLARE_ACCOUNT_ID)
+mise.local.toml
