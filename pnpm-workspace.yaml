@@ -46,3 +46,10 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
   workerd: true
+permissions:
+  "@tanstack/react-hotkeys":
+    skills: false
+  "@tanstack/react-router":
+    skills: false
+  "@tanstack/react-start":
+    skills: false
