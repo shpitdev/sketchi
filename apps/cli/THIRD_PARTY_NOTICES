@@ -50,8 +50,8 @@ License:
 - @clack/prompts 1.9.0 and @clack/core 1.6.0
 - fast-string-width 3.0.2, fast-wrap-ansi 0.2.2, and sisteransi 2.0.0
 - chalk 6.0.0
-- string-width 8.2.2, get-east-asian-width 1.6.0, and strip-ansi 7.2.0
-- wrap-ansi 10.0.0 and ansi-styles 6.2.3
+- string-width 9.0.0 and 8.3.0, get-east-asian-width 1.7.0, and strip-ansi 7.2.0
+- wrap-ansi 10.0.2 and ansi-styles 6.2.3
 
 Copyright (c) 2025-Present Bombshell contributors
 Copyright (c) 2024-present Fabio Spampinato
