@@ -69,8 +69,8 @@ choices come from the workflow ref; the build and selectors come from the PR hea
 The workflow resolves the PR head SHA before checkout; that SHA appears in deploy
 metadata and comments. It also adds the `preview` label before anything uploads,
 so closing the PR cleans up even if no Preview comment exists yet, and later
-pushes keep the PR's affected Previews current. For a proof run, dispatch only the
-project you need, then remove the label between runs to avoid deploying on each push.
+pushes keep the PR's affected Previews current. Dispatch only the project you need.
+Remove the label between completed runs, and only once the bot's Preview comment exists for cleanup.
 For routing or rendering changes, replay the relevant scenarios against the Studio
 preview MCP (`pr-<number>-sketchi-studio`) and inspect a small set of exported PNGs.
 
