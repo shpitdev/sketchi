@@ -43,6 +43,22 @@ const flowchartAnswer = {
 	],
 };
 
+// Three stages exercise the middle-column label background that broke CLI scene decoding (#628).
+const sankeyAnswer = {
+	id: "hiring-flow",
+	title: "Hiring funnel",
+	type: "sankey",
+	nodes: [
+		{ id: "applied", label: "Applied" },
+		{ id: "screened", label: "Screened" },
+		{ id: "hired", label: "Hired" },
+	],
+	links: [
+		{ source: "applied", target: "screened", value: 40 },
+		{ source: "screened", target: "hired", value: 40 },
+	],
+};
+
 function generationText(diagram: Readonly<Record<string, unknown>>): string {
 	const { title, type, ...diagramWithoutTitle } = diagram;
 	// A drawn flowchart fixture reaches the model's answer as its document.
@@ -117,8 +133,9 @@ function generateRequest(env: StudioEnv, body: unknown): Promise<Response> {
 describe("generate responses installed CLIs can decode", () => {
 	it.each(DIAGRAM_TYPES)("accepts and decodes %s", async (type) => {
 		const family = familyForType(type);
+		const diagram = type === "sankey" ? sankeyAnswer : { ...family.fixture };
 		const response = await generateRequest(
-			{ AI: fakeAiGateway(generationText({ ...family.fixture })) },
+			{ AI: fakeAiGateway(generationText(diagram)) },
 			{ prompt: "Draw it", type },
 		);
 		const body = (await response.json()) as {
