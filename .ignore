@@ -1,1 +1,4 @@
-!.memory/**
+!/.memory/
+!/.memory/**
+.memory/**/node_modules/
+.memory/**/dist/
