@@ -42,12 +42,12 @@
 		}
 	},
 	"dependencies": {
-		"fast-xml-parser": "5.11.2",
+		"fast-xml-parser": "5.12.1",
 		"effect": "catalog:"
 	},
 	"devDependencies": {
 		"@resvg/resvg-wasm": "2.6.2",
-		"lucide-static": "1.65.0",
+		"lucide-static": "1.74.0",
 		"svg-pathdata": "9.0.0",
 		"wordlist-english": "1.2.1"
 	}

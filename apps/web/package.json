@@ -6,12 +6,12 @@
 		"@excalidraw/excalidraw": "0.18.1",
 		"@sketchi/editor-surface": "workspace:*",
 		"@sketchi/ui": "workspace:*",
-		"lucide-react": "1.65.0"
+		"lucide-react": "1.74.0"
 	},
 	"devDependencies": {
 		"@sketchi/social-card": "workspace:*",
-		"@tailwindcss/vite": "4.3.3",
-		"linkedom": "0.18.14",
-		"tailwindcss": "4.3.3"
+		"@tailwindcss/vite": "4.3.5",
+		"linkedom": "0.18.15",
+		"tailwindcss": "4.3.5"
 	}
 }

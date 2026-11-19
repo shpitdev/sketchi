@@ -9,7 +9,7 @@
 		"@sketchi/ui": "workspace:*",
 		"@tanstack/react-hotkeys": "0.19.0",
 		"fflate": "0.8.3",
-		"lucide-react": "1.65.0",
+		"lucide-react": "1.74.0",
 		"roughjs": "4.6.6",
 		"@sketchi/observability": "workspace:*",
 		"@sketchi/cloudflare": "workspace:*",
@@ -23,8 +23,8 @@
 	"devDependencies": {
 		"@resvg/resvg-wasm": "2.6.2",
 		"@sketchi/social-card": "workspace:*",
-		"@tailwindcss/vite": "4.3.3",
+		"@tailwindcss/vite": "4.3.5",
 		"sharp": "0.35.5",
-		"tailwindcss": "4.3.3"
+		"tailwindcss": "4.3.5"
 	}
 }

@@ -10,7 +10,7 @@
 		"dist"
 	],
 	"dependencies": {
-		"@clack/prompts": "1.8.1",
+		"@clack/prompts": "1.9.0",
 		"@effect/platform-node": "catalog:",
 		"@excalidraw/excalidraw": "0.18.1",
 		"@resvg/resvg-wasm": "2.6.2",
@@ -19,7 +19,7 @@
 		"chalk": "6.0.1",
 		"effect": "catalog:",
 		"is-ci": "4.1.0",
-		"linkedom": "0.18.14",
+		"linkedom": "0.18.15",
 		"pako": "3.0.3",
 		"string-width": "8.3.0",
 		"wrap-ansi": "10.0.2",

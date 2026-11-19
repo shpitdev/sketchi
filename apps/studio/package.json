@@ -18,21 +18,21 @@
 		"@sketchi/icon-draw": "workspace:*",
 		"@sketchi/observability": "workspace:*",
 		"@sketchi/ui": "workspace:*",
-		"@streamdown/cjk": "1.0.4",
-		"@streamdown/code": "2.0.0",
-		"@streamdown/math": "1.0.3",
+		"@streamdown/cjk": "1.0.5",
+		"@streamdown/code": "2.0.1",
+		"@streamdown/math": "1.0.4",
 		"katex": "0.19.1",
-		"lucide-react": "1.65.0",
-		"motion": "14.9.0",
+		"lucide-react": "1.74.0",
+		"motion": "14.14.0",
 		"nanoid": "6.0.2",
 		"partial-json": "0.1.7",
-		"streamdown": "2.7.1",
+		"streamdown": "2.8.0",
 		"use-stick-to-bottom": "1.1.6"
 	},
 	"devDependencies": {
 		"@sketchi/diagram-scenarios": "workspace:*",
-		"@tailwindcss/vite": "4.3.3",
-		"tailwindcss": "4.3.3"
+		"@tailwindcss/vite": "4.3.5",
+		"tailwindcss": "4.3.5"
 	},
 	"exports": {
 		"./styles.css": "./src/styles/app.css"
