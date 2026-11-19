@@ -26,7 +26,7 @@
 		"clipper-lib": "6.4.2",
 		"earcut": "3.2.4",
 		"effect": "catalog:",
-		"fast-xml-parser": "5.11.2",
+		"fast-xml-parser": "5.12.1",
 		"fractional-indexing": "4.0.0",
 		"svg-pathdata": "9.0.0"
 	},

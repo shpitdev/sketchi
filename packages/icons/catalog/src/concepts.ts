@@ -191,7 +191,7 @@ export const CONCEPT_ICONS: readonly ConceptIcon[] = [
 		slug: "warning",
 		name: "Warning",
 		aliases: ["error", "incident", "alert"],
-		lucide: "triangle-alert",
+		lucide: "triangle-exclamation-point",
 	},
 	{
 		slug: "success",
