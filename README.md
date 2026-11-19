@@ -14,7 +14,7 @@
   <a href="https://www.npmjs.com/package/sketchi"><img alt="npm version" src="https://img.shields.io/npm/v/sketchi?logo=npm&color=CB3837" /></a>
   <a href="https://nx.dev/"><img alt="Nx" src="https://img.shields.io/badge/Nx-24-143055?logo=nx" /></a>
   <a href="https://workers.cloudflare.com/"><img alt="Cloudflare Workers" src="https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white" /></a>
-  <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white" /></a>
+  <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white" /></a>
   <a href="https://excalidraw.com/"><img alt="Excalidraw" src="https://img.shields.io/badge/output-Excalidraw-6965DB" /></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2F855A" /></a>
 </p>
@@ -74,7 +74,7 @@ prompt ─▶ model candidate ─▶ typed diagram ─▶ deterministic layout �
 | `tools/scenarios`             | maintained scenarios and the scenario CLI                               |
 | `packages/editor-surface`     | reusable React drawing surface (Nx `editor-surface`)                    |
 | `packages/icons/*`            | the icon catalog and search, community icons, and hand-drawn logos      |
-| `packages/observability`      | span telemetry for every Worker request                                 |
+| `packages/observability`      | best-effort request span export for Studio and Icons                    |
 | `packages/ui`                 | shadcn primitives and tokens for the Tailwind apps                      |
 
 | App (`apps/`) | Nx project   | Serves                                                          |
