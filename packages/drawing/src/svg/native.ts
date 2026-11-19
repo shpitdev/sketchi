@@ -277,11 +277,3 @@ export function constructNativeTrace(
 		},
 	};
 }
-
-export function deterministicTraceJson(result: NativeTraceResult): string {
-	return JSON.stringify(result.elements);
-}
-
-export function deterministicTraceChecksum(result: NativeTraceResult): string {
-	return fnv1a32(deterministicTraceJson(result), "hex");
-}

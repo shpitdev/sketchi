@@ -6,9 +6,6 @@ export default defineConfig({
 	test: {
 		environment: "jsdom",
 		globals: true,
-		coverage: {
-			reportsDirectory: "../../coverage/apps/web",
-		},
 		include: ["apps/web/src/tests/**/*.test.ts"],
 	},
 });

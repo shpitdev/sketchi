@@ -60,7 +60,7 @@ const DrawIconResultSchema = Schema.Union([
 		retryAfterSeconds: Schema.optionalKey(Schema.Number),
 	}),
 ]);
-export const codeModeContracts = [
+const codeModeContracts = [
 	...families.slice(0, 1).map((family) => [family.operation, family.contracts] as const),
 	["editFlowchart", { input: EditFlowchartRequest, output: EditFlowchartResultSchema }],
 	...families.slice(1).map((family) => [family.operation, family.contracts] as const),
@@ -71,12 +71,6 @@ export const codeModeContracts = [
 	["drawIcon", { input: DrawIconRequestSchema, output: DrawIconResultSchema }],
 ] as const;
 export type CodeModeOperation = (typeof codeModeContracts)[number][0];
-export const CODE_MODE_OPERATIONS = codeModeContracts.map(([operation]) => operation);
-export function contractForOperation(operation: CodeModeOperation) {
-	const entry = codeModeContracts.find(([name]) => operation === name);
-	if (!entry) throw new Error(`Unknown operation: ${operation}`);
-	return entry[1];
-}
 
 /**
  * Package schemas that recur across operations. Each is declared once and referenced by name, so
@@ -141,7 +135,7 @@ function propertyName(name: string): string {
  * toCode callbacks. Its JSON bridge loses array mutability and spells nonfinite numbers
  * as strings. Replace this formatter after those family-owned declarations are retired.
  */
-export function jsonSchemaType(
+function jsonSchemaType(
 	value: unknown,
 	prefix: string,
 	shared: ReadonlyMap<string, string> = new Map(),

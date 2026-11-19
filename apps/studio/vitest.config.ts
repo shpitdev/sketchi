@@ -7,9 +7,6 @@ export default defineConfig({
 		server: { deps: { inline: ["@cloudflare/codemode"] } },
 		environment: "jsdom",
 		globals: true,
-		coverage: {
-			reportsDirectory: "../../coverage/apps/studio",
-		},
 		include: ["apps/studio/src/**/*.test.ts", "apps/studio/src/**/*.test.tsx"],
 		passWithNoTests: true,
 	},

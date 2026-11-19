@@ -49,7 +49,6 @@
 		},
 		"test": {
 			"executor": "nx:run-commands",
-			"outputs": ["{workspaceRoot}/coverage/apps/studio"],
 			"options": {
 				"command": "vitest run --config apps/studio/vitest.config.ts"
 			}

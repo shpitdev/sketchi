@@ -10,9 +10,5 @@ export default defineConfig({
 		environment: "node",
 		include: ["{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}"],
 		reporters: ["default"],
-		coverage: {
-			reportsDirectory: "../../coverage/packages/social-card",
-			provider: "v8",
-		},
 	},
 });

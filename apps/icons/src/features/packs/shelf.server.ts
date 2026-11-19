@@ -49,8 +49,6 @@ const runtime = ManagedRuntime.make(
 		}),
 	),
 );
-export const loadPackIndex = (origin: string) =>
-	runtime.runPromise(Effect.flatMap(PackIndex, (cache) => Cache.get(cache, origin)));
 export const loadPackShelf = (origin: string) =>
 	runtime.runPromise(
 		Effect.gen(function* () {

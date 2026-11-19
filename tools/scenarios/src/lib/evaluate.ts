@@ -23,7 +23,7 @@ import { parseVennDiagram, resolveVennShorthand } from "@sketchi/diagrams/famili
 import { parseWireframeDiagram } from "@sketchi/diagrams/families/wireframe/document";
 import { type CanonicalDiagram, type CanonicalValidationError } from "@sketchi/diagrams/family";
 import { lineCrossings, unavoidableCrossings } from "@sketchi/diagrams/graph/planarity";
-import { Result, Schema } from "effect";
+import { Result, type Schema } from "effect";
 
 import { renderDiagram } from "@sketchi/diagrams/family";
 
@@ -874,32 +874,6 @@ function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram)
 	return { checks, ownedNodes };
 }
 
-export function extractJsonCandidate(
-	output: string,
-): Result.Result<unknown, ScenarioCandidateParseError> {
-	const parse = (text: string) =>
-		Result.try({
-			try: (): unknown => JSON.parse(text),
-			catch: (cause) =>
-				ScenarioCandidateParseError.make({
-					cause,
-					message:
-						cause instanceof Error ? cause.message : "Model output did not contain a JSON object.",
-				}),
-		});
-	return Result.orElse(parse(output), () => {
-		const firstBrace = output.indexOf("{");
-		const lastBrace = output.lastIndexOf("}");
-		if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace)
-			return Result.fail(
-				ScenarioCandidateParseError.make({
-					message: "Model output did not contain a JSON object.",
-				}),
-			);
-		return parse(output.slice(firstBrace, lastBrace + 1));
-	});
-}
-
 function excalidrawCheck(scene: CanvasSpec) {
 	const excalidrawScene = convertSceneToExcalidraw(scene);
 	const excalidrawValidation = validateExcalidrawScene(excalidrawScene);
@@ -1357,15 +1331,6 @@ function flowchartCrossingCheck(diagram: FlowchartDiagram, scene: CanvasSpec) {
 	};
 }
 
-export function evaluateScenarioOutput(
-	scenario: DiagramScenario,
-	output: string,
-): Result.Result<ScenarioEvaluation, ScenarioEvaluationError | ScenarioCandidateParseError> {
-	return Result.flatMap(extractJsonCandidate(output), (candidate) =>
-		evaluateScenarioDiagram(scenario, candidate),
-	);
-}
-
 export function evaluateScenarioFixture(
 	scenario: DiagramScenario,
 ): Result.Result<ScenarioEvaluation, ScenarioEvaluationError | MindmapInputError> {
@@ -1373,10 +1338,3 @@ export function evaluateScenarioFixture(
 }
 
 export type ScenarioEvaluationError = CanonicalValidationError | Schema.SchemaError;
-export class ScenarioCandidateParseError extends Schema.TaggedError<
-	ScenarioCandidateParseError,
-	{ readonly brand: unique symbol }
->()("ScenarioCandidateParseError", {
-	message: Schema.String,
-	cause: Schema.optionalKey(Schema.Defect()),
-}) {}

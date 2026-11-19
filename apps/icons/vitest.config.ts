@@ -14,9 +14,6 @@ export default defineConfig({
 	test: {
 		environment: "jsdom",
 		globals: true,
-		coverage: {
-			reportsDirectory: "../../coverage/apps/icons",
-		},
 		include: ["apps/icons/tests/**/*.test.{ts,tsx}"],
 	},
 });

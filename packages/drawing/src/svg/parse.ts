@@ -1253,11 +1253,3 @@ export function parseSvg(source: string, options: SvgParseOptions = {}): SvgPars
 		return parseFailure(error instanceof Error ? error.message : "Unknown SVG parser error.");
 	}
 }
-
-export function deterministicDocumentJson(document: CanonicalSvgDocument): string {
-	return JSON.stringify(document);
-}
-
-export function deterministicDocumentChecksum(document: CanonicalSvgDocument): string {
-	return fnv1a32(deterministicDocumentJson(document), "hex");
-}

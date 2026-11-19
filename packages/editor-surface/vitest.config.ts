@@ -6,9 +6,6 @@ export default defineConfig({
 	test: {
 		environment: "jsdom",
 		globals: true,
-		coverage: {
-			reportsDirectory: new URL("../../coverage/packages/editor-surface", import.meta.url).pathname,
-		},
 		include: ["packages/editor-surface/src/tests/**/*.test.tsx"],
 		server: { deps: { inline: [/@excalidraw\/excalidraw/] } },
 		// Hang guard, not a speed budget: the full scenario suite renders every

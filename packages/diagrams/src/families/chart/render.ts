@@ -181,12 +181,6 @@ export function textOn(fill: string): string {
 	return contrast(background, luminance(INK)) >= contrast(background, 1) ? INK : "#ffffff";
 }
 
-/** Ink or white, whichever keeps the better worst contrast across several fills a text spans. */
-export function textOnFills(fills: readonly string[]): string {
-	const worst = (text: number) => Math.min(...fills.map((fill) => contrast(luminance(fill), text)));
-	return worst(luminance(INK)) >= worst(1) ? INK : "#ffffff";
-}
-
 /** Pies need one color per slice; seven slices skip violet, which sits too close to blue at the seam. */
 export function chartColors(count: number, ring: boolean): string[] {
 	const colors: string[] = [...CHART_SERIES_COLORS.slice(0, count)];

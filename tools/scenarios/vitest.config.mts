@@ -25,9 +25,5 @@ export default defineConfig(() => ({
 		// the deterministic pipeline, which took 5.3s on a loaded CI runner against 0.5s alone.
 		testTimeout: 60_000,
 		reporters: ["default"],
-		coverage: {
-			reportsDirectory: "../../coverage/tools/scenarios",
-			provider: "v8",
-		},
 	},
 }));

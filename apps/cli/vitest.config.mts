@@ -70,9 +70,5 @@ export default defineConfig(() => ({
 		// OS. Clipboard tests inject their own platform, session, and fake tools.
 		env: { SKETCHI_CLIPBOARD_COMMAND: "off", WAYLAND_DISPLAY: "", DISPLAY: "" },
 		reporters: ["default"],
-		coverage: {
-			reportsDirectory: "../../coverage/apps/cli",
-			provider: "v8" as const,
-		},
 	},
 }));

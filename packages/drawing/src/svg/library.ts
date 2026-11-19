@@ -1,5 +1,3 @@
-import { fnv1a32 } from "../hash";
-
 import { type ExcalidrawLibraryItemInput, type SerializeExcalidrawLibraryOptions } from "./types";
 
 const DEFAULT_LIBRARY_SOURCE = "https://sketchi.app";
@@ -33,8 +31,4 @@ export function serializeExcalidrawLibrary(
 		null,
 		2,
 	);
-}
-
-export function deterministicLibraryChecksum(serialized: string): string {
-	return fnv1a32(serialized, "hex", "utf16");
 }

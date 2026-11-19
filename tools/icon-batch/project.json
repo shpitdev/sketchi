@@ -15,7 +15,6 @@
 		"test": {
 			"executor": "nx:run-commands",
 			"dependsOn": ["^build"],
-			"outputs": ["{workspaceRoot}/coverage/tools/icon-batch"],
 			"options": {
 				"command": "vitest run --config tools/icon-batch/vitest.config.mts"
 			}

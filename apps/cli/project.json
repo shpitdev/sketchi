@@ -16,7 +16,6 @@
 		"test": {
 			"executor": "nx:run-commands",
 			"dependsOn": ["build"],
-			"outputs": ["{workspaceRoot}/coverage/apps/cli"],
 			"options": {
 				"command": "vitest run --config apps/cli/vitest.config.mts"
 			}

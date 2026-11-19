@@ -36,9 +36,5 @@ export default defineConfig(() => ({
 		setupFiles: ["./tests/setup-excalidraw.ts"],
 		include: ["tests/**/*.test.ts"],
 		reporters: ["default"],
-		coverage: {
-			reportsDirectory: "../../../coverage/packages/icons/draw",
-			provider: "v8" as const,
-		},
 	},
 }));

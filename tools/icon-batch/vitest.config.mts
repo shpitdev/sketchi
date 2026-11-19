@@ -24,9 +24,5 @@ export default defineConfig(() => ({
 		include: ["tests/**/*.test.ts"],
 		testTimeout: 60_000,
 		reporters: ["default"],
-		coverage: {
-			reportsDirectory: "../../coverage/tools/icon-batch",
-			provider: "v8" as const,
-		},
 	},
 }));

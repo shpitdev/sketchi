@@ -23,9 +23,6 @@ export default defineConfig({
 	test: {
 		environment: "jsdom",
 		globals: true,
-		coverage: {
-			reportsDirectory: "../../coverage/apps/editor",
-		},
 		include: ["apps/editor/src/tests/**/*.test.{ts,tsx}"],
 	},
 	resolve: {

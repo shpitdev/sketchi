@@ -282,9 +282,3 @@ export const generationReliabilityScenarios = [
 		assertions: { minDepth: 3, minTopicCount: 18 },
 	},
 ] as const satisfies readonly GenerationReliabilityScenario[];
-
-export function getGenerationReliabilityScenario(id: string): GenerationReliabilityScenario {
-	const scenario = generationReliabilityScenarios.find((candidate) => candidate.id === id);
-	if (!scenario) throw new Error(`Unknown reliability scenario "${id}".`);
-	return scenario;
-}

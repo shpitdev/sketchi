@@ -26,9 +26,5 @@ export default defineConfig(() => ({
 		include: ["src/svg/**/*.test.ts"],
 		exclude: ["src/svg/tests/native-corpus-renderer.test.ts"],
 		reporters: ["default"],
-		coverage: {
-			reportsDirectory: "../../coverage/packages/drawing/svg",
-			provider: "v8" as const,
-		},
 	},
 }));
