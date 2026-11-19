@@ -40,7 +40,8 @@ flowchart LR
 ## A run
 
 ```sh
-export CF_AIG_TOKEN="$(infisical secrets get CF_AIG_TOKEN --projectId bb3fe729-e290-4740-84d4-304752f0d719 --env prod --path / --plain --silent)"
+# Set CLOUDFLARE_ACCOUNT_ID for draw and INFISICAL_PROJECT_ID for the token lookup.
+export CF_AIG_TOKEN="$(infisical secrets get CF_AIG_TOKEN --projectId "${INFISICAL_PROJECT_ID:?required}" --env prod --path / --plain --silent)"
 pnpm nx draw icon-batch -- draw --run catalog              # every mark without a recipe
 pnpm nx draw icon-batch -- draw --run trial --sample 30    # a spread across collections
 pnpm nx draw icon-batch -- sheets --run catalog

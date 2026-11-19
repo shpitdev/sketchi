@@ -15,7 +15,7 @@ pnpm db --preview                       # PR previews
 pnpm db -c "FROM generations LIMIT 5"   # one query
 ```
 
-It needs a read-only `R2_DATA_READ_TOKEN`; when the variable is unset, `pnpm db` gets one from Infisical. Allow about a minute after a request ends for its rows to arrive. A failed send or lost isolate can leave no rows.
+Export `CLOUDFLARE_ACCOUNT_ID` and a read-only `R2_DATA_READ_TOKEN`. To load the token from Infisical instead, leave it unset and export `INFISICAL_PROJECT_ID`; the project's `prod` environment can also supply the account ID. Allow about a minute after a request ends for its rows to arrive. A failed send or lost isolate can leave no rows.
 
 ## Views
 

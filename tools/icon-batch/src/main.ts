@@ -15,7 +15,6 @@ import { getIconSourceFile, iconManifest, nodeLogoIcons } from "@sketchi/icon-ca
 import { iconAuthorModel, type IconAuthorModel } from "@sketchi/icon-draw";
 
 import { attemptCeilingUsd, drawMark, REVIEW_NOTE_MAX_BYTES, reviewNoteFits } from "./draw-mark";
-import { SKETCHI_ACCOUNT_ID } from "./gateway";
 import { promote } from "./promote";
 import { readRecipe, type SheetTheme, writeRecipeSheets } from "./recipe-sheets";
 import { BatchWriteError, runBatch } from "./runner";
@@ -105,7 +104,9 @@ async function writeLedger() {
 switch (command) {
 	case "draw": {
 		// @effect-diagnostics-next-line processEnv:off -- The Node command host reads the gateway credential from its invoking environment.
-		const token = process.env["CF_AIG_TOKEN"];
+		const { CF_AIG_TOKEN: token, CLOUDFLARE_ACCOUNT_ID } = process.env;
+		const accountId = CLOUDFLARE_ACCOUNT_ID?.trim();
+		if (!accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID is required.");
 		if (!token) throw new Error("Set CF_AIG_TOKEN to Sketchi's AI Gateway token.");
 		const marks = marksToDraw(nodeLogoIcons, recipeSlugs(), {
 			...(values.slugs ? { slugs: values.slugs.split(",").map((slug) => slug.trim()) } : {}),
@@ -113,7 +114,7 @@ switch (command) {
 		});
 		const notes = reviewNotes(values.notes);
 		await mkdir(store.root, { recursive: true });
-		const access = { accountId: SKETCHI_ACCOUNT_ID, token };
+		const access = { accountId, token };
 		const runId = values.run;
 		const outcome = await runBatch({
 			marks,

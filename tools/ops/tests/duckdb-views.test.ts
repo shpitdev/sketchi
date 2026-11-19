@@ -1,25 +1,22 @@
 // The checked-in DuckDB init and views, run by the real DuckDB CLI on local rows and a local
 // Iceberg REST catalog.
 import { execFile, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { expect, test } from "vitest";
 
-import { duckdbCommand, INIT_SQL, VIEWS_SQL } from "../src/telemetry/db";
+import { duckdbCommand, VIEWS_SQL } from "../src/telemetry/db";
 
-const init = readFileSync(INIT_SQL, "utf8");
 const views = readFileSync(VIEWS_SQL, "utf8");
 const duckdb = spawnSync("duckdb", ["--version"], { encoding: "utf8" });
 const pinnedDuckdb = readFileSync(new URL("../../../mise.toml", import.meta.url), "utf8").match(
 	/^duckdb = "([\d.]+)"$/m,
 )?.[1];
 const CATALOG_HOST = "https://catalog.cloudflarestorage.com";
-const ACCOUNT = "75f9660f39e4dafe8b95980b87e7399a";
+const ACCOUNT = "test-account";
 const SPAN_COLUMNS = [
 	...["schema", "trace_id", "span_id", "parent_span_id", "name", "kind", "service"],
 	...["environment", "service_version", "start_time", "end_time", "duration_ms", "outcome"],
@@ -105,18 +102,13 @@ test.skipIf(duckdb.status !== 0).each(["preview", "production"] as const)(
 			new RegExp(`^v${pinnedDuckdb} `),
 		);
 		const catalog = await emptySpanCatalog();
-		const directory = mkdtempSync(join(tmpdir(), "sketchi-duckdb-init-"));
 		try {
-			const localInit = join(directory, "duckdb-init.sql");
-			writeFileSync(localInit, init.replaceAll(CATALOG_HOST, catalog.endpoint));
 			const sql = "SELECT getvariable('telemetry_env') AS env, (FROM spans SELECT count(*)) AS n";
 			const flags = environment === "preview" ? ["--preview"] : [];
-			const command = duckdbCommand([...flags, "-noheader", "-list", "-c", sql], true);
+			const command = duckdbCommand([...flags, "-noheader", "-list", "-c", sql], ACCOUNT);
 			const { stdout } = await promisify(execFile)(
 				command.command,
-				command.args.map((arg) =>
-					arg === INIT_SQL ? localInit : arg.replaceAll(CATALOG_HOST, catalog.endpoint),
-				),
+				command.args.map((arg) => arg.replaceAll(CATALOG_HOST, catalog.endpoint)),
 				{ env: { ...process.env, ...command.env, R2_DATA_READ_TOKEN: "test-token", AI_AGENT: "" } },
 			);
 			expect(stdout.trim().split("\n").at(-1)).toBe(`${environment}|0`);
@@ -145,7 +137,6 @@ test.skipIf(duckdb.status !== 0).each(["preview", "production"] as const)(
 			).toBe(true);
 		} finally {
 			await catalog.close();
-			rmSync(directory, { force: true, recursive: true });
 		}
 	},
 );

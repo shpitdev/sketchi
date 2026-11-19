@@ -12,8 +12,6 @@ import {
 	HttpClientResponse,
 } from "effect/http";
 
-/** Sketchi's Cloudflare account, whose AI Gateway stores the provider keys Studio uses. */
-export const SKETCHI_ACCOUNT_ID = "75f9660f39e4dafe8b95980b87e7399a";
 /** Studio's gateway (`SKETCHI_AI_GATEWAY_ID`). */
 export const SKETCHI_GATEWAY_ID = "google-ai-studio";
 
