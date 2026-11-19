@@ -46,15 +46,17 @@ Keep family tests beside the source in `tests/`: at most `<name>.test.ts`, `<nam
 ## Proof
 
 - Before pushing: `pnpm ci:local --no-signoff`. After opening the PR: `pnpm ci:local` from the clean, pushed head to post `local-ci`. Signoff requires the `origin/main` base commit. Logs: `.memory/ci-local/`.
-- Restacks and retargets carry `local-ci` only for an unchanged patch. A changed patch needs fresh relevant proof and a full gate before signoff. PR CI typechecks the affected head, not a trial merge.
+- Restacks and retargets carry `local-ci` only for an unchanged patch. A changed patch needs fresh relevant proof and a full gate before signoff.
+- Skip duplicate runtime gates for docs-only or unchanged patches. Keep heavy and timing-sensitive suites local; PR CI typechecks the affected head.
 - For layout, drawing or graph changes, retain artifact identity, affected fuzz results and timing. The `*-fuzz` targets on `diagrams` are the full local suites; list them with `pnpm nx show project diagrams`.
-- Run `pnpm nx run drawing:corpus-renderer` when its inputs change; use `pnpm run test:wrangler-dry-runs` after affected app builds.
+- Declare external fixtures and environment inputs on the target. Do not clear or relocate the shared Nx cache for routine gates.
+- Run `pnpm nx run drawing:corpus-renderer` when its inputs change. Build all four Workers before `pnpm run test:wrangler-dry-runs`.
 - Verify rendering at the product entrypoint. For UI changes use headless `agent-browser` on the PR preview or production; never open a visible browser. See [Worker previews](docs/preview-deploys.md) for routing and rendering proof.
 
 ## Deploy and release triggers
 
 - A push to `main` deploys Worker apps whose build inputs it reaches, without approval. Root Markdown and `docs/` alone do not trigger a production deploy.
-- On `main`, `.changeset/` changes run `changesets.yml`, which merges the Version Packages PR and dispatches `release.yml`.
+- On `main`, `.changeset/` changes run `changesets.yml`, which merges and dispatches `release.yml` only if there is a Version Packages PR.
 - Changing `apps/cli/package.json` on `main` triggers `release.yml` directly. It submits `npm publish` only for an untagged, unpublished CLI version; npm may require 2FA approval.
 
 Keep temporary notes, logs and screenshots in `.memory/`. Git ignores it; `.ignore` keeps notes searchable.
